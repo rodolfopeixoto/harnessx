@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# HarnessX pre-push gate.
+#
+# Blocks `git push` until `make ci` (vet + race tests + build + every phase
+# e2e) is green. GitHub Actions is not used in this repo — local CI is the
+# contract.
+#
+# Bypass for emergencies: `git push --no-verify` (logged to .harness/logs).
+# Don't make it a habit; the pre-commit equivalent should catch any churn.
+set -euo pipefail
+
+unset GOROOT || true
+
+if [[ "${HARNESS_SKIP_CI:-}" == "1" ]]; then
+  echo "→ HARNESS_SKIP_CI=1 — skipping local ci (do not push to main/develop without it)"
+  exit 0
+fi
+
+cd "$(git rev-parse --show-toplevel)"
+
+remote="${1:-origin}"
+url="${2:-unknown}"
+echo "→ pre-push to $remote ($url): running 'make ci'"
+echo "  set HARNESS_SKIP_CI=1 to bypass (only for emergency hotfixes)"
+echo
+
+if ! make ci; then
+  echo
+  echo "✗ pre-push gate failed — push aborted"
+  exit 1
+fi
+
+echo
+echo "✓ pre-push gate green"

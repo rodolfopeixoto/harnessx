@@ -1,0 +1,40 @@
+id: fake
+name: Fake CLI
+enabled: true
+type: cli
+
+command:
+  binary: fake-cli
+  check: fake-cli --version
+
+capabilities:
+  text: true
+  files: true
+  json_output: true
+  max_context_tokens: 100000
+
+strengths: [test_fixture]
+
+models:
+  default: fake-default
+
+execution:
+  prompt_mode: stdin
+  timeout_seconds: 10
+
+run:
+  args: ["run", "--model", "{{model}}"]
+
+output:
+  format: jsonl
+  final_message_json_path: "$.message"
+  usage_json_path: "$.usage"
+
+failure_detection:
+  rate_limit: ["rate limit"]
+  auth: ["unauthorized"]
+
+cost:
+  mode: estimated
+  input_token_price_per_1m: 0.0
+  output_token_price_per_1m: 0.0

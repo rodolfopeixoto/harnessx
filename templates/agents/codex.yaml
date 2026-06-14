@@ -1,0 +1,52 @@
+id: codex
+name: Codex
+enabled: true
+type: cli
+
+command:
+  binary: codex
+  check: codex --version
+
+capabilities:
+  text: true
+  vision: false
+  files: true
+  folders: true
+  diff: true
+  json_output: true
+  stream_output: true
+  tool_use: true
+  mcp: false
+  max_context_tokens: 128000
+
+strengths: [implementation, tests, rails_api]
+
+models:
+  default: gpt-5-codex
+  cheap: gpt-5-mini
+  deep: gpt-5
+
+execution:
+  prompt_mode: stdin
+  working_directory: project
+  timeout_seconds: 1800
+  max_retries: 1
+
+run:
+  args: ["exec", "--json"]
+
+output:
+  format: jsonl
+  final_message_json_path: "$.message"
+  usage_json_path: "$.usage"
+
+failure_detection:
+  rate_limit: ["rate limit", "429"]
+  context_limit: ["context length", "max tokens"]
+  auth: ["unauthorized", "invalid api key"]
+  transient: ["timeout", "temporarily unavailable"]
+
+cost:
+  mode: estimated
+  input_token_price_per_1m: 2.5
+  output_token_price_per_1m: 10.0

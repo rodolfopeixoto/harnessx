@@ -1,0 +1,47 @@
+id: kimi
+name: Kimi
+enabled: true
+type: cli
+
+command:
+  binary: kimi
+  check: kimi --version
+
+capabilities:
+  text: true
+  vision: false
+  files: true
+  folders: true
+  diff: true
+  json_output: false
+  stream_output: true
+  tool_use: false
+  mcp: false
+  max_context_tokens: 256000
+
+strengths: [codebase_exploration, dependency_audit, cheap_review]
+
+models:
+  default: kimi-k2
+
+execution:
+  prompt_mode: stdin
+  working_directory: project
+  timeout_seconds: 900
+  max_retries: 1
+
+run:
+  args: ["chat"]
+
+output:
+  format: text
+
+failure_detection:
+  rate_limit: ["rate limit", "too many requests"]
+  auth: ["unauthorized", "invalid token"]
+  context_limit: ["context exceeded"]
+
+cost:
+  mode: estimated
+  input_token_price_per_1m: 0.6
+  output_token_price_per_1m: 2.5

@@ -1,0 +1,113 @@
+version: "2"
+
+run:
+  timeout: 5m
+  tests: true
+
+linters:
+  default: none
+  enable:
+    - errcheck
+    - govet
+    - staticcheck
+    - ineffassign
+    - unused
+    - misspell
+    - revive
+    - nolintlint
+    - gocyclo
+    - gocognit
+    - gosec
+    - unconvert
+    - gocritic
+    - dupl
+
+  settings:
+    gocyclo:
+      min-complexity: 15
+    gocognit:
+      min-complexity: 25
+    dupl:
+      threshold: 180
+    revive:
+      rules:
+        - name: blank-imports
+        - name: context-as-argument
+        - name: error-return
+        - name: error-strings
+        - name: error-naming
+        - name: increment-decrement
+        - name: var-naming
+        - name: indent-error-flow
+        - name: receiver-naming
+        - name: unreachable-code
+    errcheck:
+      check-blank: false
+      check-type-assertions: false
+      exclude-functions:
+        - (io.Closer).Close
+        - (*os.File).Close
+        - (*database/sql.Rows).Close
+        - (*database/sql.DB).Close
+        - (io.Writer).Write
+        - (net/http.ResponseWriter).Write
+        - fmt.Fprint
+        - fmt.Fprintf
+        - fmt.Fprintln
+        - encoding/json.NewEncoder.Encode
+        - (*github.com/ropeixoto/harnessx/internal/adapters/sqlite.Repo).Close
+        - (*github.com/ropeixoto/harnessx/internal/adapters/logger.JSONL).Close
+        - (*archive/zip.ReadCloser).Close
+        - os.Remove
+        - os.RemoveAll
+    gosec:
+      excludes:
+        - G104
+        - G115
+        - G118
+        - G122
+        - G204
+        - G301
+        - G302
+        - G304
+        - G306
+        - G307
+        - G705
+    godot:
+      scope: declarations
+      capital: true
+    nolintlint:
+      allow-unused: false
+      require-explanation: false
+      require-specific: true
+
+  exclusions:
+    rules:
+      - path: _test\.go$
+        linters: [errcheck, gosec, dupl, gocyclo, gocognit, unparam, godot, revive]
+      - path: cmd/harness/cmd_.*\.go$
+        linters: [dupl]
+      - path: internal/adapters/lsp/.*\.go$
+        linters: [gocyclo, gocognit, dupl]
+      - path: internal/optimize/.*\.go$
+        linters: [gocyclo, gocognit]
+      - path: internal/sensors/.*\.go$
+        linters: [gocyclo, gocognit]
+      - path: internal/index/.*\.go$
+        linters: [gocyclo, gocognit]
+      - path: internal/design/.*\.go$
+        linters: [gocyclo, gocognit]
+      - path: internal/context/.*\.go$
+        linters: [gocyclo, gocognit]
+      - path: internal/agents/.*\.go$
+        linters: [gocyclo, gocognit]
+      - path: internal/app/.*\.go$
+        linters: [gocyclo, gocognit]
+
+formatters:
+  enable:
+    - gofmt
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0

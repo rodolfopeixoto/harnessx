@@ -1,0 +1,37 @@
+name: Question / discussion
+description: How do I…? Why does HarnessX…?
+title: "[question] <short description>"
+labels: ["question", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For general usage questions please check `docs/` first. Questions
+        that surface a documentation gap are valuable — say so and a
+        maintainer will turn the answer into a doc PR.
+
+  - type: textarea
+    id: question
+    attributes:
+      label: What are you trying to do?
+    validations:
+      required: true
+
+  - type: textarea
+    id: tried
+    attributes:
+      label: What have you tried already?
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: docs
+    attributes:
+      label: Sources consulted
+      options:
+        - label: README
+        - label: docs/cli-reference.md
+        - label: docs/architecture.md
+        - label: HARNESSX-MASTER-PLAN.md
+        - label: existing issues
+          required: true

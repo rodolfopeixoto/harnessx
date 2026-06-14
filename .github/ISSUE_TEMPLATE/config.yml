@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security disclosure
+    url: https://github.com/ropeixoto/harnessx/security/advisories/new
+    about: Report security issues privately via GitHub Security Advisories.
+  - name: Discussions
+    url: https://github.com/ropeixoto/harnessx/discussions
+    about: Open-ended ideas, architecture chats, RFCs.
