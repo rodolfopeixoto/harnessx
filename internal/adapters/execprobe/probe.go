@@ -5,7 +5,9 @@ package execprobe
 import (
 	"context"
 	"errors"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -32,9 +34,27 @@ func Default() *Probe {
 	return &Probe{
 		Lookup: exec.LookPath,
 		Runner: func(ctx context.Context, name string, args ...string) ([]byte, error) {
-			return exec.CommandContext(ctx, name, args...).Output()
+			cmd := exec.CommandContext(ctx, name, args...)
+			if isGoFamilyBinary(name) {
+				cmd.Env = withoutGOROOT(os.Environ())
+			}
+			return cmd.Output()
 		},
 	}
+}
+
+func isGoFamilyBinary(name string) bool {
+	return strings.HasPrefix(filepath.Base(name), "go")
+}
+
+func withoutGOROOT(env []string) []string {
+	out := env[:0]
+	for _, e := range env {
+		if !strings.HasPrefix(e, "GOROOT=") {
+			out = append(out, e)
+		}
+	}
+	return out
 }
 
 func (p *Probe) Run(parent context.Context, binary string, versionArgs []string, timeout time.Duration) Result {

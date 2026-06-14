@@ -3,6 +3,8 @@ package execprobe
 import (
 	"context"
 	"errors"
+	"os"
+	"os/exec"
 	"testing"
 	"time"
 
@@ -38,4 +40,20 @@ func TestProbe_PresentWithVersion(t *testing.T) {
 	r := p.Run(context.Background(), "x", []string{"--version"}, time.Second)
 	require.True(t, r.Present)
 	require.Equal(t, "x version 1.2.3", r.Version)
+}
+
+func TestDefaultProbe_GoVersionIgnoresInheritedGOROOT(t *testing.T) {
+	goBin := "/usr/local/bin/go"
+	if _, err := os.Stat(goBin); err != nil {
+		var lookErr error
+		goBin, lookErr = exec.LookPath("go")
+		require.NoError(t, lookErr)
+	}
+
+	t.Setenv("GOROOT", "/nonexistent")
+	r := Default().Run(context.Background(), goBin, []string{"version"}, 5*time.Second)
+
+	require.True(t, r.Present)
+	require.NoError(t, r.Err)
+	require.Contains(t, r.Version, "go version")
 }
