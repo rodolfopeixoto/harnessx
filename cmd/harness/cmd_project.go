@@ -3,10 +3,15 @@
 package main
 
 import (
+	"fmt"
+
 	"github.com/spf13/cobra"
 
+	"github.com/ropeixoto/harnessx/internal/app/importwizcmd"
 	"github.com/ropeixoto/harnessx/internal/app/indexcmd"
 	"github.com/ropeixoto/harnessx/internal/app/projectcmd"
+	"github.com/ropeixoto/harnessx/internal/importwiz"
+	"github.com/ropeixoto/harnessx/internal/stale"
 )
 
 func newProjectCmd() *cobra.Command {
@@ -159,5 +164,50 @@ func newProjectWorkspaceCmds() []*cobra.Command {
 	}
 	forget.Flags().StringVar(&registry, "registry", "", "registry SQLite path")
 
-	return []*cobra.Command{add, list, switchCmd, current, archive, unarchive, scan, forget}
+	importC := &cobra.Command{
+		Use:   "import [path]",
+		Short: "Wizard: register a project, fingerprint stale files, suggest next step",
+		Args:  cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			path := ""
+			if len(args) == 1 {
+				path = args[0]
+			}
+			name, _ := cmd.Flags().GetString("name")
+			slug, _ := cmd.Flags().GetString("slug")
+			yes, _ := cmd.Flags().GetBool("yes")
+			opts.RegistryPath = registry
+			return importwizcmd.Run(cmd.Context(), importwiz.Options{Path: path, DisplayName: name, Slug: slug, Confirm: yes}, opts.RegistryPath, cmd.OutOrStdout())
+		},
+	}
+	importC.Flags().String("name", "", "display name (defaults to folder basename)")
+	importC.Flags().String("slug", "", "registry slug")
+	importC.Flags().Bool("yes", false, "skip the interactive review (wizard CLI is non-interactive)")
+	importC.Flags().StringVar(&registry, "registry", "", "registry SQLite path")
+
+	staleC := &cobra.Command{
+		Use:   "stale [path]",
+		Short: "Detect tracked files that changed since the last fingerprint",
+		Args:  cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			root, err := rootFromArgs(args)
+			if err != nil {
+				return err
+			}
+			entries, err := stale.Detect(root)
+			if err != nil {
+				return err
+			}
+			if len(entries) == 0 {
+				fmt.Fprintln(cmd.OutOrStdout(), "no stale files")
+				return nil
+			}
+			for _, e := range entries {
+				fmt.Fprintf(cmd.OutOrStdout(), "%-12s %s\t%s\n", e.Kind, e.Path, e.Reason)
+			}
+			return nil
+		},
+	}
+
+	return []*cobra.Command{add, list, switchCmd, current, archive, unarchive, scan, forget, importC, staleC}
 }
