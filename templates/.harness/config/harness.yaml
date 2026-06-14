@@ -1,0 +1,23 @@
+# HarnessX project configuration. Created by `harness init`.
+# See docs/configuration.md for the full schema.
+
+version: 1
+
+project:
+  name: "{{.ProjectName}}"
+  root: "{{.ProjectRoot}}"
+
+# Phase 1: only the database path is honoured. Other sections are reserved
+# for later phases (Phase 3 agents, Phase 4 sensors, Phase 5 context).
+database:
+  path: .harness/db/harness.sqlite
+
+logging:
+  path: .harness/logs/events.jsonl
+  rotate_max_bytes: 10485760  # 10 MiB
+
+# Reserved — Phase 3+
+agents: {}
+routes: {}
+sensors: {}
+context: {}

@@ -1,0 +1,15 @@
+/bin/
+/dist/
+*.test
+*.out
+coverage.*
+.DS_Store
+.idea/
+.vscode/
+node_modules/
+web/dashboard/dist/
+web/dashboard/coverage/
+.harness/db/
+.harness/logs/
+.harness/cache/
+.harness/artifacts/

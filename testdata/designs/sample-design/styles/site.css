@@ -1,0 +1,5 @@
+:root { --font-sans: Inter, sans-serif; }
+body { background: #ffffff; color: #7C3AED; padding: 16px; font-family: var(--font-sans); }
+.UiButton { padding: 8px 16px; background: #7C3AED; color: #ffffff; }
+.UiCard { padding: 24px; background: #f5f3ff; }
+@media (max-width: 640px) { body { padding: 8px; } }
