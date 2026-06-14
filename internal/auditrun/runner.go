@@ -16,10 +16,12 @@ import (
 
 	"github.com/ropeixoto/harnessx/internal/platform/constants"
 	"github.com/ropeixoto/harnessx/internal/runtime/containers"
+	"github.com/ropeixoto/harnessx/internal/workspace"
 )
 
 type Options struct {
 	RepoRoot          string
+	ProjectSlug       string
 	BaseURL           string
 	Timestamp         string
 	Keep              bool
@@ -69,7 +71,7 @@ func New(opts Options) *Runner {
 }
 
 func (r *Runner) Layout() Paths {
-	base := filepath.Join(r.opts.RepoRoot, constants.AuditRootDir, r.opts.Timestamp)
+	base := filepath.Join(r.opts.RepoRoot, constants.AuditRootDir, r.projectSlug(), r.opts.Timestamp)
 	return Paths{
 		Base:                 base,
 		JSON:                 filepath.Join(base, "json"),
@@ -79,6 +81,18 @@ func (r *Runner) Layout() Paths {
 		Diff:                 filepath.Join(base, "diff"),
 		RunLog:               filepath.Join(base, constants.AuditRunLogFile),
 	}
+}
+
+func (r *Runner) projectSlug() string {
+	if r.opts.ProjectSlug != "" {
+		return r.opts.ProjectSlug
+	}
+	base := filepath.Base(r.opts.RepoRoot)
+	slug := workspace.Slugify(base)
+	if slug == "" {
+		return constants.SlugFallbackName
+	}
+	return slug
 }
 
 type Paths struct {
