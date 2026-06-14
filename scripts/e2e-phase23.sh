@@ -6,6 +6,7 @@ make build > /dev/null
 BIN="$(pwd)/bin/harness"
 
 export AUDIT_PLAYWRIGHT_SKIP=1
+export AUDIT_BUNDLE=0
 export AUDIT_BASE_URL="http://127.0.0.1:7373"
 
 PROJ="$(mktemp -d)"
@@ -17,9 +18,11 @@ mkdir -p tmp
 
 grep -q "Audit finished" "$PROJ/out.txt" || { echo "✗ summary missing"; cat "$PROJ/out.txt"; exit 1; }
 
-ts_dir="$(ls -1 tmp/app-audit | head -1)"
-[ -n "$ts_dir" ] || { echo "✗ no run dir"; ls tmp/app-audit; exit 1; }
-ROOT="tmp/app-audit/$ts_dir"
+proj_dir="$(ls -1 tmp/app-audit | head -1)"
+[ -n "$proj_dir" ] || { echo "✗ no project dir"; ls tmp/app-audit; exit 1; }
+ts_dir="$(ls -1 tmp/app-audit/$proj_dir | head -1)"
+[ -n "$ts_dir" ] || { echo "✗ no run dir"; ls tmp/app-audit/$proj_dir; exit 1; }
+ROOT="tmp/app-audit/$proj_dir/$ts_dir"
 
 for f in json/feature-map.json json/results.json json/summary.json json/visual-diff.json json/layout-metrics.json json/network-errors.json json/console-errors.json json/missing-selectors.json report/audit.html report/fix-backlog.md run.log; do
   [ -f "$ROOT/$f" ] || { echo "✗ missing artifact: $f"; ls -la "$ROOT"; exit 1; }

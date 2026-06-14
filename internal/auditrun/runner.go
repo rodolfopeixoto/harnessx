@@ -34,6 +34,8 @@ type Options struct {
 	PreviousReport    string
 	Out               io.Writer
 	PlaywrightSkip    bool
+	BundleDisabled    bool
+	SkipCLIFlows      bool
 	DashboardLauncher func(ctx context.Context, addr string) (cleanup func(), err error)
 }
 
@@ -52,6 +54,7 @@ func DefaultOptionsFromEnv(repoRoot string) Options {
 		ReferencePath:  os.Getenv(constants.EnvAuditReference),
 		PreviousReport: os.Getenv(constants.EnvAuditPrevReport),
 		PlaywrightSkip: os.Getenv(constants.EnvAuditPlaywrightSkip) == "1",
+		BundleDisabled: os.Getenv(constants.EnvAuditBundle) == "0",
 	}
 	return opts
 }
@@ -132,6 +135,7 @@ func (r *Runner) Run(ctx context.Context) (Summary, error) {
 	if err := r.persistResults(paths, results); err != nil {
 		return Summary{}, err
 	}
+	r.captureSideArtifacts(ctx, paths, logf)
 	summary := Aggregate(results, features)
 	summary.BaseURL = r.opts.BaseURL
 	if err := WriteJSONFile(filepath.Join(paths.JSON, constants.AuditSummaryFile), summary); err != nil {
@@ -140,8 +144,64 @@ func (r *Runner) Run(ctx context.Context) (Summary, error) {
 	if err := r.renderReports(ctx, paths, summary, features, results, logf); err != nil {
 		return Summary{}, err
 	}
+	if !r.opts.BundleDisabled {
+		r.writeBundle(paths, logf)
+	}
 	logf("audit finished base=%s pass_rate=%.2f", r.opts.BaseURL, summary.PassRate)
 	return summary, nil
+}
+
+func (r *Runner) captureSideArtifacts(ctx context.Context, paths Paths, logf logger) {
+	if !r.opts.SkipCLIFlows {
+		r.captureCLIFlows(ctx, paths, logf)
+	}
+	inv := BuildInventory(r.opts.RepoRoot)
+	if err := WriteJSONFile(filepath.Join(paths.JSON, constants.AuditInventoryFile), inv); err != nil {
+		logf("inventory write failed: %v", err)
+		return
+	}
+	logf("inventory: go=%d (tests %d), tsx=%d (tests %d), shell=%d (e2e %d), specs=%d",
+		inv.GoFiles, inv.GoTestFiles, inv.TSXFiles, inv.TSXTestFiles, inv.ShellScripts, inv.E2EScripts, inv.SpecFiles)
+}
+
+func (r *Runner) captureCLIFlows(ctx context.Context, paths Paths, logf logger) {
+	binary, err := os.Executable()
+	if err != nil {
+		logf("cli executable lookup failed: %v", err)
+		return
+	}
+	if !looksLikeHarnessBinary(binary) {
+		logf("cli flow capture skipped: %s is not a harness binary", binary)
+		return
+	}
+	tmpRoot, cleanup, err := PrepareCLITmpRoot()
+	if err != nil {
+		logf("cli flow tmp root failed: %v", err)
+		return
+	}
+	defer cleanup()
+	report := RunCLIFlows(ctx, binary, tmpRoot, DefaultCLIFlows())
+	if err := WriteJSONFile(filepath.Join(paths.JSON, constants.AuditCLIFlowsFile), report); err != nil {
+		logf("cli flow write failed: %v", err)
+		return
+	}
+	logf("captured %d cli flows", len(report.Flows))
+}
+
+func looksLikeHarnessBinary(path string) bool {
+	base := filepath.Base(path)
+	return base == "harness" || strings.HasPrefix(base, "harness")
+}
+
+func (r *Runner) writeBundle(paths Paths, logf logger) {
+	target := filepath.Join(paths.ReportDir, constants.AuditBundleFile)
+	size, err := WriteBundle(paths.Base, target)
+	if err != nil {
+		logf("bundle write failed: %v", err)
+		return
+	}
+	logf("wrote bundle %s (%d bytes)", target, size)
+	fmt.Fprintf(r.opts.Out, "Bundle: %s\n", target)
 }
 
 type logger func(format string, a ...any)
@@ -181,7 +241,11 @@ func (r *Runner) collectResults(ctx context.Context, paths Paths, features []Fea
 	}
 	runResults, runErr := r.runPlaywright(ctx, paths)
 	if runErr != nil {
-		logf("playwright run failed: %v", runErr)
+		logf("playwright run errored: %v", runErr)
+		if partial, readErr := ReadResults(filepath.Join(paths.JSON, constants.AuditResultsFile)); readErr == nil && len(partial.Results) > 0 {
+			logf("recovered %d partial results from playwright", len(partial.Results))
+			return partial.Results
+		}
 		return synthesiseSkipped(features, viewports, runErr.Error())
 	}
 	return runResults

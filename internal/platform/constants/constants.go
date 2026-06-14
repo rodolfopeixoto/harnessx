@@ -119,6 +119,15 @@ const (
 	EnvAuditReference      = "AUDIT_REFERENCE_PATH"
 	EnvAuditPrevReport     = "AUDIT_PREVIOUS_REPORT"
 	EnvAuditPlaywrightSkip = "AUDIT_PLAYWRIGHT_SKIP"
+	EnvAuditBundle         = "AUDIT_BUNDLE"
+)
+
+const (
+	AuditBundleFile    = "audit-bundle.zip"
+	AuditBundleIndex   = "BUNDLE_INDEX.md"
+	AuditCLIFlowsFile  = "cli-flows.json"
+	AuditInventoryFile = "inventory.json"
+	AuditDesignRefFile = "design-reference.json"
 )
 
 const (
