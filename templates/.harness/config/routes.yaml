@@ -1,0 +1,56 @@
+# HarnessX route configuration.
+#
+# Each entry maps a task type to a chain of agent adapter ids. The first
+# agent in the chain is the primary pick; subsequent ids are tried on
+# recoverable failures (rate_limit, context_limit, transient, timeout).
+# Auth and permanent failures stop the chain immediately.
+#
+# Agent ids must match `harness agent list` output. Unknown ids are
+# silently dropped — the chain stays useful as long as at least one
+# registered agent remains.
+
+routes:
+  prompt_refinement:
+    primary: gemini
+    fallback: [kimi, claude, fake]
+    budget_usd: 0.05
+
+  planning:
+    primary: claude
+    fallback: [kimi, gemini, fake]
+    budget_usd: 0.30
+
+  codebase_exploration:
+    primary: kimi
+    fallback: [claude, gemini, fake]
+    budget_usd: 0.25
+
+  implementation:
+    primary: codex
+    fallback: [claude, gemini, kimi, fake]
+    budget_usd: 1.00
+
+  design_to_product:
+    primary: claude
+    fallback: [codex, kimi, gemini, fake]
+    budget_usd: 2.00
+
+  resource_optimization:
+    primary: claude
+    fallback: [codex, kimi, gemini, fake]
+    budget_usd: 1.50
+
+  dependency_audit:
+    primary: kimi
+    fallback: [claude, gemini, fake]
+    budget_usd: 0.50
+
+  security_review:
+    primary: claude
+    fallback: [kimi, codex, fake]
+    budget_usd: 0.50
+
+  cheap_review:
+    primary: gemini
+    fallback: [kimi, codex, fake]
+    budget_usd: 0.10

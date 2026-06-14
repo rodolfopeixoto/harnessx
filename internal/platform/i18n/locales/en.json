@@ -1,0 +1,41 @@
+{
+  "common.error":           "error",
+  "common.warning":         "warning",
+  "common.info":            "info",
+  "common.skipped":         "skipped",
+  "common.passed":          "passed",
+  "common.failed":          "failed",
+  "common.yes":             "yes",
+  "common.no":              "no",
+  "common.none":            "(none)",
+
+  "doctor.title":           "HarnessX Doctor",
+  "doctor.section.tools":   "Tools",
+  "doctor.section.agents":  "Agents",
+  "doctor.section.project": "Project",
+  "doctor.harness_ready":   "✓ ready",
+  "doctor.harness_missing": "not initialised (run `harness init`)",
+
+  "init.summary":           "harness: initialised",
+  "init.already":           "harness: already initialised at",
+
+  "plan.confirm":           "Approve plan? [y/N] ",
+  "plan.not_approved":      "Plan not approved. Re-run with --yes to execute autonomously.",
+  "plan.requires_confirm":  "Plan requires confirmation. Re-run with --yes to execute autonomously.",
+
+  "memory.empty":           "(no memories yet)",
+  "memory.promoted":        "promoted memory",
+
+  "sensor.summary":         "summary",
+
+  "execute.no_agents":      "Execute: no agent adapters registered; skipping",
+  "execute.no_route":       "Execute: router failed; skipping",
+  "execute.success":        "agent succeeded",
+  "execute.failed":         "agent chain failed",
+
+  "dashboard.serving":      "harness: dashboard serving on",
+  "dashboard.serving_react": "serving React build from",
+  "dashboard.serving_builtin": "serving built-in HTML (run `make dashboard-build` for React UI)",
+
+  "completion.shell_help":  "Output a shell-specific completion script."
+}

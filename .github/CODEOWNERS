@@ -1,0 +1,16 @@
+# Default reviewers — every PR pings the maintainers list automatically.
+# Add yourself here when you take ownership of a module so reviews route
+# to the right person without manual @-mentions.
+
+*                       @ropeixoto
+
+# Subsystem owners (extend as the project grows)
+/internal/agents/       @ropeixoto
+/internal/sensors/      @ropeixoto
+/internal/router/       @ropeixoto
+/internal/design/       @ropeixoto
+/internal/optimize/     @ropeixoto
+/internal/adapters/lsp/ @ropeixoto
+/web/dashboard/         @ropeixoto
+/docs/                  @ropeixoto
+/.github/               @ropeixoto

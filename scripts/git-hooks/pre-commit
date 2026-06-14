@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# Lightweight pre-commit gate — runs `make vet` + `gofmt` against staged
+# Go files so common breakage is caught before the heavier pre-push hook
+# fires. Keep this fast (sub-3-seconds) so it doesn't disrupt commit flow.
+set -euo pipefail
+
+unset GOROOT || true
+
+cd "$(git rev-parse --show-toplevel)"
+
+if [[ "${HARNESS_SKIP_PRECOMMIT:-}" == "1" ]]; then
+  exit 0
+fi
+
+staged="$(git diff --cached --name-only --diff-filter=ACMR -- '*.go' || true)"
+if [[ -z "$staged" ]]; then
+  exit 0
+fi
+
+echo "→ gofmt -l on staged files"
+unformatted="$(gofmt -l $staged || true)"
+if [[ -n "$unformatted" ]]; then
+  echo "✗ unformatted Go files (run 'gofmt -w'):"
+  echo "$unformatted"
+  exit 1
+fi
+
+echo "→ go vet (incremental)"
+go vet ./... > /dev/null
+
+echo "✓ pre-commit gate green"

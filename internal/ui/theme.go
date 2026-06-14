@@ -1,0 +1,26 @@
+// SPDX-License-Identifier: MIT
+
+package ui
+
+import "github.com/charmbracelet/lipgloss"
+
+var (
+	Heading = lipgloss.NewStyle().Bold(true)
+	Success = lipgloss.NewStyle().Foreground(lipgloss.Color("#4CAF50"))
+	Warn    = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFB300"))
+	Error   = lipgloss.NewStyle().Foreground(lipgloss.Color("#E53935"))
+	Muted   = lipgloss.NewStyle().Faint(true)
+)
+
+// SetPlain disables ANSI styling. Useful for CI snapshots and tests.
+func SetPlain(plain bool) {
+	if !plain {
+		return
+	}
+	noop := lipgloss.NewStyle()
+	Heading = noop
+	Success = noop
+	Warn = noop
+	Error = noop
+	Muted = noop
+}
