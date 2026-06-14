@@ -42,6 +42,28 @@ func serveFileJSON(w http.ResponseWriter, path string) {
 	_, _ = w.Write(b)
 }
 
+// serveOrEmpty serves the JSON file at path, or — when the file is
+// absent — writes a 200 with the supplied empty-envelope marshaller.
+// Used by endpoints whose artifact is produced by a later optional step
+// (e.g. `harness project index`) so the dashboard can render the empty
+// state instead of an error.
+func serveOrEmpty(w http.ResponseWriter, path string, empty func() any) {
+	if _, err := os.Stat(path); err != nil {
+		writeJSON(w, http.StatusOK, empty())
+		return
+	}
+	serveFileJSON(w, path)
+}
+
+func emptyProfile() any {
+	return map[string]any{
+		"stacks":       []any{},
+		"languages":    []any{},
+		"markers":      []any{},
+		"generated_at": nil,
+	}
+}
+
 func writeJSON(w http.ResponseWriter, code int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)

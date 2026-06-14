@@ -255,5 +255,5 @@ func (s *Server) features(w http.ResponseWriter, _ *http.Request) {
 }
 func (s *Server) profile(w http.ResponseWriter, _ *http.Request) {
 	p := filepath.Join(paths.HarnessDir(s.root), "project", "profile.json")
-	serveFileJSON(w, p)
+	serveOrEmpty(w, p, emptyProfile)
 }
