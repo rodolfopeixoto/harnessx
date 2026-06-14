@@ -3,6 +3,52 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-14 — v0.2.0 — Workspace Hub + Capabilities + Stack Tour (P11–P22)
+
+- **P11 Workspace Hub** — Multi-project registry at `~/.harness/registry.sqlite`;
+  `harness project add|list|switch|archive|scan|forget|import|stale`; HTTP
+  `/api/workspace/{projects,switch,current,import,stale[/slug]}`. Resolver
+  precedence: --project flag > HARNESS_PROJECT env > cwd walk-up > active row.
+- **P12 Capabilities Center** — 8 kinds (agent/mcp/hook/sensor/skill/context/
+  resource/plugin) with deterministic discovery, Plan→approval→Apply pipeline
+  (path-traversal guard + stage-then-rename), bundled manifests, HTTP
+  `/api/catalog/{kinds,items,plan}`, CLI `harness catalog`.
+- **P13 Cleanup Engine** — Scanner + detectors (worktrees, caches, abandoned
+  .harness, large files, VM leftovers, Claude leftovers, containers via
+  runtime/containers.Lister). D5 two-key rule: policy match OR interactive y
+  OR HARNESS_CLEANUP_I_UNDERSTAND=1. Every delete writes audit_event with
+  sha256.
+- **P14 Coverage gates** — `coverage-gate.sh` (go), `coverage-web.sh` (vitest
+  + @vitest/coverage-v8), `coverage-shell.sh` (bashcov). CORE regex covers
+  every new pkg. Entry thresholds 50/55 with documented ratchet to 90 by v0.3.
+- **P15 Design System** — `web/dashboard/src/ds/`: tokens + strings + Badge,
+  Card, EmptyState, Tabs, InspectorPanel, DataExplorer, Shell. App wired via
+  Shell with nav as data. 11 DS unit tests.
+- **P16 Import Wizard + Stale Detection** — Shared `importwiz.Plan` powering
+  both CLI + future UI; `internal/stale` fingerprints package files into
+  `.harness/project/fingerprints.json`; Detect reports changes by kind.
+- **P17 Command Palette ⌘K** — `internal/palette` (Score: exact 100 > prefix
+  80 > contains 60 > fuzzy 20+), sources for Projects/Capabilities/Builtin
+  commands. CLI `harness palette search`, HTTP `/api/palette`, React modal
+  with arrow-key navigation.
+- **P18 Autonomy + Health** — 5 levels (Manual/PlanAndAsk/SafeExecute/
+  FullProjectLoop/ScheduledMaintenance) with declarative Gate matrix.
+  Deterministic 10-subsystem health score. CLI `harness autonomy get|set`,
+  `harness health show`. HTTP `/api/autonomy`, `/api/health/score`.
+- **P20 Stack Tour** — `harness stack tour [--dashboard --keep]` deterministic
+  walkthrough (workspace add → catalog install → cleanup scan → autonomy
+  gate → health score → optional /api/health probe). `harness stack status`
+  reports dashboard online/offline. Self-cleaning by default.
+- **P21 Role Grid** — `web/dashboard/src/auth/{roles.ts,RoleContext.tsx}`
+  (anonymous|operator|admin), role-grid.test.tsx walks every page × every
+  role. Vitest total: 15 files / 67 tests.
+- **P22 Container lifecycle harness** — `internal/runtime/containers` shared
+  by Cleanup + Stack Tour: typed docker Lister, Compose Up/Down, HealthProbe
+  with bounded backoff, VerifyClean asserting `docker ps -a` empty.
+
+Install: `curl -fsSL https://raw.githubusercontent.com/rodolfopeixoto/harnessx/main/scripts/install.sh | bash`
+(now accepts `--dry-run` and `--prefix`).
+
 ## 2026-06-14 — GitFlow hardening sweep (G1–G7)
 
 - G1: GitFlow — `main` (releases) + `develop` (integration);
