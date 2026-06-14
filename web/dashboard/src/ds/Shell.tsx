@@ -24,6 +24,7 @@ export function Shell({ title, nav, rightSlot, children }: Props) {
         background: tokens.color.bg,
         fontFamily: tokens.font.family,
         color: tokens.color.text,
+        overflowX: "hidden",
       }}
     >
       <header
@@ -32,12 +33,13 @@ export function Shell({ title, nav, rightSlot, children }: Props) {
           borderBottom: `1px solid ${tokens.color.border}`,
           background: tokens.color.surface,
           display: "flex",
+          flexWrap: "wrap",
           alignItems: "center",
           gap: tokens.space(3),
         }}
       >
         <strong>{title}</strong>
-        <nav style={{ display: "flex", gap: tokens.space(2), flex: 1 }}>
+        <nav style={{ display: "flex", flexWrap: "wrap", gap: tokens.space(2), flex: 1, minWidth: 0 }}>
           {nav.map((n) => (
             <NavLink
               key={n.to}
@@ -60,7 +62,16 @@ export function Shell({ title, nav, rightSlot, children }: Props) {
         </nav>
         {rightSlot}
       </header>
-      <main style={{ padding: tokens.space(5), maxWidth: 1200, margin: "0 auto" }}>{children}</main>
+      <main
+        style={{
+          padding: tokens.space(5),
+          maxWidth: 1200,
+          margin: "0 auto",
+          overflowX: "auto",
+        }}
+      >
+        {children}
+      </main>
     </div>
   );
 }

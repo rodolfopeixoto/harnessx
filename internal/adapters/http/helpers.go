@@ -29,7 +29,26 @@ func (s *Server) openDB() (*sqlite.Repo, error) {
 }
 
 func serveProductJSON(w http.ResponseWriter, root, name string) {
-	serveFileJSON(w, filepath.Join(paths.HarnessDir(root), "product", name))
+	target := filepath.Join(paths.HarnessDir(root), "product", name)
+	if _, err := os.Stat(target); err != nil {
+		writeJSON(w, http.StatusOK, emptyProductEnvelope(name))
+		return
+	}
+	serveFileJSON(w, target)
+}
+
+func emptyProductEnvelope(name string) any {
+	switch name {
+	case "design-manifest.json":
+		return map[string]any{"pages": []any{}, "components": []any{}}
+	case "roadmap.json":
+		return map[string]any{"phases": []any{}}
+	case "toggle-map.json":
+		return map[string]any{"toggles": []any{}}
+	case "feature-map.json":
+		return map[string]any{"features": []any{}}
+	}
+	return map[string]any{}
 }
 
 func serveFileJSON(w http.ResponseWriter, path string) {

@@ -255,5 +255,14 @@ func (s *Server) features(w http.ResponseWriter, _ *http.Request) {
 }
 func (s *Server) profile(w http.ResponseWriter, _ *http.Request) {
 	p := filepath.Join(paths.HarnessDir(s.root), "project", "profile.json")
+	if _, err := os.Stat(p); err != nil {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"stacks":       []any{},
+			"languages":    []any{},
+			"markers":      []any{},
+			"generated_at": nil,
+		})
+		return
+	}
 	serveFileJSON(w, p)
 }
