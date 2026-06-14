@@ -11,17 +11,21 @@ cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 echo "→ go vet (security-relevant rules)"
 go vet ./...
 
-if command -v govulncheck >/dev/null; then
-  echo "→ govulncheck (advisory — see SECURITY.md for triage SLA)"
-  if ! govulncheck ./... > /tmp/govulncheck.log 2>&1; then
-    grep -E "^Vulnerability|GHSA|GO-" /tmp/govulncheck.log | head -20 || true
-    echo "  (vulnerabilities listed above — open a [security] issue or upgrade the affected module)"
-  else
-    echo "  (no vulnerabilities found)"
-  fi
-else
-  echo "  (govulncheck not installed; install: go install golang.org/x/vuln/cmd/govulncheck@latest)"
+# Add user-local GOBIN to PATH so `go install` targets are reachable.
+export PATH="$PATH:$HOME/go/bin"
+
+if ! command -v govulncheck >/dev/null; then
+  echo "✗ govulncheck missing — install via:"
+  echo "    go install golang.org/x/vuln/cmd/govulncheck@latest"
+  exit 1
 fi
+echo "→ govulncheck"
+if ! govulncheck ./... > /tmp/govulncheck.log 2>&1; then
+  grep -E "^Vulnerability|GHSA|GO-" /tmp/govulncheck.log | head -20 || true
+  echo "✗ vulnerabilities detected — upgrade affected modules or document waiver in SECURITY.md"
+  exit 1
+fi
+echo "  (no vulnerabilities found)"
 
 if command -v gitleaks >/dev/null; then
   echo "→ gitleaks (history scan)"

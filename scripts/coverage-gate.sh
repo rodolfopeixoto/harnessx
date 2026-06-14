@@ -21,8 +21,8 @@ unset GOROOT || true
 # Ratchet plan: when a core package crosses the next 5-pt band (50 → 55
 # → 60 → …), bump CORE_MIN to lock the gain in. Bump GLOBAL_MIN only
 # after the bottom half of core packages crosses CORE_MIN.
-GLOBAL_MIN="${GLOBAL_MIN:-40}"
-CORE_MIN="${CORE_MIN:-50}"
+GLOBAL_MIN="${GLOBAL_MIN:-50}"
+CORE_MIN="${CORE_MIN:-60}"
 COVER_PROFILE="${COVER_PROFILE:-coverage.out}"
 CORE_REGEX='internal/(domain|intent|memory|router|sensors|spec|plan|index|context|design|optimize|skills|platform/)'
 
