@@ -77,6 +77,7 @@ func (s *Server) Handler() http.Handler {
 	s.registerWorkspace(mux)
 	s.registerCatalog(mux)
 	s.registerImport(mux)
+	s.registerPalette(mux)
 	mux.HandleFunc("/", s.staticOrFallback)
 	return logRequests(mux)
 }

@@ -9,6 +9,7 @@ import { RoadmapPage } from "./pages/Roadmap";
 import { MemoryPage } from "./pages/Memory";
 import { SettingsPage } from "./pages/Settings";
 import { Shell, type NavItem } from "./ds";
+import { CommandPalette } from "./components/CommandPalette";
 
 const navItems: NavItem[] = [
   { to: "/", label: "Sessions", end: true },
@@ -23,6 +24,7 @@ const navItems: NavItem[] = [
 export function App() {
   return (
     <Shell title="HarnessX" nav={navItems}>
+      <CommandPalette />
       <Routes>
         <Route path="/" element={<SessionsPage />} />
         <Route path="/sessions/:id" element={<SessionDetailPage />} />
