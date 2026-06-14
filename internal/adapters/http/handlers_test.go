@@ -135,6 +135,16 @@ func TestProductJSON_Endpoints(t *testing.T) {
 	}
 }
 
+func TestProfile_MissingReturnsEmptyEnvelope(t *testing.T) {
+	root := bootstrap(t)
+	rec := do(t, root, "/api/profile")
+	require.Equal(t, http.StatusOK, rec.Code)
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	require.Equal(t, []any{}, body["stacks"])
+	require.Nil(t, body["generated_at"])
+}
+
 func TestProfile_Endpoint(t *testing.T) {
 	root := bootstrap(t)
 	projDir := filepath.Join(root, ".harness", "project")
