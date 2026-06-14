@@ -1,0 +1,41 @@
+{
+  "common.error":           "erro",
+  "common.warning":         "aviso",
+  "common.info":            "info",
+  "common.skipped":         "ignorado",
+  "common.passed":          "ok",
+  "common.failed":          "falhou",
+  "common.yes":             "sim",
+  "common.no":              "não",
+  "common.none":            "(nenhum)",
+
+  "doctor.title":           "HarnessX Doctor",
+  "doctor.section.tools":   "Ferramentas",
+  "doctor.section.agents":  "Agentes",
+  "doctor.section.project": "Projeto",
+  "doctor.harness_ready":   "✓ pronto",
+  "doctor.harness_missing": "não inicializado (execute `harness init`)",
+
+  "init.summary":           "harness: inicializado",
+  "init.already":           "harness: já inicializado em",
+
+  "plan.confirm":           "Aprovar plano? [s/N] ",
+  "plan.not_approved":      "Plano não aprovado. Use --yes para execução autônoma.",
+  "plan.requires_confirm":  "Plano precisa de confirmação. Use --yes para execução autônoma.",
+
+  "memory.empty":           "(sem memórias ainda)",
+  "memory.promoted":        "memória promovida",
+
+  "sensor.summary":         "resumo",
+
+  "execute.no_agents":      "Execução: nenhum agente registrado; pulando",
+  "execute.no_route":       "Execução: roteador falhou; pulando",
+  "execute.success":        "agente concluído",
+  "execute.failed":         "cadeia de agentes falhou",
+
+  "dashboard.serving":      "harness: dashboard servindo em",
+  "dashboard.serving_react": "servindo build React de",
+  "dashboard.serving_builtin": "servindo HTML embutido (rode `make dashboard-build` para a UI React)",
+
+  "completion.shell_help":  "Gera script de autocomplete para o shell."
+}

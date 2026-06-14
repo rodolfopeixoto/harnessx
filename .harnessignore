@@ -1,0 +1,29 @@
+# HarnessX scans itself. These files define detection patterns
+# (regexes) that intentionally embed example secrets/commands so the
+# scanners can validate against them. Excluding them prevents
+# secrets_scan + forbidden_commands from flagging their own rule sets.
+
+internal/sensors/scanners.go
+internal/sensors/bench_test.go
+internal/memory/memory.go
+internal/optimize/logs_scan.go
+scripts/coverage-gate.sh
+scripts/security-gate.sh
+scripts/e2e-memory.sh
+scripts/install.sh
+docs/security.md
+docs/sensors.md
+docs/agents.md
+scripts/license-gate.sh
+README.md
+CHANGELOG.md
+CONTRIBUTING.md
+CLAUDE.md
+SECURITY.md
+HARNESSX-MASTER-PLAN.md
+
+# Vendor / build artifacts that should never enter scans.
+dist/
+bin/
+node_modules/
+web/dashboard/dist/

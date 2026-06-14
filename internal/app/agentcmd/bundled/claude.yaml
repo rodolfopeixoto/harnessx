@@ -1,0 +1,52 @@
+id: claude
+name: Claude Code
+enabled: true
+type: cli
+
+command:
+  binary: claude
+  check: claude --version
+
+capabilities:
+  text: true
+  vision: true
+  files: true
+  folders: true
+  diff: true
+  json_output: true
+  stream_output: true
+  tool_use: true
+  mcp: true
+  max_context_tokens: 200000
+
+strengths: [planning, react_design_system, security_review, design_to_product]
+
+models:
+  default: claude-sonnet-4-6
+  cheap: claude-haiku-4-5
+  deep: claude-opus-4-7
+
+execution:
+  prompt_mode: stdin
+  working_directory: project
+  timeout_seconds: 1800
+  max_retries: 1
+
+run:
+  args: ["--print", "--output-format", "json"]
+
+output:
+  format: json
+  final_message_json_path: "$.result"
+  usage_json_path: "$.usage"
+
+failure_detection:
+  rate_limit: ["rate limit", "429", "quota exceeded"]
+  context_limit: ["context length", "too many tokens", "context window"]
+  auth: ["unauthorized", "invalid api key", "not authenticated"]
+  transient: ["timeout", "temporarily unavailable", "service unavailable"]
+
+cost:
+  mode: estimated
+  input_token_price_per_1m: 3.0
+  output_token_price_per_1m: 15.0

@@ -1,0 +1,49 @@
+id: gemini
+name: Gemini
+enabled: true
+type: cli
+
+command:
+  binary: gemini
+  check: gemini --version
+
+capabilities:
+  text: true
+  vision: true
+  files: true
+  folders: true
+  diff: false
+  json_output: true
+  stream_output: true
+  tool_use: false
+  mcp: false
+  max_context_tokens: 1000000
+
+strengths: [prompt_refinement, cheap_review, codebase_exploration]
+
+models:
+  default: gemini-2.5-pro
+  cheap: gemini-2.5-flash
+
+execution:
+  prompt_mode: arg
+  working_directory: project
+  timeout_seconds: 900
+  max_retries: 1
+
+run:
+  args: ["-p", "{{prompt}}"]
+
+output:
+  format: text
+
+failure_detection:
+  rate_limit: ["quota", "rate limit", "429"]
+  auth: ["unauthorized", "permission denied"]
+  context_limit: ["maximum context", "token limit"]
+  transient: ["timeout", "internal error"]
+
+cost:
+  mode: estimated
+  input_token_price_per_1m: 1.25
+  output_token_price_per_1m: 5.0
