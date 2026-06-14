@@ -82,6 +82,42 @@ const (
 	DefaultContainerUpTimeout = 90 * time.Second
 )
 
+// --- Autonomy levels ----------------------------------------------------
+
+const (
+	AutonomyManual               = "manual"
+	AutonomyPlanAndAsk           = "plan_and_ask"
+	AutonomySafeExecute          = "safe_execute"
+	AutonomyFullProjectLoop      = "full_project_loop"
+	AutonomyScheduledMaintenance = "scheduled_maintenance"
+)
+
+const (
+	AutonomyOpRead            = "read"
+	AutonomyOpPlan            = "plan"
+	AutonomyOpExecuteLowRisk  = "execute_low_risk"
+	AutonomyOpExecuteHighRisk = "execute_high_risk"
+	AutonomyOpClean           = "clean"
+	AutonomyOpSchedule        = "schedule"
+)
+
+// --- Health score -------------------------------------------------------
+
+const (
+	HealthMaxScore          = 100
+	HealthDefaultScore      = 50
+	HealthSubsystemTests    = "tests"
+	HealthSubsystemSensors  = "sensors"
+	HealthSubsystemSecurity = "security"
+	HealthSubsystemPerf     = "perf"
+	HealthSubsystemDeps     = "deps"
+	HealthSubsystemDocs     = "docs"
+	HealthSubsystemParity   = "design_parity"
+	HealthSubsystemRoadmap  = "roadmap_readiness"
+	HealthSubsystemMemory   = "memory_freshness"
+	HealthSubsystemConfigs  = "configs"
+)
+
 // --- Network --------------------------------------------------------------
 
 const (
