@@ -17,3 +17,4 @@ docs/design-handoff-v2/harness-cli-ui/
 web/dashboard/src/**/*.js
 web/dashboard/src/**/*.js.map
 tmp/
+web/dashboard/test-results/
