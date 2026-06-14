@@ -1,0 +1,196 @@
+{
+  "generated_at": "2026-06-14T20:31:21.654866Z",
+  "base_url": "http://127.0.0.1:7373",
+  "features": [
+    {
+      "id": "p01-public-landing",
+      "name": "Sessions list",
+      "route": "/",
+      "role": "operator",
+      "category": "core",
+      "priority": "P0",
+      "apis_used": [
+        "/api/sessions"
+      ],
+      "expected_http_status": 200,
+      "expected_selectors": [
+        "[data-testid='shell']",
+        "[data-testid='nav-home']"
+      ],
+      "expected_content": [
+        "Sessions"
+      ],
+      "viewports": [
+        "desktop",
+        "tablet",
+        "mobile"
+      ]
+    },
+    {
+      "id": "p02-sensors",
+      "name": "Sensors page",
+      "route": "/sensors",
+      "role": "operator",
+      "category": "core",
+      "priority": "P1",
+      "apis_used": [
+        "/api/sensors"
+      ],
+      "expected_http_status": 200,
+      "expected_selectors": [
+        "[data-testid='nav-sensors']"
+      ],
+      "viewports": [
+        "desktop",
+        "mobile"
+      ]
+    },
+    {
+      "id": "p03-agents",
+      "name": "Agents page",
+      "route": "/agents",
+      "role": "operator",
+      "category": "core",
+      "priority": "P1",
+      "apis_used": [
+        "/api/agents"
+      ],
+      "expected_http_status": 200,
+      "expected_selectors": [
+        "[data-testid='nav-agents']"
+      ],
+      "viewports": [
+        "desktop"
+      ]
+    },
+    {
+      "id": "p04-memory",
+      "name": "Memory page",
+      "route": "/memory",
+      "role": "operator",
+      "category": "core",
+      "priority": "P1",
+      "apis_used": [
+        "/api/memory"
+      ],
+      "expected_http_status": 200,
+      "expected_selectors": [
+        "[data-testid='nav-memory']"
+      ],
+      "viewports": [
+        "desktop"
+      ]
+    },
+    {
+      "id": "p05-design",
+      "name": "Design ingestion view",
+      "route": "/design",
+      "role": "operator",
+      "category": "secondary",
+      "priority": "P2",
+      "apis_used": [
+        "/api/design"
+      ],
+      "expected_http_status": 200,
+      "expected_selectors": [
+        "[data-testid='nav-design']"
+      ],
+      "viewports": [
+        "desktop"
+      ]
+    },
+    {
+      "id": "p06-roadmap",
+      "name": "Roadmap view",
+      "route": "/roadmap",
+      "role": "operator",
+      "category": "secondary",
+      "priority": "P2",
+      "apis_used": [
+        "/api/roadmap"
+      ],
+      "expected_http_status": 200,
+      "expected_selectors": [
+        "[data-testid='nav-roadmap']"
+      ],
+      "viewports": [
+        "desktop"
+      ]
+    },
+    {
+      "id": "p07-settings",
+      "name": "Settings",
+      "route": "/settings",
+      "role": "admin",
+      "category": "admin",
+      "priority": "P1",
+      "apis_used": [
+        "/api/health",
+        "/api/profile"
+      ],
+      "expected_http_status": 200,
+      "expected_selectors": [
+        "[data-testid='nav-settings']"
+      ],
+      "viewports": [
+        "desktop"
+      ]
+    },
+    {
+      "id": "p08-workspace-api",
+      "name": "Workspace projects endpoint",
+      "route": "/api/workspace/projects",
+      "role": "operator",
+      "category": "api",
+      "priority": "P0",
+      "expected_http_status": 200,
+      "expected_selectors": null,
+      "viewports": [
+        "desktop"
+      ]
+    },
+    {
+      "id": "p09-catalog-api",
+      "name": "Catalog kinds endpoint",
+      "route": "/api/catalog/kinds",
+      "role": "operator",
+      "category": "api",
+      "priority": "P0",
+      "expected_http_status": 200,
+      "expected_selectors": null,
+      "viewports": [
+        "desktop"
+      ]
+    },
+    {
+      "id": "p10-autonomy-api",
+      "name": "Autonomy matrix endpoint",
+      "route": "/api/autonomy",
+      "role": "operator",
+      "category": "api",
+      "priority": "P1",
+      "expected_http_status": 200,
+      "expected_selectors": null,
+      "viewports": [
+        "desktop"
+      ]
+    }
+  ],
+  "viewports": [
+    {
+      "name": "desktop",
+      "width": 1440,
+      "height": 900
+    },
+    {
+      "name": "tablet",
+      "width": 768,
+      "height": 1024
+    },
+    {
+      "name": "mobile",
+      "width": 390,
+      "height": 844
+    }
+  ]
+}

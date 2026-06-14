@@ -82,6 +82,72 @@ const (
 	DefaultContainerUpTimeout = 90 * time.Second
 )
 
+// --- Audit runner -------------------------------------------------------
+
+const (
+	AuditRootDir           = "tmp/app-audit"
+	AuditFeatureMapFile    = "feature-map.json"
+	AuditResultsFile       = "results.json"
+	AuditSummaryFile       = "summary.json"
+	AuditVisualDiffFile    = "visual-diff.json"
+	AuditLayoutFile        = "layout-metrics.json"
+	AuditNetworkFile       = "network-errors.json"
+	AuditConsoleFile       = "console-errors.json"
+	AuditSelectorsFile     = "missing-selectors.json"
+	AuditRunLogFile        = "run.log"
+	AuditHTMLFile          = "audit.html"
+	AuditPDFFile           = "audit.pdf"
+	AuditBacklogFile       = "fix-backlog.md"
+	AuditDefaultBaseURL    = "http://127.0.0.1:7373"
+	AuditViewportDeskW     = 1440
+	AuditViewportDeskH     = 900
+	AuditViewportTabW      = 768
+	AuditViewportTabH      = 1024
+	AuditViewportMobW      = 390
+	AuditViewportMobH      = 844
+	AuditViewportDesk      = "desktop"
+	AuditViewportTab       = "tablet"
+	AuditViewportMob       = "mobile"
+	EnvAuditKeep           = "AUDIT_KEEP"
+	EnvAuditHeaded         = "AUDIT_HEADED"
+	EnvAuditRole           = "AUDIT_ROLE"
+	EnvAuditFeature        = "AUDIT_FEATURE"
+	EnvAuditMobile         = "AUDIT_MOBILE"
+	EnvAuditVisual         = "AUDIT_VISUAL"
+	EnvAuditFix            = "AUDIT_FIX"
+	EnvAuditBaseURL        = "AUDIT_BASE_URL"
+	EnvAuditReference      = "AUDIT_REFERENCE_PATH"
+	EnvAuditPrevReport     = "AUDIT_PREVIOUS_REPORT"
+	EnvAuditPlaywrightSkip = "AUDIT_PLAYWRIGHT_SKIP"
+)
+
+const (
+	AuditStatusPassed          = "passed"
+	AuditStatusFailed          = "failed"
+	AuditStatusPartial         = "partial"
+	AuditStatusBlocked         = "blocked"
+	AuditStatusNotImplemented  = "not_implemented"
+	AuditStatusSelectorMissing = "selector_missing"
+	AuditStatusAPIError        = "api_error"
+	AuditStatusConsoleError    = "console_error"
+	AuditStatusVisualBroken    = "visual_broken"
+	AuditStatusPermissionError = "permission_error"
+	AuditStatusDataMissing     = "data_missing"
+	AuditStatusWrongScreen     = "wrong_screen"
+	AuditStatusLayoutCollapsed = "layout_collapsed"
+	AuditStatusNeedsManualRev  = "needs_manual_review"
+	AuditVisualPassed          = "visual_passed"
+	AuditVisualMinorDiff       = "visual_minor_diff"
+	AuditVisualMajorDiff       = "visual_major_diff"
+	AuditSeverityP0            = "P0"
+	AuditSeverityP1            = "P1"
+	AuditSeverityP2            = "P2"
+	AuditSeverityP3            = "P3"
+	AuditVisualThresholdMinor  = 5
+	AuditVisualThresholdMajor  = 15
+	AuditVisualThresholdBroken = 35
+)
+
 // --- Autonomy levels ----------------------------------------------------
 
 const (

@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>HarnessX stack audit — 20260614T203121Z</title>
+<style>
+  body { font-family: -apple-system, system-ui, sans-serif; margin: 0; color: #0F172A; }
+  header { background: #4338CA; color: white; padding: 24px; }
+  main { padding: 24px; max-width: 1080px; margin: 0 auto; }
+  h1, h2, h3 { margin: 16px 0 8px; }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+  th, td { border: 1px solid #E4E4E7; padding: 8px; text-align: left; font-size: 13px; }
+  th { background: #F1F5F9; }
+  .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+  .passed { background: #DCFCE7; color: #166534; }
+  .failed { background: #FEE2E2; color: #991B1B; }
+  .partial { background: #FEF9C3; color: #854D0E; }
+  .blocked { background: #E0E7FF; color: #3730A3; }
+  .other { background: #F1F5F9; color: #475569; }
+  img { max-width: 100%; height: auto; border: 1px solid #E4E4E7; border-radius: 8px; margin: 8px 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>HarnessX stack audit</h1>
+  <p>Run timestamp: 20260614T203121Z · base URL: http://127.0.0.1:7373</p>
+</header>
+<main>
+  <h2>Summary</h2>
+  <table>
+    <tr><th>Total features</th><td>10</td></tr>
+    <tr><th>Total results</th><td>13</td></tr>
+    <tr><th>Pass rate</th><td>0.0%</td></tr>
+  </table>
+  <h2>Functional counts</h2>
+  <table>
+    <thead><tr><th>Status</th><th>Count</th></tr></thead>
+    <tbody>
+      <tr><td>not_implemented</td><td>13</td></tr>
+    </tbody>
+  </table>
+  <h2>Visual counts</h2>
+  <table>
+    <thead><tr><th>Visual status</th><th>Count</th></tr></thead>
+    <tbody>
+      
+    </tbody>
+  </table>
+  <h2>Feature matrix</h2>
+  <table>
+    <thead><tr><th>ID</th><th>Feature</th><th>Route</th><th>Role</th><th>Priority</th><th>Viewports</th></tr></thead>
+    <tbody>
+      
+      <tr>
+        <td>p01-public-landing</td><td>Sessions list</td><td>/</td>
+        <td>operator</td><td>P0</td><td>desktop, tablet, mobile</td>
+      </tr>
+      
+      <tr>
+        <td>p02-sensors</td><td>Sensors page</td><td>/sensors</td>
+        <td>operator</td><td>P1</td><td>desktop, mobile</td>
+      </tr>
+      
+      <tr>
+        <td>p03-agents</td><td>Agents page</td><td>/agents</td>
+        <td>operator</td><td>P1</td><td>desktop</td>
+      </tr>
+      
+      <tr>
+        <td>p04-memory</td><td>Memory page</td><td>/memory</td>
+        <td>operator</td><td>P1</td><td>desktop</td>
+      </tr>
+      
+      <tr>
+        <td>p05-design</td><td>Design ingestion view</td><td>/design</td>
+        <td>operator</td><td>P2</td><td>desktop</td>
+      </tr>
+      
+      <tr>
+        <td>p06-roadmap</td><td>Roadmap view</td><td>/roadmap</td>
+        <td>operator</td><td>P2</td><td>desktop</td>
+      </tr>
+      
+      <tr>
+        <td>p07-settings</td><td>Settings</td><td>/settings</td>
+        <td>admin</td><td>P1</td><td>desktop</td>
+      </tr>
+      
+      <tr>
+        <td>p08-workspace-api</td><td>Workspace projects endpoint</td><td>/api/workspace/projects</td>
+        <td>operator</td><td>P0</td><td>desktop</td>
+      </tr>
+      
+      <tr>
+        <td>p09-catalog-api</td><td>Catalog kinds endpoint</td><td>/api/catalog/kinds</td>
+        <td>operator</td><td>P0</td><td>desktop</td>
+      </tr>
+      
+      <tr>
+        <td>p10-autonomy-api</td><td>Autonomy matrix endpoint</td><td>/api/autonomy</td>
+        <td>operator</td><td>P1</td><td>desktop</td>
+      </tr>
+      
+    </tbody>
+  </table>
+  <h2>Results</h2>
+  <table>
+    <thead><tr><th>Feature</th><th>Viewport</th><th>Status</th><th>HTTP</th><th>Reason</th><th>Screenshot</th></tr></thead>
+    <tbody>
+    
+      <tr>
+        <td>p01-public-landing</td>
+        <td>desktop</td>
+        <td><span class="pill other">not_implemented</span></td>
+        <td>0</td>
+        <td>AUDIT_PLAYWRIGHT_SKIP=1</td>
+        <td></td>
+      </tr>
+    
+      <tr>
+        <td>p01-public-landing</td>
+        <td>tablet</td>
+        <td><span class="pill other">not_implemented</span></td>
+        <td>0</td>
+        <td>AUDIT_PLAYWRIGHT_SKIP=1</td>
+        <td></td>
+      </tr>
+    
+      <tr>
+        <td>p01-public-landing</td>
+        <td>mobile</td>
+        <td><span class="pill other">not_implemented</span></td>
+        <td>0</td>
+        <td>AUDIT_PLAYWRIGHT_SKIP=1</td>
+        <td></td>
+      </tr>
+    
+      <tr>
+        <td>p02-sensors</td>
+        <td>desktop</td>
+        <td><span class="pill other">not_implemented</span></td>
+        <td>0</td>
+        <td>AUDIT_PLAYWRIGHT_SKIP=1</td>
+        <td></td>
+      </tr>
+    
+      <tr>
+        <td>p02-sensors</td>
+        <td>mobile</td>
+        <td><span class="pill other">not_implemented</span></td>
+        <td>0</td>
+        <td>AUDIT_PLAYWRIGHT_SKIP=1</td>
+        <td></td>
+      </tr>
+    
+      <tr>
+        <td>p03-agents</td>
+        <td>desktop</td>
+        <td><span class="pill other">not_implemented</span></td>
+        <td>0</td>
+        <td>AUDIT_PLAYWRIGHT_SKIP=1</td>
+        <td></td>
+      </tr>
+    
+      <tr>
+        <td>p04-memory</td>
+        <td>desktop</td>
+        <td><span class="pill other">not_implemented</span></td>
+        <td>0</td>
+        <td>AUDIT_PLAYWRIGHT_SKIP=1</td>
+        <td></td>
+      </tr>
+    
+      <tr>
+        <td>p05-design</td>
+        <td>desktop</td>
+        <td><span class="pill other">not_implemented</span></td>
+        <td>0</td>
+        <td>AUDIT_PLAYWRIGHT_SKIP=1</td>
+        <td></td>
+      </tr>
+    
+      <tr>
+        <td>p06-roadmap</td>
+        <td>desktop</td>
+        <td><span class="pill other">not_implemented</span></td>
+        <td>0</td>
+        <td>AUDIT_PLAYWRIGHT_SKIP=1</td>
+        <td></td>
+      </tr>
+    
+      <tr>
+        <td>p07-settings</td>
+        <td>desktop</td>
+        <td><span class="pill other">not_implemented</span></td>
+        <td>0</td>
+        <td>AUDIT_PLAYWRIGHT_SKIP=1</td>
+        <td></td>
+      </tr>
+    
+      <tr>
+        <td>p08-workspace-api</td>
+        <td>desktop</td>
+        <td><span class="pill other">not_implemented</span></td>
+        <td>0</td>
+        <td>AUDIT_PLAYWRIGHT_SKIP=1</td>
+        <td></td>
+      </tr>
+    
+      <tr>
+        <td>p09-catalog-api</td>
+        <td>desktop</td>
+        <td><span class="pill other">not_implemented</span></td>
+        <td>0</td>
+        <td>AUDIT_PLAYWRIGHT_SKIP=1</td>
+        <td></td>
+      </tr>
+    
+      <tr>
+        <td>p10-autonomy-api</td>
+        <td>desktop</td>
+        <td><span class="pill other">not_implemented</span></td>
+        <td>0</td>
+        <td>AUDIT_PLAYWRIGHT_SKIP=1</td>
+        <td></td>
+      </tr>
+    
+    </tbody>
+  </table>
+  <h2>Backlog</h2>
+  
+  <table>
+    <thead><tr><th>Severity</th><th>Feature</th><th>Failure</th><th>Reproduce</th></tr></thead>
+    <tbody>
+    
+      <tr>
+        <td><span class="pill failed">P0</span></td>
+        <td>Sessions list (desktop)</td>
+        <td>not_implemented — AUDIT_PLAYWRIGHT_SKIP=1</td>
+        <td><code>AUDIT_FEATURE=p01-public-landing AUDIT_ROLE=operator bin/stack audit</code></td>
+      </tr>
+    
+      <tr>
+        <td><span class="pill failed">P0</span></td>
+        <td>Sessions list (mobile)</td>
+        <td>not_implemented — AUDIT_PLAYWRIGHT_SKIP=1</td>
+        <td><code>AUDIT_FEATURE=p01-public-landing AUDIT_ROLE=operator bin/stack audit</code></td>
+      </tr>
+    
+      <tr>
+        <td><span class="pill failed">P0</span></td>
+        <td>Sessions list (tablet)</td>
+        <td>not_implemented — AUDIT_PLAYWRIGHT_SKIP=1</td>
+        <td><code>AUDIT_FEATURE=p01-public-landing AUDIT_ROLE=operator bin/stack audit</code></td>
+      </tr>
+    
+      <tr>
+        <td><span class="pill failed">P0</span></td>
+        <td>Workspace projects endpoint (desktop)</td>
+        <td>not_implemented — AUDIT_PLAYWRIGHT_SKIP=1</td>
+        <td><code>AUDIT_FEATURE=p08-workspace-api AUDIT_ROLE=operator bin/stack audit</code></td>
+      </tr>
+    
+      <tr>
+        <td><span class="pill failed">P0</span></td>
+        <td>Catalog kinds endpoint (desktop)</td>
+        <td>not_implemented — AUDIT_PLAYWRIGHT_SKIP=1</td>
+        <td><code>AUDIT_FEATURE=p09-catalog-api AUDIT_ROLE=operator bin/stack audit</code></td>
+      </tr>
+    
+      <tr>
+        <td><span class="pill partial">P1</span></td>
+        <td>Sensors page (desktop)</td>
+        <td>not_implemented — AUDIT_PLAYWRIGHT_SKIP=1</td>
+        <td><code>AUDIT_FEATURE=p02-sensors AUDIT_ROLE=operator bin/stack audit</code></td>
+      </tr>
+    
+      <tr>
+        <td><span class="pill partial">P1</span></td>
+        <td>Sensors page (mobile)</td>
+        <td>not_implemented — AUDIT_PLAYWRIGHT_SKIP=1</td>
+        <td><code>AUDIT_FEATURE=p02-sensors AUDIT_ROLE=operator bin/stack audit</code></td>
+      </tr>
+    
+      <tr>
+        <td><span class="pill partial">P1</span></td>
+        <td>Agents page (desktop)</td>
+        <td>not_implemented — AUDIT_PLAYWRIGHT_SKIP=1</td>
+        <td><code>AUDIT_FEATURE=p03-agents AUDIT_ROLE=operator bin/stack audit</code></td>
+      </tr>
+    
+      <tr>
+        <td><span class="pill partial">P1</span></td>
+        <td>Memory page (desktop)</td>
+        <td>not_implemented — AUDIT_PLAYWRIGHT_SKIP=1</td>
+        <td><code>AUDIT_FEATURE=p04-memory AUDIT_ROLE=operator bin/stack audit</code></td>
+      </tr>
+    
+      <tr>
+        <td><span class="pill partial">P1</span></td>
+        <td>Settings (desktop)</td>
+        <td>not_implemented — AUDIT_PLAYWRIGHT_SKIP=1</td>
+        <td><code>AUDIT_FEATURE=p07-settings AUDIT_ROLE=admin bin/stack audit</code></td>
+      </tr>
+    
+      <tr>
+        <td><span class="pill partial">P1</span></td>
+        <td>Autonomy matrix endpoint (desktop)</td>
+        <td>not_implemented — AUDIT_PLAYWRIGHT_SKIP=1</td>
+        <td><code>AUDIT_FEATURE=p10-autonomy-api AUDIT_ROLE=operator bin/stack audit</code></td>
+      </tr>
+    
+      <tr>
+        <td><span class="pill other">P2</span></td>
+        <td>Design ingestion view (desktop)</td>
+        <td>not_implemented — AUDIT_PLAYWRIGHT_SKIP=1</td>
+        <td><code>AUDIT_FEATURE=p05-design AUDIT_ROLE=operator bin/stack audit</code></td>
+      </tr>
+    
+      <tr>
+        <td><span class="pill other">P2</span></td>
+        <td>Roadmap view (desktop)</td>
+        <td>not_implemented — AUDIT_PLAYWRIGHT_SKIP=1</td>
+        <td><code>AUDIT_FEATURE=p06-roadmap AUDIT_ROLE=operator bin/stack audit</code></td>
+      </tr>
+    
+    </tbody>
+  </table>
+  
+</main>
+</body>
+</html>
