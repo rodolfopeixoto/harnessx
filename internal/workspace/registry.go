@@ -418,27 +418,26 @@ func defaultProjectDBPath(root string) string {
 	return filepath.Join(root, constants.HarnessDir, constants.DBSubdir, constants.DBFilename)
 }
 
-// Slugify lowercases, collapses non-alphanumeric runs to single dashes and
-// trims leading/trailing dashes. Empty input becomes "project".
 func Slugify(in string) string {
-	in = strings.ToLower(in)
 	var b strings.Builder
-	prevDash := false
-	for _, r := range in {
-		switch {
-		case r >= 'a' && r <= 'z', r >= '0' && r <= '9':
+	prevSeparator := false
+	for _, r := range strings.ToLower(in) {
+		if isSlugRune(r) {
 			b.WriteRune(r)
-			prevDash = false
-		default:
-			if !prevDash {
-				b.WriteByte('-')
-				prevDash = true
-			}
+			prevSeparator = false
+			continue
+		}
+		if !prevSeparator {
+			b.WriteString(constants.SlugSeparator)
+			prevSeparator = true
 		}
 	}
-	out := strings.Trim(b.String(), "-")
-	if out == "" {
-		return "project"
+	if out := strings.Trim(b.String(), constants.SlugSeparator); out != "" {
+		return out
 	}
-	return out
+	return constants.SlugFallbackName
+}
+
+func isSlugRune(r rune) bool {
+	return (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9')
 }

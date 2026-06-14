@@ -46,6 +46,13 @@ const (
 	EnvProjectOverride         = "HARNESS_PROJECT"
 )
 
+// --- Slug + identifier defaults -----------------------------------------
+
+const (
+	SlugSeparator    = "-"
+	SlugFallbackName = "project"
+)
+
 // --- Network --------------------------------------------------------------
 
 const (
