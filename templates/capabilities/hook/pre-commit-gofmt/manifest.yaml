@@ -1,0 +1,14 @@
+kind: hook
+name: pre-commit-gofmt
+version: 0.1.0
+description: gofmt -l on staged Go files, blocks commit when any are unformatted.
+scope: project
+source: bundled
+body: |
+  #!/usr/bin/env bash
+  set -euo pipefail
+  files="$(git diff --cached --name-only --diff-filter=AM | grep '\.go$' || true)"
+  [ -z "$files" ] && exit 0
+  bad=$(gofmt -l $files)
+  [ -z "$bad" ] && exit 0
+  echo "gofmt issues:"; echo "$bad"; exit 1

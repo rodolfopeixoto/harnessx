@@ -1,0 +1,10 @@
+kind: sensor
+name: go-vet
+version: 0.1.0
+description: Runs `go vet ./...` as a deterministic gate.
+scope: project
+source: bundled
+body: |
+  command: "go vet ./..."
+  blocking: true
+  timeout_seconds: 60

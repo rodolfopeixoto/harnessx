@@ -1,0 +1,8 @@
+kind: plugin
+name: example
+version: 0.1.0
+description: Reference plugin manifest illustrating the install/configure flow.
+scope: project
+source: bundled
+body: |
+  entrypoint: harness-plugin-example

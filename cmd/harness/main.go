@@ -40,6 +40,7 @@ func newRoot() *cobra.Command {
 		newDoctorCmd(),
 		newLogsCmd(),
 		newProjectCmd(),
+		newCatalogCmd(),
 		newAgentCmd(),
 		newSensorCmd(),
 		newCheckCmd(),

@@ -1,0 +1,14 @@
+kind: mcp
+name: filesystem
+version: 0.1.0
+description: Local filesystem MCP server (stdio).
+transport: stdio
+tools: 6
+scope: project
+source: bundled
+body: |
+  {
+    "command": "npx -y @modelcontextprotocol/server-filesystem",
+    "args": ["."],
+    "scope": "project"
+  }

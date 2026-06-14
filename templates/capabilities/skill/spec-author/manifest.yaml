@@ -1,0 +1,11 @@
+kind: skill
+name: spec-author
+version: 0.1.0
+description: Drafts a spec.md from a one-line prompt using the configured agent.
+scope: project
+source: bundled
+body: |
+  steps:
+    - intent: detect
+    - spec: draft
+    - approve: human
