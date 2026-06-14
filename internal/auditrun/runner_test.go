@@ -74,7 +74,7 @@ func TestRunner_FilterByFeatureLimitsScope(t *testing.T) {
 		RepoRoot:       t.TempDir(),
 		BaseURL:        srv.URL,
 		Timestamp:      "20260614T120100Z",
-		OnlyFeature:    "p01-public-landing",
+		OnlyFeature:    "home",
 		PlaywrightSkip: true,
 	})
 	summary, err := r.Run(context.Background())

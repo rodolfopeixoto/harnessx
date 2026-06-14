@@ -25,83 +25,87 @@ func DefaultViewports() []Viewport {
 	}
 }
 
-func DefaultFeatures(baseURL string) []Feature {
+func DefaultFeatures(_ string) []Feature {
+	uiDesk := []string{constants.AuditViewportDesk}
+	uiAll := []string{constants.AuditViewportDesk, constants.AuditViewportTab, constants.AuditViewportMob}
+	uiMobile := []string{constants.AuditViewportDesk, constants.AuditViewportMob}
+	uiPage := func(id, name, route string, role Role, priority string, viewports []string) Feature {
+		return Feature{
+			ID: id, Name: name, Route: route, Role: role,
+			Category: "ui", Priority: priority,
+			ExpectedHTTPStatus: 200,
+			ExpectedSelectors:  []string{"[data-testid='shell']", "[data-testid='page-" + id + "']"},
+			Viewports:          viewports,
+		}
+	}
+	uiHomePage := Feature{
+		ID: "home", Name: "Sessions / Home", Route: "/", Role: RoleOperator,
+		Category: "ui", Priority: constants.AuditSeverityP0,
+		ExpectedHTTPStatus: 200,
+		ExpectedSelectors:  []string{"[data-testid='shell']", "[data-testid='nav-home']"},
+		Viewports:          uiAll,
+	}
+	apiCheck := func(id, name, route string, priority string) Feature {
+		return Feature{
+			ID: id, Name: name, Route: route, Role: RoleOperator,
+			Category: "api", Priority: priority,
+			ExpectedHTTPStatus: 200,
+			Viewports:          uiDesk,
+		}
+	}
 	return []Feature{
+		uiHomePage,
+		uiPage("projects", "Projects hub", "/projects", RoleOperator, constants.AuditSeverityP0, uiAll),
+		uiPage("command", "Command", "/command", RoleOperator, constants.AuditSeverityP0, uiAll),
+		uiPage("plan", "Plan", "/plan", RoleOperator, constants.AuditSeverityP0, uiDesk),
+		uiPage("activerun", "Active run", "/run", RoleOperator, constants.AuditSeverityP0, uiDesk),
 		{
-			ID: "p01-public-landing", Name: "Sessions list", Route: "/",
-			Role: RoleOperator, Category: "core", Priority: constants.AuditSeverityP0,
-			ExpectedHTTPStatus: 200,
-			ExpectedSelectors:  []string{"[data-testid='shell']", "[data-testid='nav-home']"},
-			ExpectedContent:    []string{"Sessions"},
-			APIsUsed:           []string{"/api/sessions"},
-			Viewports:          []string{constants.AuditViewportDesk, constants.AuditViewportTab, constants.AuditViewportMob},
+			ID: "design", Name: "Design to product", Route: "/design", Role: RoleOperator,
+			Category: "ui", Priority: constants.AuditSeverityP1, ExpectedHTTPStatus: 200,
+			ExpectedSelectors: []string{"[data-testid='shell']", "[data-testid='nav-design']"},
+			Viewports:         uiDesk,
 		},
 		{
-			ID: "p02-sensors", Name: "Sensors page", Route: "/sensors",
-			Role: RoleOperator, Category: "core", Priority: constants.AuditSeverityP1,
-			ExpectedHTTPStatus: 200,
-			ExpectedSelectors:  []string{"[data-testid='nav-sensors']"},
-			APIsUsed:           []string{"/api/sensors"},
-			Viewports:          []string{constants.AuditViewportDesk, constants.AuditViewportMob},
+			ID: "roadmap", Name: "Roadmap", Route: "/roadmap", Role: RoleOperator,
+			Category: "ui", Priority: constants.AuditSeverityP1, ExpectedHTTPStatus: 200,
+			ExpectedSelectors: []string{"[data-testid='shell']", "[data-testid='nav-roadmap']"},
+			Viewports:         uiDesk,
 		},
 		{
-			ID: "p03-agents", Name: "Agents page", Route: "/agents",
-			Role: RoleOperator, Category: "core", Priority: constants.AuditSeverityP1,
-			ExpectedHTTPStatus: 200,
-			ExpectedSelectors:  []string{"[data-testid='nav-agents']"},
-			APIsUsed:           []string{"/api/agents"},
-			Viewports:          []string{constants.AuditViewportDesk},
+			ID: "agents", Name: "Agents", Route: "/agents", Role: RoleOperator,
+			Category: "ui", Priority: constants.AuditSeverityP1, ExpectedHTTPStatus: 200,
+			ExpectedSelectors: []string{"[data-testid='shell']", "[data-testid='nav-agents']"},
+			Viewports:         uiDesk,
 		},
+		uiPage("catalog", "Capabilities", "/catalog", RoleOperator, constants.AuditSeverityP0, uiAll),
 		{
-			ID: "p04-memory", Name: "Memory page", Route: "/memory",
-			Role: RoleOperator, Category: "core", Priority: constants.AuditSeverityP1,
-			ExpectedHTTPStatus: 200,
-			ExpectedSelectors:  []string{"[data-testid='nav-memory']"},
-			APIsUsed:           []string{"/api/memory"},
-			Viewports:          []string{constants.AuditViewportDesk},
+			ID: "sensors", Name: "Sensors", Route: "/sensors", Role: RoleOperator,
+			Category: "ui", Priority: constants.AuditSeverityP1, ExpectedHTTPStatus: 200,
+			ExpectedSelectors: []string{"[data-testid='shell']", "[data-testid='nav-sensors']"},
+			Viewports:         uiMobile,
 		},
+		uiPage("context", "Context pack", "/context", RoleOperator, constants.AuditSeverityP1, uiDesk),
 		{
-			ID: "p05-design", Name: "Design ingestion view", Route: "/design",
-			Role: RoleOperator, Category: "secondary", Priority: constants.AuditSeverityP2,
-			ExpectedHTTPStatus: 200,
-			ExpectedSelectors:  []string{"[data-testid='nav-design']"},
-			APIsUsed:           []string{"/api/design"},
-			Viewports:          []string{constants.AuditViewportDesk},
+			ID: "memory", Name: "Memory", Route: "/memory", Role: RoleOperator,
+			Category: "ui", Priority: constants.AuditSeverityP1, ExpectedHTTPStatus: 200,
+			ExpectedSelectors: []string{"[data-testid='shell']", "[data-testid='nav-memory']"},
+			Viewports:         uiDesk,
 		},
+		uiPage("resources", "Resources", "/resources", RoleOperator, constants.AuditSeverityP1, uiDesk),
+		uiPage("cleanup", "Cleanup", "/cleanup", RoleOperator, constants.AuditSeverityP1, uiDesk),
+		uiPage("reports", "Reports", "/reports", RoleOperator, constants.AuditSeverityP1, uiDesk),
+		uiPage("stakeholder", "Stakeholder", "/stakeholder", RoleOperator, constants.AuditSeverityP2, uiDesk),
+		uiPage("onboarding", "Onboarding", "/onboarding", RoleOperator, constants.AuditSeverityP1, uiDesk),
 		{
-			ID: "p06-roadmap", Name: "Roadmap view", Route: "/roadmap",
-			Role: RoleOperator, Category: "secondary", Priority: constants.AuditSeverityP2,
-			ExpectedHTTPStatus: 200,
-			ExpectedSelectors:  []string{"[data-testid='nav-roadmap']"},
-			APIsUsed:           []string{"/api/roadmap"},
-			Viewports:          []string{constants.AuditViewportDesk},
+			ID: "settings", Name: "Settings", Route: "/settings", Role: RoleAdmin,
+			Category: "ui", Priority: constants.AuditSeverityP1, ExpectedHTTPStatus: 200,
+			ExpectedSelectors: []string{"[data-testid='shell']", "[data-testid='nav-settings']"},
+			Viewports:         uiDesk,
 		},
-		{
-			ID: "p07-settings", Name: "Settings", Route: "/settings",
-			Role: RoleAdmin, Category: "admin", Priority: constants.AuditSeverityP1,
-			ExpectedHTTPStatus: 200,
-			ExpectedSelectors:  []string{"[data-testid='nav-settings']"},
-			APIsUsed:           []string{"/api/health", "/api/profile"},
-			Viewports:          []string{constants.AuditViewportDesk},
-		},
-		{
-			ID: "p08-workspace-api", Name: "Workspace projects endpoint", Route: "/api/workspace/projects",
-			Role: RoleOperator, Category: "api", Priority: constants.AuditSeverityP0,
-			ExpectedHTTPStatus: 200,
-			Viewports:          []string{constants.AuditViewportDesk},
-		},
-		{
-			ID: "p09-catalog-api", Name: "Catalog kinds endpoint", Route: "/api/catalog/kinds",
-			Role: RoleOperator, Category: "api", Priority: constants.AuditSeverityP0,
-			ExpectedHTTPStatus: 200,
-			Viewports:          []string{constants.AuditViewportDesk},
-		},
-		{
-			ID: "p10-autonomy-api", Name: "Autonomy matrix endpoint", Route: "/api/autonomy",
-			Role: RoleOperator, Category: "api", Priority: constants.AuditSeverityP1,
-			ExpectedHTTPStatus: 200,
-			Viewports:          []string{constants.AuditViewportDesk},
-		},
+		apiCheck("api-workspace", "Workspace projects API", "/api/workspace/projects", constants.AuditSeverityP0),
+		apiCheck("api-catalog", "Catalog kinds API", "/api/catalog/kinds", constants.AuditSeverityP0),
+		apiCheck("api-autonomy", "Autonomy matrix API", "/api/autonomy", constants.AuditSeverityP1),
+		apiCheck("api-health-score", "Health score API", "/api/health/score", constants.AuditSeverityP1),
 	}
 }
 
