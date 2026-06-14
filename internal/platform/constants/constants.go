@@ -53,6 +53,35 @@ const (
 	SlugFallbackName = "project"
 )
 
+// --- Cleanup engine -----------------------------------------------------
+
+const (
+	CleanupSubdir              = "cleanup"
+	CleanupPolicyFilename      = "policy.yaml"
+	EnvCleanupAcknowledgement  = "HARNESS_CLEANUP_I_UNDERSTAND"
+	CleanupRiskLow             = "low"
+	CleanupRiskMedium          = "medium"
+	CleanupRiskHigh            = "high"
+	CleanupLargeFileThresholdB = int64(50 * 1024 * 1024)
+	CleanupStaleThresholdHours = 24 * 30
+)
+
+const (
+	KindCleanupWorktree       = "worktree"
+	KindCleanupCache          = "cache"
+	KindCleanupAbandonedHX    = "abandoned_harness"
+	KindCleanupVMLeftover     = "vm_leftover"
+	KindCleanupClaudeLeftover = "claude_leftover"
+	KindCleanupLargeFile      = "large_file"
+	KindCleanupContainer      = "container"
+)
+
+const (
+	EnvDockerBinary           = "HARNESS_DOCKER"
+	DefaultDockerBinary       = "docker"
+	DefaultContainerUpTimeout = 90 * time.Second
+)
+
 // --- Network --------------------------------------------------------------
 
 const (

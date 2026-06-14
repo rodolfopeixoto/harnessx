@@ -74,6 +74,7 @@ linters:
         - G306
         - G307
         - G705
+        - G703
     godot:
       scope: declarations
       capital: true
