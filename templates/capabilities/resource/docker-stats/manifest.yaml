@@ -1,0 +1,9 @@
+kind: resource
+name: docker-stats
+version: 0.1.0
+description: Records `docker stats --no-stream` snapshots into runtime_metrics.
+scope: project
+source: bundled
+body: |
+  interval_seconds: 30
+  retention_hours: 168

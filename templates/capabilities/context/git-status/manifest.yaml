@@ -1,0 +1,10 @@
+kind: context
+name: git-status
+version: 0.1.0
+description: Provides the current git diff + status to the agent.
+scope: project
+source: bundled
+body: |
+  providers:
+    - git
+    - diff

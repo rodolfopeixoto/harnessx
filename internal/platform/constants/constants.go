@@ -36,6 +36,88 @@ const (
 	IgnoreFilename = ".harnessignore"
 )
 
+// --- Global (cross-project) home -----------------------------------------
+
+const (
+	GlobalHarnessDirName       = "harness"
+	GlobalRegistryFilename     = "registry.sqlite"
+	GlobalRegistryLockFilename = "registry.lock"
+	EnvHarnessHome             = "HARNESS_HOME"
+	EnvProjectOverride         = "HARNESS_PROJECT"
+)
+
+// --- Slug + identifier defaults -----------------------------------------
+
+const (
+	SlugSeparator    = "-"
+	SlugFallbackName = "project"
+)
+
+// --- Cleanup engine -----------------------------------------------------
+
+const (
+	CleanupSubdir              = "cleanup"
+	CleanupPolicyFilename      = "policy.yaml"
+	EnvCleanupAcknowledgement  = "HARNESS_CLEANUP_I_UNDERSTAND"
+	CleanupRiskLow             = "low"
+	CleanupRiskMedium          = "medium"
+	CleanupRiskHigh            = "high"
+	CleanupLargeFileThresholdB = int64(50 * 1024 * 1024)
+	CleanupStaleThresholdHours = 24 * 30
+)
+
+const (
+	KindCleanupWorktree       = "worktree"
+	KindCleanupCache          = "cache"
+	KindCleanupAbandonedHX    = "abandoned_harness"
+	KindCleanupVMLeftover     = "vm_leftover"
+	KindCleanupClaudeLeftover = "claude_leftover"
+	KindCleanupLargeFile      = "large_file"
+	KindCleanupContainer      = "container"
+)
+
+const (
+	EnvDockerBinary           = "HARNESS_DOCKER"
+	DefaultDockerBinary       = "docker"
+	DefaultContainerUpTimeout = 90 * time.Second
+)
+
+// --- Autonomy levels ----------------------------------------------------
+
+const (
+	AutonomyManual               = "manual"
+	AutonomyPlanAndAsk           = "plan_and_ask"
+	AutonomySafeExecute          = "safe_execute"
+	AutonomyFullProjectLoop      = "full_project_loop"
+	AutonomyScheduledMaintenance = "scheduled_maintenance"
+)
+
+const (
+	AutonomyOpRead            = "read"
+	AutonomyOpPlan            = "plan"
+	AutonomyOpExecuteLowRisk  = "execute_low_risk"
+	AutonomyOpExecuteHighRisk = "execute_high_risk"
+	AutonomyOpClean           = "clean"
+	AutonomyOpSchedule        = "schedule"
+)
+
+// --- Health score -------------------------------------------------------
+
+const (
+	HealthMaxScore          = 100
+	HealthDefaultScore      = 50
+	HealthSubsystemTests    = "tests"
+	HealthSubsystemSensors  = "sensors"
+	HealthSubsystemSecurity = "security"
+	HealthSubsystemPerf     = "perf"
+	HealthSubsystemDeps     = "deps"
+	HealthSubsystemDocs     = "docs"
+	HealthSubsystemParity   = "design_parity"
+	HealthSubsystemRoadmap  = "roadmap_readiness"
+	HealthSubsystemMemory   = "memory_freshness"
+	HealthSubsystemConfigs  = "configs"
+)
+
 // --- Network --------------------------------------------------------------
 
 const (

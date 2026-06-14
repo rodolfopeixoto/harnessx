@@ -74,7 +74,7 @@ tidy:
 check: vet test build
 
 # ci: full local CI gate. Wired to the pre-push hook by `make install-hooks`.
-ci: lint check coverage-gate test-sh e2e-all
+ci: lint check coverage-gate coverage-shell test-sh e2e-all
 
 # test-sh: shell test harness (scripts/tests/test-*.sh).
 test-sh:
@@ -95,6 +95,12 @@ coverage:
 
 coverage-gate:
 	@bash scripts/coverage-gate.sh
+
+coverage-web:
+	@bash scripts/coverage-web.sh
+
+coverage-shell:
+	@bash scripts/coverage-shell.sh
 
 security: build
 	@bash scripts/security-gate.sh

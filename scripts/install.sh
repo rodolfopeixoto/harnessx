@@ -1,14 +1,28 @@
 #!/usr/bin/env bash
 # HarnessX one-line installer.
 #
-#   curl -fsSL https://raw.githubusercontent.com/ropeixoto/harnessx/main/scripts/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/rodolfopeixoto/harnessx/main/scripts/install.sh | bash
 #
 # Detects OS + arch, downloads the matching tarball from the latest GitHub
 # release, verifies SHA-256, installs into ${HARNESS_PREFIX:-/usr/local/bin}.
+#
+# Flags:
+#   --dry-run        plan + verify checksum without installing
+#   --prefix <dir>   install dir (overrides HARNESS_PREFIX env)
 set -euo pipefail
 
-REPO="${HARNESS_REPO:-ropeixoto/harnessx}"
+REPO="${HARNESS_REPO:-rodolfopeixoto/harnessx}"
 PREFIX="${HARNESS_PREFIX:-/usr/local/bin}"
+DRY_RUN=0
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --dry-run) DRY_RUN=1; shift ;;
+    --prefix) PREFIX="$2"; shift 2 ;;
+    --help|-h) grep -E "^# " "$0" | sed 's/^# //'; exit 0 ;;
+    *) echo "unknown flag: $1" >&2; exit 2 ;;
+  esac
+done
 
 os="$(uname -s | tr '[:upper:]' '[:lower:]')"
 arch="$(uname -m)"
@@ -35,6 +49,7 @@ sha_url="${url}.sha256"
 
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
+echo "→ resolved tag: ${tag}"
 echo "→ downloading ${url}"
 curl -fsSL "${url}"     -o "${tmp}/${target}.tar.gz"
 curl -fsSL "${sha_url}" -o "${tmp}/${target}.tar.gz.sha256"
@@ -44,6 +59,12 @@ echo "→ verifying SHA-256"
 
 echo "→ extracting"
 tar -xzf "${tmp}/${target}.tar.gz" -C "${tmp}"
+
+if [[ "${DRY_RUN}" -eq 1 ]]; then
+  echo "→ dry-run: would install ${tmp}/${target} to ${PREFIX}/harness"
+  "${tmp}/${target}" version
+  exit 0
+fi
 
 dest="${PREFIX}/harness"
 echo "→ installing ${dest}"
@@ -60,4 +81,5 @@ echo "next steps:"
 echo "  cd your-project"
 echo "  harness init"
 echo "  harness doctor"
+echo "  harness stack tour --keep            # walk every feature deterministically"
 echo "  harness completion bash > /etc/bash_completion.d/harness   # optional"

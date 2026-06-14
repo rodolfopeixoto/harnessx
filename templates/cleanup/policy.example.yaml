@@ -1,0 +1,16 @@
+version: 1
+globals:
+  require_acknowledgement: true
+rules:
+  - kind: cache
+    allowlist:
+      - "**/.npm"
+      - "**/.pnpm-store"
+    min_age_hours: 168
+    max_risk: medium
+  - kind: large_file
+    allowlist:
+      - "**/dist/**"
+      - "**/build/**"
+    min_age_hours: 720
+    max_risk: medium

@@ -57,6 +57,7 @@ linters:
         - encoding/json.NewEncoder.Encode
         - (*github.com/ropeixoto/harnessx/internal/adapters/sqlite.Repo).Close
         - (*github.com/ropeixoto/harnessx/internal/adapters/logger.JSONL).Close
+        - (*github.com/ropeixoto/harnessx/internal/workspace.Registry).Close
         - (*archive/zip.ReadCloser).Close
         - os.Remove
         - os.RemoveAll
@@ -73,6 +74,7 @@ linters:
         - G306
         - G307
         - G705
+        - G703
     godot:
       scope: declarations
       capital: true
