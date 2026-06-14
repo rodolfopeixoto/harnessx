@@ -36,6 +36,16 @@ const (
 	IgnoreFilename = ".harnessignore"
 )
 
+// --- Global (cross-project) home -----------------------------------------
+
+const (
+	GlobalHarnessDirName       = "harness"
+	GlobalRegistryFilename     = "registry.sqlite"
+	GlobalRegistryLockFilename = "registry.lock"
+	EnvHarnessHome             = "HARNESS_HOME"
+	EnvProjectOverride         = "HARNESS_PROJECT"
+)
+
 // --- Network --------------------------------------------------------------
 
 const (

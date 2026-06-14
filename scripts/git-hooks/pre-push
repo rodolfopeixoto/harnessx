@@ -20,6 +20,11 @@ cd "$(git rev-parse --show-toplevel)"
 
 remote="${1:-origin}"
 url="${2:-unknown}"
+
+if [[ "${HARNESS_SKIP_SPEC_GATE:-}" != "1" ]]; then
+  bash scripts/spec-gate.sh "$remote" || exit 1
+fi
+
 echo "→ pre-push to $remote ($url): running 'make ci'"
 echo "  set HARNESS_SKIP_CI=1 to bypass (only for emergency hotfixes)"
 echo
