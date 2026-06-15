@@ -16,6 +16,7 @@ import (
 	"github.com/ropeixoto/harnessx/internal/app/reportcmd"
 	hxcontext "github.com/ropeixoto/harnessx/internal/context"
 	"github.com/ropeixoto/harnessx/internal/domain"
+	"github.com/ropeixoto/harnessx/internal/input"
 	"github.com/ropeixoto/harnessx/internal/intent"
 	"github.com/ropeixoto/harnessx/internal/plan"
 	"github.com/ropeixoto/harnessx/internal/platform/budget"
@@ -24,17 +25,20 @@ import (
 )
 
 type Options struct {
-	StartDir  string
-	Prompt    string
-	ModeHint  domain.Mode
-	AutoYes   bool
-	BudgetUSD float64
-	Execute   bool
-	NoSensors bool
-	AgentID   string
-	Apply     bool
-	PlanOnly  bool
-	Autonomy  string
+	StartDir   string
+	Prompt     string
+	ModeHint   domain.Mode
+	AutoYes    bool
+	BudgetUSD  float64
+	Execute    bool
+	NoSensors  bool
+	AgentID    string
+	Apply      bool
+	PlanOnly   bool
+	Autonomy   string
+	PromptFile string
+	PDF        string
+	Image      string
 }
 
 type Result struct {
@@ -122,6 +126,16 @@ func planThenMaybeExecute(ctx stdctx.Context, opts Options, execute bool, out io
 	if err != nil {
 		return Result{}, err
 	}
+	if opts.PromptFile != "" || opts.PDF != "" || opts.Image != "" {
+		assembled, aerr := input.Assemble(input.Sources{
+			Positional: opts.Prompt, PromptFile: opts.PromptFile, PDF: opts.PDF, Image: opts.Image,
+		})
+		if aerr != nil {
+			return Result{}, aerr
+		}
+		opts.Prompt = assembled.Prompt
+		fmt.Fprintf(out, "Input: %d attachments (%v)\n", len(assembled.Attachments), assembled.Notes)
+	}
 	res := Result{}
 	res.Intent = intent.Classify(opts.Prompt)
 	mode := res.Intent.Mode
@@ -196,8 +210,16 @@ func planThenMaybeExecute(ctx stdctx.Context, opts Options, execute bool, out io
 	}
 
 	if execute {
-		if opts.AgentID != "" {
-			exRes, exErr := runWithExecutor(ctx, rc, mode, opts, out)
+		if opts.AgentID != "" && res.Intent.Complexity == intent.ComplexityTrivial && !opts.Apply {
+			fmt.Fprintln(out, "Routing: trivial prompt — using AskAgent fast path (no diff, no worktree)")
+			exRes, exErr := askAgent(ctx, rc, opts, out)
+			if exErr != nil {
+				fmt.Fprintf(out, "Ask: %v\n", exErr)
+			}
+			res.ExecutionRunID = exRes.RunID
+			res.ExecutionStatus = string(exRes.Status)
+		} else if opts.AgentID != "" {
+			exRes, exErr := runWithExecutorAndComplexity(ctx, rc, mode, opts, res.Intent.Complexity, pack, out)
 			if exErr != nil {
 				fmt.Fprintf(out, "Execute: %v\n", exErr)
 			}

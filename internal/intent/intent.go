@@ -15,6 +15,65 @@ type Classification struct {
 	Mode       domain.Mode
 	Confidence float64
 	Reasons    []string
+	Complexity Complexity
+}
+
+// Complexity is a deterministic estimate of how much work a prompt
+// requires. Used by the workflow router (`Trivial` skips spec+plan and
+// routes to the AskAgent fast path) and by the cost router (chooses
+// cheap / default / deep model from the adapter's models map).
+type Complexity string
+
+const (
+	ComplexityTrivial  Complexity = "trivial"
+	ComplexityStandard Complexity = "standard"
+	ComplexityComplex  Complexity = "complex"
+)
+
+var actionTokens = []string{
+	"create ", "add ", "implement", "build ", "fix ", "refactor",
+	"migrate", "rewrite", "extract", "introduce ", "support ", "expose ",
+	"scaffold", "audit", "optimize", "optimise", "design",
+}
+
+var trivialStarts = []string{
+	"what ", "how ", "where ", "why ", "when ", "who ",
+	"explain ", "describe ", "is ", "are ", "does ", "do ",
+	"can ", "could ", "should ", "list ",
+}
+
+// classifyComplexity inspects the lowercase prompt + the chosen mode and
+// returns a deterministic complexity tier. Heuristics are deliberately
+// blunt so the user can predict them:
+//
+//   - Trivial: question-like start, under 120 chars, no action verb.
+//   - Complex: prompt longer than 600 chars OR explicitly mentions a
+//     multi-step / cross-file scope ("entire codebase", "across files").
+//   - Standard: everything else (default — current behavior).
+func classifyComplexity(lower string, mode domain.Mode) Complexity {
+	trim := strings.TrimSpace(lower)
+	if len(trim) > 600 {
+		return ComplexityComplex
+	}
+	if strings.Contains(trim, "entire codebase") || strings.Contains(trim, "across files") || strings.Contains(trim, "every file") {
+		return ComplexityComplex
+	}
+	for _, a := range actionTokens {
+		if strings.Contains(trim, a) {
+			return ComplexityStandard
+		}
+	}
+	if len(trim) < 120 {
+		for _, s := range trivialStarts {
+			if strings.HasPrefix(trim, s) {
+				return ComplexityTrivial
+			}
+		}
+	}
+	if mode == domain.ModeQuestion {
+		return ComplexityTrivial
+	}
+	return ComplexityStandard
 }
 
 type rule struct {
@@ -101,11 +160,13 @@ func Classify(prompt string) Classification {
 	if bestScore == 0 {
 		return Classification{
 			Mode: domain.ModeFeature, Confidence: 0.3,
-			Reasons: []string{"no rule matched — defaulting to feature mode (will gate on spec)"},
+			Reasons:    []string{"no rule matched — defaulting to feature mode (will gate on spec)"},
+			Complexity: classifyComplexity(lower, domain.ModeFeature),
 		}
 	}
 	conf := bestScore / (bestScore + 1.0) // squash to 0..1
 	return Classification{
 		Mode: best, Confidence: conf, Reasons: reasons[best],
+		Complexity: classifyComplexity(lower, best),
 	}
 }
