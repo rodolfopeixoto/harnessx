@@ -79,6 +79,7 @@ func (s *Server) Handler() http.Handler {
 	s.registerImport(mux)
 	s.registerPalette(mux)
 	s.registerAutonomy(mux)
+	s.registerScans(mux)
 	mux.HandleFunc("/", s.staticOrFallback)
 	return logRequests(mux)
 }

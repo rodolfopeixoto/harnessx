@@ -46,6 +46,8 @@ func newRoot() *cobra.Command {
 		newAutonomyCmd(),
 		newHealthCmd(),
 		newStackCmd(),
+		newMCPCmd(),
+		newHookCmd(),
 		newAgentCmd(),
 		newSensorCmd(),
 		newCheckCmd(),
