@@ -1,0 +1,19 @@
+name: rclone
+description: Cloud storage sync used by harness backup
+category: tool
+probe:
+  binary: rclone
+  version_args: ["version"]
+strategies:
+  - kind: brew
+    platform: { os: [darwin] }
+    args: { package: rclone }
+  - kind: apt
+    platform: { os: [linux] }
+    args: { package: rclone }
+  - kind: dnf
+    platform: { os: [linux] }
+    args: { package: rclone }
+  - kind: pacman
+    platform: { os: [linux] }
+    args: { package: rclone }
