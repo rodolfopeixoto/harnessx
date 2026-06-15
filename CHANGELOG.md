@@ -3,6 +3,13 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-15 — v0.11.0 — install.sh smoke + completion + tutorial v0.11 (P41)
+
+- **`scripts/tests/install_smoke.sh`**: runs the public installer against a clean `HARNESS_PREFIX` in a temp dir, verifies the resulting binary boots, reports the version, and exercises `harness update status` + `harness --help`.
+- **Shell completion verified** for bash, zsh, fish via the existing `harness completion <shell>` command. Tutorial documents the per-shell install path.
+- **Tutorial `docs/tutorial-v0.11-manual.md`**: end-to-end walkthrough for every surface shipped between v0.6 and v0.10 (`install`, `runtime`, `containers`, `images`, `secret`, API adapters, `--sandbox container`, channels, help topics). 14-row validation checklist. Honest "what is not shipped yet" list (dashboard pages, brew, Windows, Apple Container `Run`, v1.0).
+- **Roadmap refresh**: v1.0.0 deferred; P41–P45 cover the 0.11 → 0.15 cycle so we dog-food each release before declaring 1.0.
+
 ## 2026-06-15 — v0.10.0 — Clean-code sweep (P40)
 
 - **Refactor `internal/index/api.go::BuildAPIMap`** (gocognit 57 → under threshold): one helper per stack (`collectRailsRoutes`, `collectNextRoutes`, `collectGoRoutes`) plus `hasStack`, `nextRoutePath`, `sortRoutes`. Behaviour preserved; tests green.
