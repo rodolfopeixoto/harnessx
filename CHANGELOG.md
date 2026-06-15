@@ -3,6 +3,16 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-15 — v0.14.0 — Dashboard UI pages for runtime / containers / images / install / secrets / backup (P44)
+
+- **`/runtime`** lists detected runtimes with selected ★, plus current binary / version / source.
+- **`/containers`** cross-runtime listing with `--all` toggle; mutations stay on the CLI for safety.
+- **`/images`** image listing across the selected runtime.
+- **`/install`** bundled manifest catalog with category filter + `harness install <name>` hint per row.
+- **`/secrets`** names per backend (env / keychain / encrypted_file); values never returned by the API.
+- **`/backup`** copy-paste cheatsheet for `harness backup` (no upload from dashboard process).
+- **Nav order** reorganised so infrastructure surfaces cluster between Resources and Cleanup.
+
 ## 2026-06-15 — v0.13.0 — Portable backup + sync via rclone (P43)
 
 - **`harness backup snapshot|restore|list|sync|remotes|remote add`**: tar.gz snapshots pushed/pulled through any rclone remote (drive, s3, dropbox, onedrive, r2, webdav, crypt). Provider credentials live in rclone; harness never touches them.
