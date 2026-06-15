@@ -22,6 +22,9 @@ type Runtime interface {
 	List(ctx context.Context, opts ListOptions) ([]Container, error)
 	Kill(ctx context.Context, id string) error
 	Prune(ctx context.Context, opts PruneOptions) (PruneResult, error)
+	Run(ctx context.Context, spec RunSpec) (RunResult, error)
+	ListImages(ctx context.Context) ([]Image, error)
+	PruneImages(ctx context.Context, opts ImagePruneOptions) (PruneResult, error)
 }
 
 type ListOptions struct {

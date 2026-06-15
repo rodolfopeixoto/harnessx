@@ -70,6 +70,12 @@ type Request struct {
 	// EnhancedPrompt overrides Prompt when non-empty; the executor still
 	// records the original Prompt on the Result for audit.
 	EnhancedPrompt string
+	// Sandbox = host (default) runs the adapter on the host directly;
+	// container runs it inside the project's selected runtime via the
+	// internal/runtime/containers abstraction with the worktree
+	// bind-mounted into /work.
+	Sandbox      string
+	SandboxImage string
 }
 
 type SensorOutcome struct {

@@ -103,7 +103,7 @@ func (e *DefaultExecutor) Execute(ctx context.Context, req Request) (Result, err
 		return res, err
 	}
 
-	agentRes := e.Adapter.Run(ctx, agentReq)
+	agentRes := e.invokeAdapter(ctx, req, wt, agentReq)
 	if err := os.WriteFile(stdoutPath, agentRes.Output.Stdout, 0o644); err != nil {
 		return res, fmt.Errorf("execution: write stdout: %w", err)
 	}
@@ -220,6 +220,20 @@ func (e *DefaultExecutor) finalizeNoChanges(ctx context.Context, req Request, wt
 		return *res, fmt.Errorf("agent produced no changes for %s mode", req.Mode)
 	}
 	return *res, nil
+}
+
+func (e *DefaultExecutor) invokeAdapter(ctx context.Context, req Request, wt Worktree, agentReq agents.AgentRequest) agents.AgentResult {
+	if SandboxMode(req.Sandbox) != SandboxContainer {
+		return e.Adapter.Run(ctx, agentReq)
+	}
+	binary := e.Adapter.ID()
+	sb := SandboxSpec{Mode: SandboxContainer, Image: req.SandboxImage}
+	res, err := runInContainer(ctx, e.ProjectRoot, sb, wt, agentReq, binary)
+	if err != nil {
+		res.Err = err
+		res.Failure = agents.FailureTransient
+	}
+	return res
 }
 
 func (e *DefaultExecutor) buildAgentRequest(req Request, wt Worktree, runDir string, res *Result) agents.AgentRequest {

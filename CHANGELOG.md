@@ -3,6 +3,13 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-15 — v0.9.0 — Sandboxed agent execution + harness images (P39)
+
+- **`Runtime.Run`**: docker-like runtimes (docker, podman, orbstack, colima) gain `Run(ctx, RunSpec) (RunResult, error)` for one-shot containers with bind mounts, env, stdin, auto-remove, timeout. AppleContainer stub returns actionable error pointing at `harness runtime set docker/podman`.
+- **`Runtime.ListImages` + `PruneImages`**: cross-runtime image ops with the same two-key safety rule as containers.
+- **`harness images list|prune`**: tabular listing + dangling prune (gated by `HARNESS_CONTAINERS_I_UNDERSTAND=1`).
+- **Executor sandbox dispatch**: `execution.Request.Sandbox = "host"|"container"` + `SandboxImage` (default `alpine:3.20`). When `container`, the worktree bind-mounts at `/work` and the agent CLI runs inside the runtime via `runInContainer`. `--sandbox container --sandbox-image <img>` on `harness execute`.
+
 ## 2026-06-15 — v0.8.0 — API agent adapters + cross-platform secret store (P38)
 
 - **Secret store** at `internal/secrets`: cross-platform backends in priority order — process env (`HARNESS_SECRET_<UPPER>` or `<UPPER>`), macOS Keychain (`security` CLI), Linux Secret Service (`secret-tool`), AES-GCM encrypted file at `~/.harness/secrets.enc`. Best practice: never log secrets, redact in `harness secret get`, encrypt-at-rest in fallback.

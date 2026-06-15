@@ -20,12 +20,14 @@ import (
 // resulting run id + paths.
 func newExecuteCmd() *cobra.Command {
 	var (
-		agentID  string
-		mode     string
-		apply    bool
-		planOnly bool
-		autonomy string
-		budget   float64
+		agentID      string
+		mode         string
+		apply        bool
+		planOnly     bool
+		autonomy     string
+		budget       float64
+		sandbox      string
+		sandboxImage string
 	)
 	c := &cobra.Command{
 		Use:   "execute <prompt>",
@@ -46,14 +48,16 @@ func newExecuteCmd() *cobra.Command {
 			}
 			ex := execution.NewDefaultExecutor(root, adapter, nil, index.Profile{})
 			req := execution.Request{
-				ProjectPath: root,
-				Prompt:      strings.Join(args, " "),
-				Mode:        execution.Mode(mode),
-				AgentID:     agentID,
-				Apply:       apply,
-				PlanOnly:    planOnly,
-				Autonomy:    execution.AutonomyLevel(autonomy),
-				BudgetUSD:   budget,
+				ProjectPath:  root,
+				Prompt:       strings.Join(args, " "),
+				Mode:         execution.Mode(mode),
+				AgentID:      agentID,
+				Apply:        apply,
+				PlanOnly:     planOnly,
+				Autonomy:     execution.AutonomyLevel(autonomy),
+				BudgetUSD:    budget,
+				Sandbox:      sandbox,
+				SandboxImage: sandboxImage,
 			}
 			res, err := ex.Execute(cmd.Context(), req)
 			if err != nil && res.Status == "" {
@@ -91,5 +95,7 @@ func newExecuteCmd() *cobra.Command {
 	c.Flags().BoolVar(&planOnly, "plan-only", false, "skip agent invocation")
 	c.Flags().StringVar(&autonomy, "autonomy", "safe_execute", "manual|plan_and_ask|safe_execute|full_project_loop|scheduled_maintenance")
 	c.Flags().Float64Var(&budget, "budget-usd", 1.0, "budget cap in USD")
+	c.Flags().StringVar(&sandbox, "sandbox", "host", "host|container — run the agent inside the selected runtime")
+	c.Flags().StringVar(&sandboxImage, "sandbox-image", "", "image to use when --sandbox container (default alpine:3.20)")
 	return c
 }
