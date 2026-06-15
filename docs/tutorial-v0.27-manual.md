@@ -1,3 +1,7 @@
+> **Superseded by `docs/tutorial-v0.28-manual.md`.** The v0.28 manual
+> covers every surface end-to-end against a real FastAPI sample with
+> all UX defects from v0.27 fixed.
+
 # HarnessX — Manual Testing Tutorial (v0.27)
 
 End-to-end walkthrough for everything shipped between v0.12 and v0.27.

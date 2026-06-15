@@ -25,21 +25,27 @@ func newSensorCmd() *cobra.Command {
 		},
 	}
 
+	var rootDir string
 	runC := &cobra.Command{
 		Use:   "run <id> [<id>...]",
 		Short: "Run one or more sensors by ID",
 		Args:  cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			dir, err := cwd()
-			if err != nil {
-				return err
+			dir := rootDir
+			if dir == "" {
+				d, err := cwd()
+				if err != nil {
+					return err
+				}
+				dir = d
 			}
-			_, err = sensorcmd.Run(cmd.Context(), sensorcmd.RunOptions{
+			_, err := sensorcmd.Run(cmd.Context(), sensorcmd.RunOptions{
 				StartDir: dir, IDs: args, FailOnError: false,
 			}, cmd.OutOrStdout())
 			return err
 		},
 	}
+	runC.Flags().StringVar(&rootDir, "root", "", "project root (defaults to cwd)")
 
 	c.AddCommand(listC, runC)
 	return c

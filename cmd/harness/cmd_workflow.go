@@ -88,7 +88,9 @@ func newWorkflowCmd(use, short string, fn workflowFn) *cobra.Command {
 			return err
 		},
 	}
-	c.Flags().Float64Var(&budget, "budget", 1.0, "max USD budget for the run")
+	c.Flags().Float64Var(&budget, "budget-usd", 1.0, "max USD budget for the run")
+	c.Flags().Float64Var(&budget, "budget", 1.0, "deprecated: use --budget-usd")
+	_ = c.Flags().MarkHidden("budget")
 	c.Flags().BoolVar(&autoYes, "yes", false, "auto-approve the plan")
 	c.Flags().BoolVar(&exec, "execute", false, "run legacy agent chain (deprecated when --agent set)")
 	c.Flags().StringVar(&agentID, "agent", "", "agent id to drive the real execution loop (claude, codex, gemini, fake-real)")
