@@ -58,18 +58,21 @@ type workflowFn func(context.Context, workflow.Options, io.Writer) (workflow.Res
 
 func newWorkflowCmd(use, short string, fn workflowFn) *cobra.Command {
 	var (
-		budget   float64
-		autoYes  bool
-		exec     bool
-		agentID  string
-		apply    bool
-		planOnly bool
-		autonomy string
+		budget     float64
+		autoYes    bool
+		exec       bool
+		agentID    string
+		apply      bool
+		planOnly   bool
+		autonomy   string
+		promptFile string
+		pdf        string
+		image      string
 	)
 	c := &cobra.Command{
 		Use:   use + " <prompt>",
 		Short: short,
-		Args:  cobra.MinimumNArgs(1),
+		Args:  cobra.MinimumNArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			dir, err := cwd()
 			if err != nil {
@@ -80,6 +83,7 @@ func newWorkflowCmd(use, short string, fn workflowFn) *cobra.Command {
 				StartDir: dir, Prompt: strings.Join(args, " "),
 				BudgetUSD: budget, AutoYes: autoYes || agentID != "", Execute: executeStep,
 				AgentID: agentID, Apply: apply, PlanOnly: planOnly, Autonomy: autonomy,
+				PromptFile: promptFile, PDF: pdf, Image: image,
 			}, cmd.OutOrStdout())
 			return err
 		},
@@ -91,6 +95,9 @@ func newWorkflowCmd(use, short string, fn workflowFn) *cobra.Command {
 	c.Flags().BoolVar(&apply, "apply", false, "apply diff to project root after gate allow")
 	c.Flags().BoolVar(&planOnly, "plan-only", false, "skip agent invocation")
 	c.Flags().StringVar(&autonomy, "autonomy", "safe_execute", "manual|plan_and_ask|safe_execute|full_project_loop|scheduled_maintenance")
+	c.Flags().StringVar(&promptFile, "prompt-file", "", "read prompt text from file (concatenated before positional)")
+	c.Flags().StringVar(&pdf, "pdf", "", "extract text from PDF via pdftotext (requires poppler-utils)")
+	c.Flags().StringVar(&image, "image", "", "attach image for vision-capable agents")
 	return c
 }
 
