@@ -20,6 +20,12 @@ import { ReportsPage } from "./pages/Reports";
 import { CleanupPage } from "./pages/Cleanup";
 import { StakeholderPage } from "./pages/Stakeholder";
 import { OnboardingPage } from "./pages/Onboarding";
+import { RuntimePage } from "./pages/Runtime";
+import { ContainersPage } from "./pages/Containers";
+import { ImagesPage } from "./pages/Images";
+import { InstallPage } from "./pages/Install";
+import { SecretsPage } from "./pages/Secrets";
+import { BackupPage } from "./pages/Backup";
 import { Shell, type NavItem } from "./ds";
 import { CommandPalette } from "./components/CommandPalette";
 
@@ -37,6 +43,12 @@ const navItems: NavItem[] = [
   { to: "/context", label: "Context" },
   { to: "/memory", label: "Memory" },
   { to: "/resources", label: "Resources" },
+  { to: "/runtime", label: "Runtime" },
+  { to: "/containers", label: "Containers" },
+  { to: "/images", label: "Images" },
+  { to: "/install", label: "Install" },
+  { to: "/secrets", label: "Secrets" },
+  { to: "/backup", label: "Backup" },
   { to: "/cleanup", label: "Cleanup" },
   { to: "/reports", label: "Reports" },
   { to: "/stakeholder", label: "Stakeholder" },
@@ -64,6 +76,12 @@ export function App() {
         <Route path="/context" element={<ContextPage />} />
         <Route path="/memory" element={<MemoryPage />} />
         <Route path="/resources" element={<ResourcesPage />} />
+        <Route path="/runtime" element={<RuntimePage />} />
+        <Route path="/containers" element={<ContainersPage />} />
+        <Route path="/images" element={<ImagesPage />} />
+        <Route path="/install" element={<InstallPage />} />
+        <Route path="/secrets" element={<SecretsPage />} />
+        <Route path="/backup" element={<BackupPage />} />
         <Route path="/cleanup" element={<CleanupPage />} />
         <Route path="/reports" element={<ReportsPage />} />
         <Route path="/stakeholder" element={<StakeholderPage />} />
