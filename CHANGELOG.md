@@ -3,6 +3,12 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-15 — v0.24.0 — Certify output UX (P58)
+
+- **`harness agent certify <id>`** now prints, per check: a `what:` line (one-sentence description of what the check proves), the existing `detail:` line, and a `fix:` line on every failure with an actionable next step (login command, `harness install <name>`, manual smoke command).
+- **Final one-line summary** at the bottom: `ready / usable / partial / blocked` plus the exact next command to run.
+- **simple_prompt failure** maps `signal: killed` to a clear "CLI is waiting on interactive auth" message and prints the login command from the adapter's auth block plus a manual smoke (`echo "ping" | <cli> --print --output-format json`).
+
 ## 2026-06-15 — v0.23.0 — Probe runtime-error guard (P57)
 
 - **Doctor probe** now rejects output containing runtime-error markers (`cannot find`, `command not found`, `no such file`, `permission denied`, `unknown command`, `error:`, `fatal:`, `panic:`) even when a semver digit pattern is present in the same string. Fixes the dog-food report where a broken `GOROOT` env (`go: cannot find GOROOT directory: /Users/.../.gvm/gos/go1.19.2`) was reported as ✓ because the regex extracted `1.19.2` from the path. Now flagged as `⚠ present, version probe failed` with the actionable substring in the version slot.
