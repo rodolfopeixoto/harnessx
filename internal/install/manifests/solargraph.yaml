@@ -1,0 +1,10 @@
+name: solargraph
+description: Ruby language server (gem-based)
+category: lsp
+probe:
+  binary: solargraph
+  version_args: ["--version"]
+strategies:
+  - kind: brew
+    platform: { os: [darwin] }
+    args: { package: solargraph }

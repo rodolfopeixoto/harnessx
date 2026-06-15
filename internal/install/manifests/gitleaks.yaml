@@ -1,0 +1,12 @@
+name: gitleaks
+description: Secret-leak scanner for git history
+category: quality
+probe:
+  binary: gitleaks
+  version_args: ["version"]
+strategies:
+  - kind: brew
+    platform: { os: [darwin] }
+    args: { package: gitleaks }
+  - kind: go_install
+    args: { package: github.com/gitleaks/gitleaks/v8 }

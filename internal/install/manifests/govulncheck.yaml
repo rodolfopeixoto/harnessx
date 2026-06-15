@@ -1,0 +1,9 @@
+name: govulncheck
+description: Go vulnerability scanner
+category: quality
+probe:
+  binary: govulncheck
+  version_args: ["-version"]
+strategies:
+  - kind: go_install
+    args: { package: golang.org/x/vuln/cmd/govulncheck }

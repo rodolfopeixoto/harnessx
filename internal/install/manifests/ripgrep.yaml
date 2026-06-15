@@ -1,0 +1,21 @@
+name: ripgrep
+description: Fast recursive grep written in Rust
+category: tool
+probe:
+  binary: rg
+  version_args: ["--version"]
+strategies:
+  - kind: brew
+    platform: { os: [darwin] }
+    args: { package: ripgrep }
+  - kind: apt
+    platform: { os: [linux] }
+    args: { package: ripgrep }
+  - kind: dnf
+    platform: { os: [linux] }
+    args: { package: ripgrep }
+  - kind: pacman
+    platform: { os: [linux] }
+    args: { package: ripgrep }
+  - kind: cargo_install
+    args: { package: ripgrep }

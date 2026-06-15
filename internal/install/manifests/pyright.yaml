@@ -1,0 +1,9 @@
+name: pyright
+description: Microsoft Python language server
+category: lsp
+probe:
+  binary: pyright-langserver
+  version_args: ["--version"]
+strategies:
+  - kind: npm_global
+    args: { package: pyright }

@@ -1,0 +1,10 @@
+name: gopls
+description: Official Go language server
+category: lsp
+probe:
+  binary: gopls
+  version_args: ["version"]
+strategies:
+  - kind: go_install
+    args:
+      package: golang.org/x/tools/gopls

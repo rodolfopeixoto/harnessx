@@ -1,0 +1,9 @@
+name: claude
+description: Anthropic Claude Code CLI
+category: agent
+probe:
+  binary: claude
+  version_args: ["--version"]
+strategies:
+  - kind: npm_global
+    args: { package: "@anthropic-ai/claude-code" }

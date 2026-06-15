@@ -1,0 +1,9 @@
+name: tsserver
+description: TypeScript language server (LSP wrapper)
+category: lsp
+probe:
+  binary: typescript-language-server
+  version_args: ["--version"]
+strategies:
+  - kind: npm_global
+    args: { package: typescript-language-server }

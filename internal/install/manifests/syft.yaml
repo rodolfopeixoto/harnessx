@@ -1,0 +1,13 @@
+name: syft
+description: SBOM generator for container images and filesystems
+category: quality
+probe:
+  binary: syft
+  version_args: ["version"]
+strategies:
+  - kind: brew
+    platform: { os: [darwin] }
+    args: { package: syft }
+  - kind: brew
+    platform: { os: [linux] }
+    args: { package: syft }

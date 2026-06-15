@@ -57,6 +57,38 @@ func RenderDoctor(w io.Writer, r doctor.Report) {
 	}
 
 	fmt.Fprintln(w, box.Render(b.String()))
+
+	hints := collectInstallHints(r)
+	if len(hints) > 0 {
+		fmt.Fprintln(w, Heading.Render("Recommended installs"))
+		for _, h := range hints {
+			fmt.Fprintln(w, "  "+Muted.Render("→ harness install "+h))
+		}
+	}
+}
+
+func collectInstallHints(r doctor.Report) []string {
+	var out []string
+	seen := map[string]bool{}
+	add := func(entries []doctor.Entry) {
+		for _, e := range entries {
+			if e.Spec.InstallID == "" {
+				continue
+			}
+			if e.Result.Present && e.Result.Err == nil {
+				continue
+			}
+			if !seen[e.Spec.InstallID] {
+				seen[e.Spec.InstallID] = true
+				out = append(out, e.Spec.InstallID)
+			}
+		}
+	}
+	add(r.Tools)
+	add(r.LSPs)
+	add(r.Quality)
+	add(r.Agents)
+	return out
 }
 
 func entryLine(e doctor.Entry) string {

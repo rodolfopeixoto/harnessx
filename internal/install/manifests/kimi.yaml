@@ -1,0 +1,9 @@
+name: kimi
+description: Moonshot Kimi CLI
+category: agent
+probe:
+  binary: kimi
+  version_args: ["--version"]
+strategies:
+  - kind: npm_global
+    args: { package: "@moonshot/kimi-cli" }

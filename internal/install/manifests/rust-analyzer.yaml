@@ -1,0 +1,13 @@
+name: rust-analyzer
+description: Rust language server
+category: lsp
+probe:
+  binary: rust-analyzer
+  version_args: ["--version"]
+strategies:
+  - kind: brew
+    platform: { os: [darwin] }
+    args: { package: rust-analyzer }
+  - kind: pacman
+    platform: { os: [linux] }
+    args: { package: rust-analyzer }

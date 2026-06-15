@@ -1,0 +1,12 @@
+name: golangci-lint
+description: Go meta-linter (fast)
+category: quality
+probe:
+  binary: golangci-lint
+  version_args: ["version"]
+strategies:
+  - kind: brew
+    platform: { os: [darwin] }
+    args: { package: golangci-lint }
+  - kind: go_install
+    args: { package: github.com/golangci/golangci-lint/v2/cmd/golangci-lint }

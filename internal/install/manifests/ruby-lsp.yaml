@@ -1,0 +1,10 @@
+name: ruby-lsp
+description: Ruby language server from Shopify
+category: lsp
+probe:
+  binary: ruby-lsp
+  version_args: ["--version"]
+strategies:
+  - kind: brew
+    platform: { os: [darwin] }
+    args: { package: ruby-lsp }

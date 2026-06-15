@@ -1,0 +1,11 @@
+name: basedpyright
+description: Pyright fork with extra checks
+category: lsp
+probe:
+  binary: basedpyright-langserver
+  version_args: ["--version"]
+strategies:
+  - kind: npm_global
+    args: { package: basedpyright }
+  - kind: pip_user
+    args: { package: basedpyright }
