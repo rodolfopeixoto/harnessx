@@ -297,10 +297,11 @@ user-triggered artefact reports — `harness security-audit`, etc. —
 live there now).
 
 ```bash
-harness report --last
+harness report
 ```
 
-Reads the most recent run report.
+Prints the most recent run report (now read from
+`.harness/runs/<id>/report.md`).
 
 ---
 
