@@ -1,0 +1,6 @@
+name: memory
+description: In-process knowledge-graph memory via @modelcontextprotocol/server-memory
+transport: stdio
+command: npx
+args: ["-y", "@modelcontextprotocol/server-memory"]
+docs: https://github.com/modelcontextprotocol/servers/tree/main/src/memory

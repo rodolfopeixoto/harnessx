@@ -1,0 +1,8 @@
+name: github
+description: GitHub API access via @modelcontextprotocol/server-github (needs GITHUB_PERSONAL_ACCESS_TOKEN)
+transport: stdio
+command: npx
+args: ["-y", "@modelcontextprotocol/server-github"]
+env:
+  GITHUB_PERSONAL_ACCESS_TOKEN: ${GITHUB_PERSONAL_ACCESS_TOKEN}
+docs: https://github.com/modelcontextprotocol/servers/tree/main/src/github

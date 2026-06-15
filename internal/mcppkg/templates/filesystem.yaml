@@ -1,0 +1,6 @@
+name: filesystem
+description: Read/write access to the project root filesystem via @modelcontextprotocol/server-filesystem
+transport: stdio
+command: npx
+args: ["-y", "@modelcontextprotocol/server-filesystem", "."]
+docs: https://github.com/modelcontextprotocol/servers/tree/main/src/filesystem

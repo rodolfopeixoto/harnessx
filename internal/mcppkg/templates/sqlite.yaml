@@ -1,0 +1,6 @@
+name: sqlite
+description: SQLite query access via @modelcontextprotocol/server-sqlite (point at .harness/db/harness.sqlite or your own)
+transport: stdio
+command: npx
+args: ["-y", "@modelcontextprotocol/server-sqlite", "--db-path", ".harness/db/harness.sqlite"]
+docs: https://github.com/modelcontextprotocol/servers/tree/main/src/sqlite

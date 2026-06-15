@@ -1,0 +1,8 @@
+name: brave-search
+description: Brave Search API via @modelcontextprotocol/server-brave-search (needs BRAVE_API_KEY)
+transport: stdio
+command: npx
+args: ["-y", "@modelcontextprotocol/server-brave-search"]
+env:
+  BRAVE_API_KEY: ${BRAVE_API_KEY}
+docs: https://github.com/modelcontextprotocol/servers/tree/main/src/brave-search

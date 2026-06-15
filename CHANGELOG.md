@@ -3,6 +3,12 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-15 — v0.19.0 — Bundled MCP templates (P49)
+
+- **`internal/mcppkg`**: 7 bundled MCP server templates — `filesystem`, `github`, `postgres`, `sqlite`, `brave-search`, `fetch`, `memory`. Each carries transport / command / args / env / docs URL.
+- **`harness mcp templates`**: lists available templates with command + description so operators do not have to grep upstream docs.
+- **`harness mcp install <name>` auto-fills** from the bundled template (when one matches the name). `--command`, `--url`, `--transport` still override. Result lands at `.harness/mcp/<name>.json` with `args`, `env`, `docs` fields too — the Executor's MCP injection picks it up unchanged.
+
 ## 2026-06-15 — v0.18.0 — Doctor --fix + harness worktree cleanup detector (P48)
 
 - **`harness doctor --fix [--dry-run]`**: walks every ⚠/✗ probe that ships a bundled install manifest and runs `harness install <name>` for each. `--dry-run` prints the chosen strategy per tool without executing. Reuses the same `install.NewRegistry()` strategy picker so the per-platform behaviour matches one-shot `harness install`.

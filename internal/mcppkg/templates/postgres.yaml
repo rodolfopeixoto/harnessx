@@ -1,0 +1,6 @@
+name: postgres
+description: Read-only Postgres query access via @modelcontextprotocol/server-postgres
+transport: stdio
+command: npx
+args: ["-y", "@modelcontextprotocol/server-postgres", "postgresql://localhost/postgres"]
+docs: https://github.com/modelcontextprotocol/servers/tree/main/src/postgres
