@@ -1,0 +1,39 @@
+id: anthropic-api
+name: Anthropic API (direct)
+type: api
+capabilities:
+  text: true
+  vision: true
+  files: true
+  json_output: true
+  tool_use: true
+  mcp: false
+  max_context_tokens: 200000
+models:
+  cheap: claude-haiku-4-5
+  default: claude-sonnet-4-6
+  deep: claude-opus-4-7
+api:
+  endpoint: https://api.anthropic.com/v1/messages
+  method: POST
+  headers:
+    anthropic-version: "2023-06-01"
+  auth:
+    header: x-api-key
+    secret_ref: secret://anthropic_api_key
+  request_template: |
+    {"model":"{{model}}","max_tokens":4096,"messages":[{"role":"user","content":"{{prompt}}"}]}
+  response:
+    final_message: "$.content.0.text"
+    usage: "$.usage"
+  timeout_seconds: 180
+  retry:
+    max: 2
+    backoff_ms: 1000
+failure_detection:
+  rate_limit: ["rate_limit", "429"]
+  auth: ["invalid_api_key", "authentication_error", "401"]
+  context_limit: ["context_length_exceeded"]
+cost:
+  input_token_price_per_1m: 3.0
+  output_token_price_per_1m: 15.0

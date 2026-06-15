@@ -45,3 +45,7 @@ cost:
   mode: estimated
   input_token_price_per_1m: 0.6
   output_token_price_per_1m: 2.5
+
+auth:
+  login_command: kimi login --provider moonshot
+  doc_url: https://platform.moonshot.cn

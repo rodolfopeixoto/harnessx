@@ -3,6 +3,16 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-15 — v0.8.0 — API agent adapters + cross-platform secret store (P38)
+
+- **Secret store** at `internal/secrets`: cross-platform backends in priority order — process env (`HARNESS_SECRET_<UPPER>` or `<UPPER>`), macOS Keychain (`security` CLI), Linux Secret Service (`secret-tool`), AES-GCM encrypted file at `~/.harness/secrets.enc`. Best practice: never log secrets, redact in `harness secret get`, encrypt-at-rest in fallback.
+- **`harness secret list|set|get|unset|info`** with `--from-env`, `--from-file`, `--reveal`. Set hidden via stdin terminal prompt; reveal opt-in.
+- **API adapter type** in `internal/agents/yaml` accepts `type: api` with an `api:` block (endpoint, method, headers, auth.header/scheme/secret_ref/query_param, request_template with `{{prompt}}/{{model}}`, response.final_message + usage JSONPath, timeout, retry).
+- **`internal/agents/http.Adapter`** implements `AgentAdapter` via stdlib `net/http`; resolves secrets via `secrets.Store.Resolve`; classifies HTTP failures (401/403→auth, 429→rate, 5xx→transient, 4xx→permanent).
+- **5 bundled API adapters**: `anthropic-api`, `openai-api`, `gemini-api`, `moonshot-api`, `minimax-api`.
+- **`harness agent login <id>`**: CLI adapters print `claude login` / `codex auth login` / etc.; API adapters store the API key in the secret backend (via stdin or `--from-env`).
+- **`harness agent install <id>`** alias for `agent add`.
+
 ## 2026-06-15 — v0.7.0 — Container runtime selection + harness containers (P37)
 
 - **Runtime interface** in `internal/runtime/containers/runtime.go`: pluggable abstraction with Docker, Podman, OrbStack, AppleContainer, Colima impls. `Detect(ctx)` returns available runtimes ordered by per-platform preference (macOS: apple_container > docker > orbstack > podman > colima; linux: docker > podman > orbstack > colima).

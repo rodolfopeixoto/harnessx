@@ -1,0 +1,36 @@
+id: openai-api
+name: OpenAI API (direct)
+type: api
+capabilities:
+  text: true
+  vision: true
+  json_output: true
+  tool_use: true
+  max_context_tokens: 128000
+models:
+  cheap: gpt-4o-mini
+  default: gpt-4o
+  deep: o1-preview
+api:
+  endpoint: https://api.openai.com/v1/chat/completions
+  method: POST
+  auth:
+    header: Authorization
+    scheme: Bearer
+    secret_ref: secret://openai_api_key
+  request_template: |
+    {"model":"{{model}}","messages":[{"role":"user","content":"{{prompt}}"}]}
+  response:
+    final_message: "$.choices.0.message.content"
+    usage: "$.usage"
+  timeout_seconds: 180
+  retry:
+    max: 2
+    backoff_ms: 1000
+failure_detection:
+  rate_limit: ["rate_limit", "429"]
+  auth: ["invalid_api_key", "401"]
+  context_limit: ["context_length_exceeded"]
+cost:
+  input_token_price_per_1m: 2.5
+  output_token_price_per_1m: 10.0

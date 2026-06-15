@@ -1,0 +1,30 @@
+id: gemini-api
+name: Google Gemini API (direct)
+type: api
+capabilities:
+  text: true
+  vision: true
+  json_output: true
+  max_context_tokens: 1000000
+models:
+  cheap: gemini-2.0-flash-lite
+  default: gemini-2.0-flash
+  deep: gemini-2.5-pro
+api:
+  endpoint: https://generativelanguage.googleapis.com/v1beta/models/{{model}}:generateContent
+  method: POST
+  auth:
+    query_param: key
+    secret_ref: secret://gemini_api_key
+  request_template: |
+    {"contents":[{"parts":[{"text":"{{prompt}}"}]}]}
+  response:
+    final_message: "$.candidates.0.content.parts.0.text"
+    usage: "$.usageMetadata"
+  timeout_seconds: 180
+failure_detection:
+  rate_limit: ["RESOURCE_EXHAUSTED", "429"]
+  auth: ["UNAUTHENTICATED", "401", "403"]
+cost:
+  input_token_price_per_1m: 0.075
+  output_token_price_per_1m: 0.30

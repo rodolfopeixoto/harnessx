@@ -62,6 +62,36 @@ type Spec struct {
 		DocURL       string `yaml:"doc_url"`
 		Check        string `yaml:"check"`
 	} `yaml:"auth"`
+
+	API APISpec `yaml:"api"`
+}
+
+type APISpec struct {
+	Endpoint        string            `yaml:"endpoint"`
+	Method          string            `yaml:"method"`
+	Headers         map[string]string `yaml:"headers"`
+	Auth            APIAuth           `yaml:"auth"`
+	RequestTemplate string            `yaml:"request_template"`
+	Response        APIResponse       `yaml:"response"`
+	TimeoutSeconds  int               `yaml:"timeout_seconds"`
+	Retry           APIRetry          `yaml:"retry"`
+}
+
+type APIAuth struct {
+	Header     string `yaml:"header"`
+	Scheme     string `yaml:"scheme"`
+	SecretRef  string `yaml:"secret_ref"`
+	QueryParam string `yaml:"query_param"`
+}
+
+type APIResponse struct {
+	FinalMessage string `yaml:"final_message"`
+	Usage        string `yaml:"usage"`
+}
+
+type APIRetry struct {
+	Max       int `yaml:"max"`
+	BackoffMs int `yaml:"backoff_ms"`
 }
 
 // Load reads a YAML file and validates it well enough to fail fast on
@@ -107,11 +137,17 @@ func (s Spec) validate() error {
 	if s.Type == "" {
 		s.Type = "cli"
 	}
-	if s.Type != "cli" {
-		return fmt.Errorf("only type=cli is supported (got %q)", s.Type)
-	}
-	if s.Command.Binary == "" {
-		return fmt.Errorf("missing command.binary")
+	switch s.Type {
+	case "cli":
+		if s.Command.Binary == "" {
+			return fmt.Errorf("type=cli: missing command.binary")
+		}
+	case "api":
+		if s.API.Endpoint == "" {
+			return fmt.Errorf("type=api: missing api.endpoint")
+		}
+	default:
+		return fmt.Errorf("unknown type %q (cli|api)", s.Type)
 	}
 	return nil
 }

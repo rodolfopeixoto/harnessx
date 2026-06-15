@@ -20,6 +20,7 @@ import (
 	"github.com/ropeixoto/harnessx/internal/agents"
 	"github.com/ropeixoto/harnessx/internal/agents/certify"
 	"github.com/ropeixoto/harnessx/internal/agents/fake"
+	httpadapter "github.com/ropeixoto/harnessx/internal/agents/http"
 	yamladapter "github.com/ropeixoto/harnessx/internal/agents/yaml"
 	"github.com/ropeixoto/harnessx/internal/domain"
 	"github.com/ropeixoto/harnessx/internal/platform/config"
@@ -85,13 +86,20 @@ func LoadAll(root string) (*agents.Registry, map[string]string, error) {
 	sort.Strings(ids)
 	for _, id := range ids {
 		d := picks[id]
-		ad := yamladapter.New(d.spec)
+		ad := buildAdapter(d.spec)
 		if err := reg.Register(ad); err != nil {
 			return nil, nil, err
 		}
 		sources[id] = d.source
 	}
 	return reg, sources, nil
+}
+
+func buildAdapter(s yamladapter.Spec) agents.AgentAdapter {
+	if s.Type == "api" {
+		return httpadapter.New(s)
+	}
+	return yamladapter.New(s)
 }
 
 func parseSpec(b []byte) (yamladapter.Spec, error) {

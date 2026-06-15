@@ -1,0 +1,31 @@
+id: minimax-api
+name: MiniMax API (direct)
+type: api
+capabilities:
+  text: true
+  vision: true
+  json_output: true
+  max_context_tokens: 245000
+models:
+  cheap: abab6.5s-chat
+  default: abab6.5-chat
+  deep: MiniMax-Text-01
+api:
+  endpoint: https://api.minimax.chat/v1/text/chatcompletion_v2
+  method: POST
+  auth:
+    header: Authorization
+    scheme: Bearer
+    secret_ref: secret://minimax_api_key
+  request_template: |
+    {"model":"{{model}}","messages":[{"role":"user","content":"{{prompt}}"}]}
+  response:
+    final_message: "$.choices.0.message.content"
+    usage: "$.usage"
+  timeout_seconds: 180
+failure_detection:
+  rate_limit: ["rate_limit", "429"]
+  auth: ["invalid_token", "401"]
+cost:
+  input_token_price_per_1m: 1.0
+  output_token_price_per_1m: 1.0

@@ -1,0 +1,31 @@
+id: moonshot-api
+name: Moonshot (Kimi) API (direct)
+type: api
+capabilities:
+  text: true
+  files: true
+  json_output: true
+  max_context_tokens: 256000
+models:
+  cheap: moonshot-v1-8k
+  default: moonshot-v1-32k
+  deep: moonshot-v1-128k
+api:
+  endpoint: https://api.moonshot.cn/v1/chat/completions
+  method: POST
+  auth:
+    header: Authorization
+    scheme: Bearer
+    secret_ref: secret://moonshot_api_key
+  request_template: |
+    {"model":"{{model}}","messages":[{"role":"user","content":"{{prompt}}"}]}
+  response:
+    final_message: "$.choices.0.message.content"
+    usage: "$.usage"
+  timeout_seconds: 180
+failure_detection:
+  rate_limit: ["rate_limit_exceeded", "429"]
+  auth: ["invalid_authentication", "401"]
+cost:
+  input_token_price_per_1m: 0.6
+  output_token_price_per_1m: 0.6
