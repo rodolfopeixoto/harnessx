@@ -53,14 +53,17 @@ type CostLine struct {
 }
 
 func Build(root string, in Input) (string, error) {
-	dir := filepath.Join(paths.HarnessDir(root), "artifacts", "reports")
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return "", err
-	}
 	if in.RunID == "" {
 		in.RunID = ids.New()
 	}
-	path := filepath.Join(dir, in.RunID+".md")
+	runDir := filepath.Join(paths.HarnessDir(root), "runs", in.RunID)
+	if err := os.MkdirAll(runDir, 0o755); err != nil {
+		return "", err
+	}
+	path := filepath.Join(runDir, "report.md")
+	if _, err := os.Stat(path); err == nil {
+		return path, nil
+	}
 	var b strings.Builder
 	w := func(s string) { b.WriteString(s); b.WriteByte('\n') }
 
@@ -173,24 +176,25 @@ func PrintLast(startDir string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	dir := filepath.Join(paths.HarnessDir(root), "artifacts", "reports")
-	entries, err := os.ReadDir(dir)
+	runsDir := filepath.Join(paths.HarnessDir(root), "runs")
+	entries, err := os.ReadDir(runsDir)
 	if err != nil {
 		return ErrNoReport
 	}
 	var newest string
 	var newestMod time.Time
 	for _, e := range entries {
-		if e.IsDir() || filepath.Ext(e.Name()) != ".md" {
+		if !e.IsDir() {
 			continue
 		}
-		info, err := e.Info()
+		path := filepath.Join(runsDir, e.Name(), "report.md")
+		info, err := os.Stat(path)
 		if err != nil {
 			continue
 		}
 		if info.ModTime().After(newestMod) {
 			newestMod = info.ModTime()
-			newest = filepath.Join(dir, e.Name())
+			newest = path
 		}
 	}
 	if newest == "" {

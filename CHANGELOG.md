@@ -3,6 +3,17 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-15 — v0.28.0 — UX fixes from real dog-food + unified tutorial (P62)
+
+- **`harness feature --budget-usd <n>`**: canonical flag name matching the docs (`docs/anthropic-billing.md`, `harness help billing`). `--budget` kept as hidden deprecated alias for one release.
+- **`harness list`** (new top-level): composite read-only view of registered projects, last 10 runs, and bundled/installed agents. No LLM call. Replaces the previous behaviour where bare `harness list` triggered the feature-intent classifier.
+- **`harness sensor run --root <path>`**: pins the project root for ad-hoc sensor runs. Default cwd, matching what every other workflow command already accepted.
+- **Reports unified to one canonical path**: every run now writes a single `.harness/runs/<id>/report.md`. The duplicate `.harness/artifacts/reports/<id>.md` writer is gone (that directory is now reserved for user-triggered artefact reports — `harness security-audit`, `harness report perf`, etc.). `harness report --last` now reads from the runs directory.
+- **`harness init` scaffolds `.harness/hooks/pre-tool-use.sh`** as a permissive `exit 0` stub with a comment block listing the bundled templates. Empty hooks directory never blocks a run again.
+- **`harness hook add <event>`**: interactive selector that lists every bundled template matching the event and installs the chosen one to `.harness/hooks/<event>.sh` with `chmod 755`. `--yes` installs the first match without prompting.
+- **Hook block messages name the script and the fix**: `pre-tool-use blocked by .harness/hooks/pre-tool-use.sh (exit 1)\n  → make the script exit 0 to allow, or remove .harness/hooks/pre-tool-use.sh` replaces the cryptic `pre-tool-use(pre-tool-use)=1`.
+- **`docs/tutorial-v0.28-manual.md`**: new unified end-to-end walkthrough against a FastAPI / Python sample app (17 sections, expected output per step). Proves HarnessX is language-independent. Older tutorials (`v0.4`, `v0.11`, `v0.27`) carry a redirect notice at the top.
+
 ## 2026-06-15 — v0.27.0 — Interactive Claude Code adapter (P61) [experimental]
 
 - **`--agent claude-interactive`**: drives Claude Code's interactive REPL programmatically so runs draw from the operator's Pro/Max subscription bucket instead of the Agent SDK monthly credit. Three strategies: `pty` (default, via `github.com/creack/pty`), `tmux` (opt-in, uses `send-keys` + `capture-pane`), `iterm2` (macOS opt-in, via `osascript`).
