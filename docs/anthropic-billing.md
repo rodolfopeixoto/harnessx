@@ -15,13 +15,13 @@ keep automation predictable.
 
 | Stream | What triggers it | How HarnessX hits it |
 |---|---|---|
-| Subscription usage | Interactive `claude` in terminal / IDE, `claude.ai` chat, Claude Cowork | **Never** (HarnessX is always non-interactive) |
+| Subscription usage | Interactive `claude` in terminal / IDE, `claude.ai` chat, Claude Cowork | `--agent claude-interactive` (experimental, drives the REPL via PTY / tmux / iTerm2) |
 | Agent SDK monthly credit | `claude -p` (or `--print`), Claude Agent SDK, claude-code GitHub Action | Default `--agent claude` adapter (`claude --print --output-format json`) |
 | Pay-as-you-go API | Calls with an Anthropic API key (`x-api-key` header) | `--agent anthropic-api` adapter |
 
 The Agent SDK credit by plan (refreshes monthly, per user, does not pool):
 
-| Plan | Credit |
+| Plan | Credit (as of 2026-06-15) |
 |---|---|
 | Pro | $20 |
 | Max 5x | $100 |
@@ -30,6 +30,8 @@ The Agent SDK credit by plan (refreshes monthly, per user, does not pool):
 | Team Premium | $100 |
 | Enterprise (usage-based) | $20 |
 | Enterprise (seat-based Premium) | $200 |
+
+Always cross-check current values at https://www.anthropic.com/pricing and your plan settings page — Anthropic adjusts credits and amounts without notice.
 
 Source: https://support.anthropic.com — "Use the Claude Agent SDK with your Claude plan".
 
@@ -52,7 +54,8 @@ harness feature "..." --agent anthropic-api --apply
 
 Cost per token published at https://www.anthropic.com/pricing. The
 adapter's `cost.input_token_price_per_1m` + `output_token_price_per_1m`
-are pre-filled at v0.21 rates; bump them when Anthropic updates pricing.
+are pre-filled at v0.21 rates (as of 2026-06-15); bump them when
+Anthropic updates pricing.
 
 ### B — `claude` CLI with the Agent SDK monthly credit
 
@@ -70,12 +73,26 @@ harness feature "..." --agent claude --apply
 returned by `claude --print --output-format json`; cross-check against
 the Anthropic console under "Agent SDK usage".
 
-### C — Hybrid
+### C — `claude-interactive` (experimental, subscription-billed)
 
-`claude` interactively for exploration (subscription).
-`anthropic-api` for HarnessX automation (pay-as-you-go).
+Drives Claude Code's interactive REPL programmatically so the run
+counts against the Pro/Max subscription instead of the Agent SDK
+credit. PTY by default; tmux and iTerm2 strategies opt-in.
 
-Practical: install both adapters. Pin per call.
+```bash
+harness agent install claude-interactive
+harness agent certify claude-interactive --simple-timeout 180s
+harness feature "..." --agent claude-interactive --apply
+```
+
+Experimental — REPL surface is undocumented; may break on Claude Code
+upgrades. Token counts return `mode: estimated`.
+
+### D — Hybrid
+
+`claude-interactive` for subscription runs, `anthropic-api` for
+unlimited pay-as-you-go, `claude` (`--print`) when you want to draw
+from the Agent SDK monthly credit. Install all three, pin per call.
 
 ---
 

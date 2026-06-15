@@ -138,15 +138,21 @@ Anthropic splits spending into three buckets (post 2026-06-15):
 
 How HarnessX adapters map:
 
-  --agent claude            uses 'claude --print --output-format json' -> Agent SDK credit
-                            ($20-$200/month depending on plan)
-  --agent anthropic-api     direct API key -> pay-as-you-go, no monthly cap
+  --agent claude               'claude --print --output-format json' -> Agent SDK credit
+                               ($20-$200/month per plan, as of 2026-06-15)
+  --agent claude-interactive   experimental; drives REPL via PTY/tmux/iTerm2
+                               -> Pro/Max subscription bucket
+  --agent anthropic-api        direct API key -> pay-as-you-go, no monthly cap
 
 Pick by workload:
 
-  automation-heavy          use anthropic-api with --budget-usd per run
-  exploration + a bit       use claude CLI, opt in Agent SDK credit at
+  automation-heavy          anthropic-api with --budget-usd per run
+  subscription-billed       claude-interactive (experimental)
+  exploration + a bit       claude CLI; opt in Agent SDK credit at
                             https://console.anthropic.com -> plan settings
+
+Amounts shown above are as of 2026-06-15. Always cross-check current
+values at https://www.anthropic.com/pricing and your plan settings.
 
 Set a per-run cap with --budget-usd 0.50. Watch harness metrics --since 1d.
 
