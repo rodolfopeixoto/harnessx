@@ -136,13 +136,23 @@ func (r *Registry) Add(ctx context.Context, rootPath, displayName, slug string) 
 	if err := r.inTx(ctx, func(tx *sql.Tx) error {
 		existing, terr := txByRoot(ctx, tx, abs)
 		if terr == nil {
+			newSlug := existing.Slug
+			if slug != "" && slug != existing.Slug {
+				if other, serr := txBySlug(ctx, tx, slug); serr == nil && other.ID != existing.ID {
+					return fmt.Errorf("workspace: slug %q already used by %s", slug, other.RootPath)
+				} else if serr != nil && !errors.Is(serr, ErrNotFound) {
+					return serr
+				}
+				newSlug = slug
+			}
 			if _, terr := tx.ExecContext(ctx,
-				`update projects set last_seen_at = ?, display_name = ? where id = ?`,
-				now, displayName, existing.ID); terr != nil {
+				`update projects set last_seen_at = ?, display_name = ?, slug = ? where id = ?`,
+				now, displayName, newSlug, existing.ID); terr != nil {
 				return fmt.Errorf("workspace: refresh: %w", terr)
 			}
 			existing.LastSeenAt = parseTimePtr(now)
 			existing.DisplayName = displayName
+			existing.Slug = newSlug
 			result = existing
 			return nil
 		}
