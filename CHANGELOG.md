@@ -3,6 +3,16 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-15 — v0.13.0 — Portable backup + sync via rclone (P43)
+
+- **`harness backup snapshot|restore|list|sync|remotes|remote add`**: tar.gz snapshots pushed/pulled through any rclone remote (drive, s3, dropbox, onedrive, r2, webdav, crypt). Provider credentials live in rclone; harness never touches them.
+- **Default `.harness/config/backup.yaml`** includes `config + artifacts/specs + runs`; excludes `db`, `cache`, `worktrees`, `secrets.enc`, `secret-seed`.
+- **Secrets default to excluded**. `--include-secrets` requires `HARNESS_BACKUP_I_UNDERSTAND_SECRETS=1`; recommendation: route the bucket through an rclone `crypt` overlay.
+- **Manifest** per snapshot: harness version, OS/arch, included paths, SHA-256 per entry, tag, timestamp.
+- **Path-traversal guard** + 500 MiB per-file ceiling on restore. Refuses to write into a non-empty target without `--force`.
+- **`internal/install/manifests/rclone.yaml`** + `harness install rclone` per-platform (brew / apt / dnf / pacman).
+- **`.harness/artifacts/specs/p43-backup-sync.md`** records the design + safety rules.
+
 ## 2026-06-15 — v0.12.0 — Dashboard read-only APIs (P42)
 
 - **`GET /api/runtime`** — currently selected runtime: id, binary, version, source (env|config|auto).
