@@ -85,3 +85,22 @@ func TestProbe_RealFailureNoVersionKeepsErr(t *testing.T) {
 	require.True(t, r.Present)
 	require.Error(t, r.Err)
 }
+
+func TestProbe_RuntimeErrorMessageWithSemverIsStillError(t *testing.T) {
+	p := &Probe{
+		Lookup: func(string) (string, error) { return "/usr/local/bin/go", nil },
+		Runner: runner("go: cannot find GOROOT directory: /Users/x/.gvm/gos/go1.19.2", "", errors.New("exit status 2")),
+	}
+	r := p.Run(context.Background(), "go", []string{"version"}, time.Second)
+	require.True(t, r.Present)
+	require.Error(t, r.Err, "runtime error must not be masked by an incidental semver match")
+}
+
+func TestProbe_CommandNotFoundFlagsAsError(t *testing.T) {
+	p := &Probe{
+		Lookup: func(string) (string, error) { return "/bin/x", nil },
+		Runner: runner("zsh: command not found: x 1.0.0", "", errors.New("exit status 127")),
+	}
+	r := p.Run(context.Background(), "x", []string{"--version"}, time.Second)
+	require.Error(t, r.Err)
+}

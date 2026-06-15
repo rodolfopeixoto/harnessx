@@ -82,12 +82,42 @@ func (p *Probe) RunSpec(parent context.Context, spec Spec) Result {
 		}
 	}
 	version, matched := extractVersion(combined, spec.VersionRegex)
+	if looksLikeRuntimeError(combined) {
+		res.Version = firstLine(combined)
+		if err == nil {
+			err = errors.New("probe: runtime error in output")
+		}
+		res.Err = err
+		res.Took = time.Since(start)
+		return res
+	}
 	res.Version = version
 	if !matched && err != nil {
 		res.Err = err
 	}
 	res.Took = time.Since(start)
 	return res
+}
+
+var runtimeErrorMarkers = []string{
+	"cannot find",
+	"command not found",
+	"no such file",
+	"permission denied",
+	"unknown command",
+	"error:",
+	"fatal:",
+	"panic:",
+}
+
+func looksLikeRuntimeError(output string) bool {
+	low := strings.ToLower(output)
+	for _, marker := range runtimeErrorMarkers {
+		if strings.Contains(low, marker) {
+			return true
+		}
+	}
+	return false
 }
 
 func joinNonEmpty(a, b string) string {

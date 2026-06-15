@@ -3,6 +3,11 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-15 — v0.23.0 — Probe runtime-error guard (P57)
+
+- **Doctor probe** now rejects output containing runtime-error markers (`cannot find`, `command not found`, `no such file`, `permission denied`, `unknown command`, `error:`, `fatal:`, `panic:`) even when a semver digit pattern is present in the same string. Fixes the dog-food report where a broken `GOROOT` env (`go: cannot find GOROOT directory: /Users/.../.gvm/gos/go1.19.2`) was reported as ✓ because the regex extracted `1.19.2` from the path. Now flagged as `⚠ present, version probe failed` with the actionable substring in the version slot.
+- **Unit tests** added: runtime-error-with-incidental-semver and command-not-found cases.
+
 ## 2026-06-15 — v0.22.0 — Roadmap-done index + final polish (P56)
 
 - **`docs/ROADMAP-DONE.md`**: single source of truth for v0.4 → v0.21. Phase table, cumulative CLI surface, dashboard pages, HTTP API, bundled artifacts (17 install / 7 mcp / 5 hook / 4 skill / 9 agent / 5 runtime / 7 cleanup), cross-platform release matrix, quality gates green at v0.21, open list, operator update path.
