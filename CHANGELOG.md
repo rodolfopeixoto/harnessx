@@ -3,6 +3,10 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-15 — v0.28.1 — Slug update honored on project re-add (hotfix)
+
+- **`harness project add <path> --slug <new>`** now updates the slug when the project root is already registered, instead of silently keeping the original slug. Collision against another row still rejects with the existing `slug %q already used by %s` error.
+
 ## 2026-06-15 — v0.28.0 — UX fixes from real dog-food + unified tutorial (P62)
 
 - **`harness feature --budget-usd <n>`**: canonical flag name matching the docs (`docs/anthropic-billing.md`, `harness help billing`). `--budget` kept as hidden deprecated alias for one release.
