@@ -3,20 +3,12 @@
 package main
 
 import (
-	"archive/tar"
-	"compress/gzip"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
-	"strings"
 	"text/tabwriter"
-	"time"
 
 	"github.com/spf13/cobra"
 
@@ -178,8 +170,8 @@ func updateFromRelease(out io.Writer, repo, tag string, dryRun bool) error {
 		fmt.Fprintln(out, "already on target tag — nothing to do")
 		return nil
 	}
-	target := fmt.Sprintf("harness-%s-%s", runtime.GOOS, runtime.GOARCH)
-	url := fmt.Sprintf("https://github.com/%s/releases/download/%s/%s.tar.gz", repo, tag, target)
+	target := update.PlatformTarget()
+	url := update.TarballURL(repo, tag, target)
 	shaURL := url + ".sha256"
 	fmt.Fprintf(out, "→ downloading %s\n", url)
 
@@ -190,31 +182,28 @@ func updateFromRelease(out io.Writer, repo, tag string, dryRun bool) error {
 	defer os.RemoveAll(tmpDir)
 
 	tarPath := filepath.Join(tmpDir, target+".tar.gz")
-	if err := downloadFile(url, tarPath); err != nil {
+	if err := update.DownloadFile(url, tarPath); err != nil {
 		return fmt.Errorf("download tarball: %w", err)
 	}
 	shaPath := tarPath + ".sha256"
-	if err := downloadFile(shaURL, shaPath); err != nil {
+	if err := update.DownloadFile(shaURL, shaPath); err != nil {
 		return fmt.Errorf("download sha256: %w", err)
 	}
 
 	fmt.Fprintln(out, "→ verifying SHA-256")
-	if err := verifySha256(tarPath, shaPath); err != nil {
+	if err := update.VerifySha256(tarPath, shaPath); err != nil {
 		return err
 	}
 
 	fmt.Fprintln(out, "→ extracting")
-	binPath, err := extractHarness(tarPath, tmpDir, target)
+	binPath, err := update.ExtractTarget(tarPath, tmpDir, target)
 	if err != nil {
 		return err
 	}
 
-	dest, err := os.Executable()
+	dest, err := resolveExecutable()
 	if err != nil {
-		return fmt.Errorf("locate current binary: %w", err)
-	}
-	if real, err := filepath.EvalSymlinks(dest); err == nil {
-		dest = real
+		return err
 	}
 
 	if dryRun {
@@ -223,7 +212,7 @@ func updateFromRelease(out io.Writer, repo, tag string, dryRun bool) error {
 	}
 
 	fmt.Fprintf(out, "→ installing %s\n", dest)
-	if err := replaceBinary(binPath, dest); err != nil {
+	if err := update.ReplaceBinary(binPath, dest); err != nil {
 		return err
 	}
 	fmt.Fprintln(out)
@@ -256,137 +245,30 @@ func updateFromSource(out io.Writer, repo string, dryRun bool) error {
 		return fmt.Errorf("go build: %w: %s", err, outBytes)
 	}
 	src := filepath.Join(tmpDir, "bin", "harness")
-	dest, err := os.Executable()
+	dest, err := resolveExecutable()
 	if err != nil {
 		return err
-	}
-	if real, err := filepath.EvalSymlinks(dest); err == nil {
-		dest = real
 	}
 	if dryRun {
 		fmt.Fprintf(out, "→ dry-run: built %s; would replace %s\n", src, dest)
 		return runNew(out, src, "version")
 	}
 	fmt.Fprintf(out, "→ installing %s\n", dest)
-	if err := replaceBinary(src, dest); err != nil {
+	if err := update.ReplaceBinary(src, dest); err != nil {
 		return err
 	}
 	return runNew(out, dest, "version")
 }
 
-func downloadFile(url, dest string) error {
-	client := &http.Client{Timeout: 5 * time.Minute}
-	resp, err := client.Get(url)
+func resolveExecutable() (string, error) {
+	dest, err := os.Executable()
 	if err != nil {
-		return err
+		return "", fmt.Errorf("locate current binary: %w", err)
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		return fmt.Errorf("download %s: status %d", url, resp.StatusCode)
+	if real, err := filepath.EvalSymlinks(dest); err == nil {
+		dest = real
 	}
-	f, err := os.Create(dest)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	_, err = io.Copy(f, resp.Body)
-	return err
-}
-
-func verifySha256(tarPath, shaPath string) error {
-	expectedBytes, err := os.ReadFile(shaPath)
-	if err != nil {
-		return err
-	}
-	expected := strings.Fields(strings.TrimSpace(string(expectedBytes)))[0]
-	f, err := os.Open(tarPath)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	h := sha256.New()
-	if _, err := io.Copy(h, f); err != nil {
-		return err
-	}
-	got := hex.EncodeToString(h.Sum(nil))
-	if !strings.EqualFold(expected, got) {
-		return fmt.Errorf("sha256 mismatch: expected %s got %s", expected, got)
-	}
-	return nil
-}
-
-func extractHarness(tarPath, tmpDir, target string) (string, error) {
-	f, err := os.Open(tarPath)
-	if err != nil {
-		return "", err
-	}
-	defer f.Close()
-	gz, err := gzip.NewReader(f)
-	if err != nil {
-		return "", err
-	}
-	defer func() { _ = gz.Close() }()
-	tr := tar.NewReader(gz)
-	for {
-		hdr, err := tr.Next()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return "", err
-		}
-		if hdr.Typeflag != tar.TypeReg {
-			continue
-		}
-		if filepath.Base(hdr.Name) != target {
-			continue
-		}
-		out := filepath.Join(tmpDir, target)
-		w, err := os.OpenFile(out, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o755)
-		if err != nil {
-			return "", err
-		}
-		if _, err := io.CopyN(w, tr, 200*1024*1024); err != nil && err != io.EOF {
-			w.Close()
-			return "", err
-		}
-		w.Close()
-		return out, nil
-	}
-	return "", fmt.Errorf("binary %s not found in tarball", target)
-}
-
-func replaceBinary(src, dest string) error {
-	info, err := os.Stat(dest)
-	if err != nil {
-		return err
-	}
-	if err := copyFile(src, dest+".new"); err != nil {
-		return err
-	}
-	if err := os.Chmod(dest+".new", info.Mode()); err != nil {
-		_ = os.Remove(dest + ".new")
-		return err
-	}
-	if err := os.Rename(dest+".new", dest); err != nil {
-		return fmt.Errorf("install: rename: %w (try sudo harness update)", err)
-	}
-	return nil
-}
-
-func copyFile(src, dst string) error {
-	in, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer in.Close()
-	out, err := os.Create(dst)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-	_, err = io.Copy(out, in)
-	return err
+	return dest, nil
 }
 
 func runCmd(bin, dir string, args ...string) ([]byte, error) {

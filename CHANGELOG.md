@@ -3,6 +3,13 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-15 — v0.10.0 — Clean-code sweep (P40)
+
+- **Refactor `internal/index/api.go::BuildAPIMap`** (gocognit 57 → under threshold): one helper per stack (`collectRailsRoutes`, `collectNextRoutes`, `collectGoRoutes`) plus `hasStack`, `nextRoutePath`, `sortRoutes`. Behaviour preserved; tests green.
+- **Refactor `internal/sensors/budget.go::snapshotValue`** (gocognit 43 → 4): table-driven `snapshotResolvers` map plus `pathValue`, `sumContainerField`, `maxContainerField`, `dockerfileFindings` resolvers.
+- **Move `cmd/harness/cmd_update.go` helpers to `internal/update`**: download / sha256 verify / tar extract / replace binary all live behind the public API now (`PlatformTarget`, `TarballURL`, `DownloadFile`, `VerifySha256`, `ExtractTarget`, `ReplaceBinary`). `cmd_update.go` is pure CLI glue.
+- **CONTRIBUTING.md** distils the comments + complexity + attribution rules so the next contributor does not reintroduce noise. Includes single-scope commit convention and no-AI-attribution policy.
+
 ## 2026-06-15 — v0.9.0 — Sandboxed agent execution + harness images (P39)
 
 - **`Runtime.Run`**: docker-like runtimes (docker, podman, orbstack, colima) gain `Run(ctx, RunSpec) (RunResult, error)` for one-shot containers with bind mounts, env, stdin, auto-remove, timeout. AppleContainer stub returns actionable error pointing at `harness runtime set docker/podman`.

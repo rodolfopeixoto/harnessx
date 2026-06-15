@@ -112,11 +112,30 @@ func newestSnapshot(root string) (map[string]any, string) {
 	return m, newest
 }
 
-// snapshotValue resolves budget keys to snapshot fields. The mapping is
-// intentionally narrow — adding a key without a snapshot mapping is a
-// no-op (skipped), not an implicit pass.
+type snapshotResolver func(snap map[string]any) (float64, bool)
+
+var snapshotResolvers = map[string]snapshotResolver{
+	"container_memory_mb":   sumContainerField("mem_usage_mb"),
+	"container_cpu_percent": maxContainerField("cpu_percent"),
+	"process_rss_mb":        pathValue("runtime", "process_rss_mb"),
+	"deps_total":            pathValue("deps", "total"),
+	"noisy_log_call_sites":  pathValue("logs", "total_call_sites"),
+	"jsonl_log_bytes":       pathValue("logs", "jsonl_bytes"),
+	"harness_dir_bytes":     pathValue("disk", "harness_dir_bytes"),
+	"project_bytes":         pathValue("disk", "project_bytes"),
+	"dockerfile_findings":   dockerfileFindings,
+}
+
 func snapshotValue(snap map[string]any, key string) (float64, bool) {
-	get := func(path ...string) (float64, bool) {
+	resolver, ok := snapshotResolvers[key]
+	if !ok {
+		return 0, false
+	}
+	return resolver(snap)
+}
+
+func pathValue(path ...string) snapshotResolver {
+	return func(snap map[string]any) (float64, bool) {
 		var cur any = snap
 		for _, p := range path {
 			m, ok := cur.(map[string]any)
@@ -130,14 +149,24 @@ func snapshotValue(snap map[string]any, key string) (float64, bool) {
 		}
 		return asFloat(cur)
 	}
-	switch key {
-	case "container_memory_mb":
-		conts, ok := snap["runtime"].(map[string]any)
+}
+
+func containerList(snap map[string]any) ([]any, bool) {
+	runtime, ok := snap["runtime"].(map[string]any)
+	if !ok {
+		return nil, false
+	}
+	list, ok := runtime["containers"].([]any)
+	if !ok || len(list) == 0 {
+		return nil, false
+	}
+	return list, true
+}
+
+func sumContainerField(field string) snapshotResolver {
+	return func(snap map[string]any) (float64, bool) {
+		list, ok := containerList(snap)
 		if !ok {
-			return 0, false
-		}
-		list, ok := conts["containers"].([]any)
-		if !ok || len(list) == 0 {
 			return 0, false
 		}
 		var total float64
@@ -146,66 +175,47 @@ func snapshotValue(snap map[string]any, key string) (float64, bool) {
 			if !ok {
 				continue
 			}
-			if v, ok := asFloat(m["mem_usage_mb"]); ok {
+			if v, ok := asFloat(m[field]); ok {
 				total += v
 			}
 		}
 		return total, true
-	case "container_cpu_percent":
-		conts, ok := snap["runtime"].(map[string]any)
+	}
+}
+
+func maxContainerField(field string) snapshotResolver {
+	return func(snap map[string]any) (float64, bool) {
+		list, ok := containerList(snap)
 		if !ok {
 			return 0, false
 		}
-		list, ok := conts["containers"].([]any)
-		if !ok || len(list) == 0 {
-			return 0, false
-		}
-		var max float64
+		var top float64
 		for _, c := range list {
 			m, ok := c.(map[string]any)
 			if !ok {
 				continue
 			}
-			if v, ok := asFloat(m["cpu_percent"]); ok && v > max {
-				max = v
+			if v, ok := asFloat(m[field]); ok && v > top {
+				top = v
 			}
 		}
-		return max, true
-	case "process_rss_mb":
-		return get("runtime", "process_rss_mb")
-	case "image_size_mb":
-		return 0, false // requires `docker history`; future Phase 9.5
-	case "build_time_s", "test_time_s":
-		return 0, false
-	case "bundle_main_kb", "bundle_vendor_kb":
-		return 0, false
-	case "request_p95_ms":
-		return 0, false
-	case "deps_total":
-		return get("deps", "total")
-	case "noisy_log_call_sites":
-		return get("logs", "total_call_sites")
-	case "jsonl_log_bytes":
-		return get("logs", "jsonl_bytes")
-	case "harness_dir_bytes":
-		return get("disk", "harness_dir_bytes")
-	case "project_bytes":
-		return get("disk", "project_bytes")
-	case "dockerfile_findings":
-		v, ok := get("dockerfile", "findings")
-		// findings is an array; len() is the metric. Fall through to a
-		// separate count when needed.
-		if ok {
-			return v, true
-		}
-		if arr, ok := snap["dockerfile"].(map[string]any); ok {
-			if list, ok := arr["findings"].([]any); ok {
-				return float64(len(list)), true
-			}
-		}
+		return top, true
+	}
+}
+
+func dockerfileFindings(snap map[string]any) (float64, bool) {
+	if v, ok := pathValue("dockerfile", "findings")(snap); ok {
+		return v, true
+	}
+	docker, ok := snap["dockerfile"].(map[string]any)
+	if !ok {
 		return 0, false
 	}
-	return 0, false
+	list, ok := docker["findings"].([]any)
+	if !ok {
+		return 0, false
+	}
+	return float64(len(list)), true
 }
 
 func numericBudget(v any) (float64, bool) { return asFloat(v) }

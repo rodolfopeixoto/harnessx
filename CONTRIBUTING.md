@@ -14,17 +14,45 @@ follows the rules below. Read them before you open a PR.
 4. `make ci` green is the contract. **There is no GitHub Actions
    pipeline** — local CI is the entire CI.
 5. Conventional Commits (enforced by `commit-msg` hook). Squash-friendly.
-   One concern per PR.
+   Single-scope (no commas). One concern per PR.
 6. No hardcoded constants — share via `internal/platform/constants`.
 7. User-facing strings via `internal/platform/i18n` (English bundle first).
 8. Tests at the interface seam. Phase boundaries are real.
+
+### Comments policy
+
+- Default to writing **no comments**. Well-named identifiers explain WHAT.
+- Add a comment only when WHY is non-obvious: a hidden constraint, a
+  subtle invariant, a workaround for a specific bug, behaviour that
+  would surprise a reader. If removing it would not confuse a future
+  reader, do not write it.
+- Never narrate what the code does ("Loop over results", "Return
+  early"). Never reference the current task, fix, or callers ("used by
+  X", "added for the Y flow", "handles the case from issue #123") —
+  those belong in the PR description and rot as the codebase evolves.
+- Never include AI attribution in commits, PRs, docs or release notes:
+  no `Co-Authored-By: Claude`, no "Generated with Claude", no `🤖`.
+  Author of every commit and release is the actual human who wrote it.
+
+### File-size + complexity ceilings
+
+- `gocognit ≤ 25` and `gocyclo ≤ 15` per function. The lint gate
+  enforces both. When a function pushes the ceiling, extract a helper
+  rather than suppress the lint.
+- File LOC ≤ 400 unless justified in a spec under
+  `.harness/artifacts/specs/`. When you cross the line, ask whether
+  the file is really one responsibility or several.
+- One public type per file when reasonable. Helpers stay `private`.
+- No upward imports from `domain` into `app` or `adapters`. Adapters
+  never import `app`. New packages must declare which layer they live
+  in (domain / app / adapters / platform).
 
 ---
 
 ## Local setup
 
 ```bash
-git clone https://github.com/ropeixoto/harnessx
+git clone https://github.com/rodolfopeixoto/harnessx
 cd harnessx
 make install-hooks                # pre-commit + commit-msg + pre-push gates
 make check                        # vet + race tests + build
