@@ -131,5 +131,15 @@ func (s *Server) secretsNames(w http.ResponseWriter, r *http.Request) {
 	if perBackend == nil {
 		perBackend = map[string][]string{}
 	}
+	for k, v := range perBackend {
+		if v == nil {
+			perBackend[k] = []string{}
+		}
+	}
+	for _, b := range store.Backends() {
+		if _, ok := perBackend[b.Name()]; !ok {
+			perBackend[b.Name()] = []string{}
+		}
+	}
 	writeJSON(w, http.StatusOK, perBackend)
 }

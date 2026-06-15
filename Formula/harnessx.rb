@@ -8,22 +8,22 @@ class Harnessx < Formula
   on_macos do
     on_arm do
       url "https://github.com/rodolfopeixoto/harnessx/releases/download/v0.15.0/harness-darwin-arm64.tar.gz"
-      sha256 "a010969e271728e97b24a2e3793fc35b4d9792b7d215aafac1e824805e50e10b"
+      sha256 "f610791d555edfbf9ac59fbd9d57388dedb4f33439b6487d96cd21ba8783c6ec"
     end
     on_intel do
       url "https://github.com/rodolfopeixoto/harnessx/releases/download/v0.15.0/harness-darwin-amd64.tar.gz"
-      sha256 "d0068b6c8d8c9b4f42d13c3ec98ddb844cfc7b7a588d17485124ee5d65be50df"
+      sha256 "243f500c837808e38cf1f108d889ef99ee20bbde570e2ffca2782619428abc65"
     end
   end
 
   on_linux do
     on_arm do
       url "https://github.com/rodolfopeixoto/harnessx/releases/download/v0.15.0/harness-linux-arm64.tar.gz"
-      sha256 "84b8ce030df203041395d987ea0b63cecb7d8acd3d9776cad6ba5c66c1f739f0"
+      sha256 "437b12ff552a741c888d29aa802ffe25b54e5310d00bff07c9343fd7a2674ca2"
     end
     on_intel do
       url "https://github.com/rodolfopeixoto/harnessx/releases/download/v0.15.0/harness-linux-amd64.tar.gz"
-      sha256 "7ecece81f8c727a393a76ed8031df9623f3fde8496047f05deb6f93e3a1f198a"
+      sha256 "d6932d5d6169ba5eca944922243531d368117a82015bef03843ef75ef9c593ce"
     end
   end
 

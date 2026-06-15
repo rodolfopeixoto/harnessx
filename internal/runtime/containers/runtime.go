@@ -366,7 +366,14 @@ func (a AppleContainer) Available(ctx context.Context) bool {
 	if err != nil {
 		return false
 	}
-	return strings.Contains(strings.ToLower(string(out)), "container")
+	if !strings.Contains(strings.ToLower(string(out)), "container") {
+		return false
+	}
+	probe := exec.CommandContext(ctx, bin, "list", "--format", "json")
+	if err := probe.Run(); err != nil {
+		return false
+	}
+	return true
 }
 
 func (a AppleContainer) Version(ctx context.Context) (string, error) {

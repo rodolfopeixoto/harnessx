@@ -3,6 +3,12 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-15 — v0.16.0 — Dog-food fixes (P46)
+
+- **Apple Container fallback**: `AppleContainer.Available` now runs a `container list --format json` probe in addition to the version check. When the probe fails (the daemon is unhealthy or the CLI flags do not match our shape), `Detect()` returns `docker` as the auto-pick. Resolves the `container list: exit status 1` operators saw when apple_container was the picked runtime but unable to actually list.
+- **`/api/secrets/names` shape**: every detected backend appears in the response (env / keychain / encrypted_file on macOS; env / secret_service / encrypted_file on Linux) with `[]` instead of `null` when no secrets are stored. Stable dashboard rendering.
+- **Dog-food smoke** in `/tmp/dogfood`: `harness init`, `project add`, `install list`, `runtime info`, `secret info`, `execute --apply`, `dashboard /api/*` all walk green now.
+
 ## 2026-06-15 — v0.15.0 — Windows binaries + Homebrew formula generator (P45)
 
 - **Windows binaries**: `make release` now cross-builds `windows/amd64` and `windows/arm64`. Windows artifacts ship as `harness-windows-<arch>.zip` (instead of tar.gz) plus matching `.sha256`. Same size budget enforcement; 18 MiB on amd64, 17 MiB on arm64.
