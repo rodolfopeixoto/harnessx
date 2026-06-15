@@ -4,6 +4,7 @@ package main
 
 import (
 	"os"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
 
@@ -31,15 +32,11 @@ func newSensorCmd() *cobra.Command {
 		Short: "Run one or more sensors by ID",
 		Args:  cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			dir := rootDir
-			if dir == "" {
-				d, err := cwd()
-				if err != nil {
-					return err
-				}
-				dir = d
+			dir, err := resolveSensorRoot(rootDir)
+			if err != nil {
+				return err
 			}
-			_, err := sensorcmd.Run(cmd.Context(), sensorcmd.RunOptions{
+			_, err = sensorcmd.Run(cmd.Context(), sensorcmd.RunOptions{
 				StartDir: dir, IDs: args, FailOnError: false,
 			}, cmd.OutOrStdout())
 			return err
@@ -49,6 +46,16 @@ func newSensorCmd() *cobra.Command {
 
 	c.AddCommand(listC, runC)
 	return c
+}
+
+func resolveSensorRoot(rootDir string) (string, error) {
+	if rootDir == "" {
+		return cwd()
+	}
+	if filepath.IsAbs(rootDir) {
+		return rootDir, nil
+	}
+	return filepath.Abs(rootDir)
 }
 
 func newCheckCmd() *cobra.Command {
