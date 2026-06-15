@@ -3,6 +3,14 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-15 — v0.7.0 — Container runtime selection + harness containers (P37)
+
+- **Runtime interface** in `internal/runtime/containers/runtime.go`: pluggable abstraction with Docker, Podman, OrbStack, AppleContainer, Colima impls. `Detect(ctx)` returns available runtimes ordered by per-platform preference (macOS: apple_container > docker > orbstack > podman > colima; linux: docker > podman > orbstack > colima).
+- **`harness runtime list|select|set|info`**: list detected runtimes with version + selection status, interactive picker, explicit pinning, current info. Persists to `.harness/config/runtime.yaml`.
+- **`HARNESS_RUNTIME=<id>`** env override per call.
+- **`harness containers list|kill|prune`** cross-runtime. `prune` honours a two-key rule: interactive `yes` OR `HARNESS_CONTAINERS_I_UNDERSTAND=1` for non-interactive flows. Flags: `--all`, `--stopped`, `--older-than 720h`, `--json`.
+- **Resolve precedence** for the runtime: env `HARNESS_RUNTIME` > `.harness/config/runtime.yaml` > auto-detect.
+
 ## 2026-06-15 — v0.6.0 — Doctor probe fix + harness install (P36)
 
 - **Probe parser** in `internal/adapters/execprobe` now captures stdout+stderr, runs an optional `VersionRegex` override per probe, and treats non-zero exits as success when a semver match is extracted. Fixes the "present, version probe failed" warning for `go` and `gemini`.
