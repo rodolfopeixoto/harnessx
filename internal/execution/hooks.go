@@ -50,10 +50,11 @@ func DispatchHooks(ctx context.Context, projectRoot string, event HookEvent, env
 		out := HookOutcome{Name: h.Name, Event: h.Event}
 		if !looksExecutable(h.ConfigPath) {
 			out.Skipped = true
-			out.Reason = "config not executable"
+			out.Reason = "config not executable (chmod +x " + h.ConfigPath + ")"
 			outs = append(outs, out)
 			continue
 		}
+		out.Reason = h.ConfigPath
 		start := time.Now()
 		cmd := exec.CommandContext(ctx, h.ConfigPath)
 		cmd.Dir = projectRoot
@@ -89,10 +90,16 @@ func FormatHookFailures(outs []HookOutcome) string {
 			continue
 		}
 		if o.ExitCode != 0 {
-			parts = append(parts, fmt.Sprintf("%s(%s)=%d", o.Name, o.Event, o.ExitCode))
+			script := o.Reason
+			if script == "" {
+				script = o.Name
+			}
+			parts = append(parts,
+				fmt.Sprintf("%s blocked by %s (exit %d)\n  → make the script exit 0 to allow, or remove %s",
+					o.Event, script, o.ExitCode, script))
 		}
 	}
-	return strings.Join(parts, ", ")
+	return strings.Join(parts, "; ")
 }
 
 // HookOutputDir returns the per-run directory where hook logs land.

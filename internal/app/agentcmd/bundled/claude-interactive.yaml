@@ -1,0 +1,49 @@
+id: claude-interactive
+name: Claude Code (interactive REPL)
+enabled: true
+type: interactive
+experimental: true
+
+interactive:
+  strategy: pty
+  binary: claude
+  args: []
+  idle_ms: 1500
+  hard_timeout_seconds: 180
+  banner_pattern: "^>"
+  tmux:
+    session_name: harness-claude-interactive
+  iterm2:
+    profile: Default
+
+capabilities:
+  text: true
+  files: true
+  json_output: false
+  max_context_tokens: 200000
+
+strengths:
+  - code
+  - reasoning
+
+models:
+  default: claude-sonnet-4-6
+
+execution:
+  prompt_mode: stdin
+  working_directory: project
+  timeout_seconds: 600
+
+failure_detection:
+  rate_limit: ["rate limit", "429"]
+  auth: ["unauthorized", "Please log in"]
+
+cost:
+  mode: estimated
+  input_token_price_per_1m: 0.0
+  output_token_price_per_1m: 0.0
+
+auth:
+  login_command: "claude login"
+  doc_url: "https://docs.anthropic.com/en/docs/claude-code"
+  check: "claude --version"

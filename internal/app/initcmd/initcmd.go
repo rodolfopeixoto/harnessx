@@ -47,6 +47,17 @@ sensors: {}
 context: {}
 `
 
+const hookTemplate = `#!/bin/sh
+# .harness/hooks/pre-tool-use.sh — runs before every adapter invocation.
+# Exit 0 to allow the run. Non-zero blocks unless autonomy=full_project_loop.
+#
+# Available bundled templates (install via 'harness hook add pre-tool-use'):
+#   lint     — go vet + golangci-lint on staged files
+#   secrets  — refuse runs when .env exposes a key/token
+#   noforce  — refuse force-push prompts
+exit 0
+`
+
 const harnessGitignore = `db/
 logs/
 cache/
@@ -91,10 +102,18 @@ func Run(ctx context.Context, opts Options, out io.Writer) (Result, error) {
 	}
 
 	// Create directory layout.
-	for _, sub := range []string{"config", "db", "logs", "cache", "artifacts", "product", "project"} {
+	for _, sub := range []string{"config", "db", "logs", "cache", "artifacts", "product", "project", "hooks"} {
 		if err := os.MkdirAll(filepath.Join(hd, sub), 0o755); err != nil {
 			return res, fmt.Errorf("init: mkdir %s: %w", sub, err)
 		}
+	}
+
+	hookPath := filepath.Join(hd, "hooks", "pre-tool-use.sh")
+	if err := writeIfMissing(hookPath, []byte(hookTemplate), opts.Force); err != nil {
+		return res, err
+	}
+	if err := os.Chmod(hookPath, 0o755); err != nil {
+		return res, err
 	}
 
 	// Write .harness/.gitignore.

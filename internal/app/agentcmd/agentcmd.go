@@ -21,6 +21,7 @@ import (
 	"github.com/ropeixoto/harnessx/internal/agents/certify"
 	"github.com/ropeixoto/harnessx/internal/agents/fake"
 	httpadapter "github.com/ropeixoto/harnessx/internal/agents/http"
+	"github.com/ropeixoto/harnessx/internal/agents/interactive"
 	yamladapter "github.com/ropeixoto/harnessx/internal/agents/yaml"
 	"github.com/ropeixoto/harnessx/internal/domain"
 	"github.com/ropeixoto/harnessx/internal/platform/config"
@@ -96,10 +97,14 @@ func LoadAll(root string) (*agents.Registry, map[string]string, error) {
 }
 
 func buildAdapter(s yamladapter.Spec) agents.AgentAdapter {
-	if s.Type == "api" {
+	switch s.Type {
+	case "api":
 		return httpadapter.New(s)
+	case "interactive":
+		return interactive.New(s)
+	default:
+		return yamladapter.New(s)
 	}
-	return yamladapter.New(s)
 }
 
 func parseSpec(b []byte) (yamladapter.Spec, error) {
@@ -131,6 +136,7 @@ func List(out io.Writer, startDir string) error {
 		fmt.Fprintln(out, "no agent adapters registered")
 		return nil
 	}
+	experimentals := loadExperimentalFlags(root)
 	cfg, _ := config.Load(filepath.Join(root, ".harness", "config", "harness.yaml"), root)
 	var repo *sqlite.Repo
 	if _, err := os.Stat(config.Resolve(root, cfg.Database.Path)); err == nil {
@@ -139,7 +145,7 @@ func List(out io.Writer, startDir string) error {
 			defer repo.Close()
 		}
 	}
-	fmt.Fprintf(out, "%-12s %-22s %-10s %s\n", "ID", "NAME", "CERT", "SOURCE")
+	fmt.Fprintf(out, "%-12s %-22s %-10s %-4s %s\n", "ID", "NAME", "CERT", "EXP", "SOURCE")
 	for _, id := range reg.IDs() {
 		a, _ := reg.Get(id)
 		cert := "—"
@@ -148,7 +154,11 @@ func List(out io.Writer, startDir string) error {
 				cert = fmt.Sprintf("%s/%d", c.Status, c.Score)
 			}
 		}
-		fmt.Fprintf(out, "%-12s %-22s %-10s %s\n", a.ID(), truncate(a.Name(), 22), cert, sources[id])
+		exp := " "
+		if experimentals[id] {
+			exp = "★"
+		}
+		fmt.Fprintf(out, "%-12s %-22s %-10s %-4s %s\n", a.ID(), truncate(a.Name(), 22), cert, exp, sources[id])
 	}
 	return nil
 }
@@ -294,6 +304,35 @@ func Certify(ctx context.Context, out io.Writer, opts CertifyOptions) (certify.R
 
 	renderCertification(out, a, res)
 	return res, nil
+}
+
+func loadExperimentalFlags(root string) map[string]bool {
+	out := map[string]bool{}
+	bundled, _ := bundledFS.ReadDir("bundled")
+	for _, e := range bundled {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".yaml") {
+			continue
+		}
+		b, err := bundledFS.ReadFile("bundled/" + e.Name())
+		if err != nil {
+			continue
+		}
+		if s, err := parseSpec(b); err == nil {
+			out[s.ID] = s.Experimental
+		}
+	}
+	projDir := filepath.Join(root, ".harness", "config", "agents")
+	if entries, err := os.ReadDir(projDir); err == nil {
+		for _, e := range entries {
+			if e.IsDir() || !strings.HasSuffix(e.Name(), ".yaml") {
+				continue
+			}
+			if s, err := yamladapter.Load(filepath.Join(projDir, e.Name())); err == nil {
+				out[s.ID] = s.Experimental
+			}
+		}
+	}
+	return out
 }
 
 func truncate(s string, n int) string {

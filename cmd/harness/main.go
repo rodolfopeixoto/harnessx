@@ -87,6 +87,7 @@ func newRoot() *cobra.Command {
 		newArtifactCmd(),
 		newSkillCmd(),
 		newSpecCmd(),
+		newListCmd(),
 		newCompletionCmd(),
 	)
 	root.Args = cobra.ArbitraryArgs

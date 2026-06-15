@@ -5,8 +5,10 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"text/tabwriter"
 
 	"github.com/spf13/cobra"
@@ -140,8 +142,91 @@ func buildMCPConfig(name, transport, command, url string) map[string]any {
 
 func newHookCmd() *cobra.Command {
 	c := &cobra.Command{Use: "hook", Short: "Hook discovery, install, listing"}
-	c.AddCommand(hookListCmd(), hookScanCmd(), hookInstallCmd(), hookTemplatesCmd())
+	c.AddCommand(hookListCmd(), hookScanCmd(), hookInstallCmd(), hookTemplatesCmd(), hookAddCmd())
 	return c
+}
+
+func hookAddCmd() *cobra.Command {
+	var yes bool
+	c := &cobra.Command{
+		Use:   "add <event>",
+		Short: "List bundled templates for an event and install one interactively",
+		Long: `Discover bundled templates whose event matches <event> and prompt for
+which to install. Pass --yes to install the first match without prompting.
+Equivalent to listing 'harness hook templates' then 'harness hook install <name>'.`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runHookAdd(cmd, args[0], yes)
+		},
+	}
+	c.Flags().BoolVar(&yes, "yes", false, "install first matching template without prompting")
+	return c
+}
+
+func runHookAdd(cmd *cobra.Command, event string, yes bool) error {
+	matches, err := hookTemplatesForEvent(event)
+	if err != nil {
+		return err
+	}
+	out := cmd.OutOrStdout()
+	printTemplateMenu(out, event, matches)
+	pick := promptTemplatePick(cmd, len(matches), yes)
+	chosen := matches[pick-1]
+	root, err := cwd()
+	if err != nil {
+		return err
+	}
+	dir := filepath.Join(root, ".harness", "hooks")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	target := filepath.Join(dir, event+".sh")
+	if err := os.WriteFile(target, chosen.Body, 0o755); err != nil {
+		return err
+	}
+	fmt.Fprintf(out, "wrote %s (template: %s)\n", target, chosen.Name)
+	return nil
+}
+
+func hookTemplatesForEvent(event string) ([]hookpkg.Template, error) {
+	all, err := hookpkg.List()
+	if err != nil {
+		return nil, err
+	}
+	var matches []hookpkg.Template
+	for _, t := range all {
+		if t.Event == event {
+			matches = append(matches, t)
+		}
+	}
+	if len(matches) == 0 {
+		return nil, fmt.Errorf("no bundled templates for event %q (run 'harness hook templates' to list all)", event)
+	}
+	return matches, nil
+}
+
+func printTemplateMenu(out io.Writer, event string, matches []hookpkg.Template) {
+	fmt.Fprintf(out, "templates for event %q:\n", event)
+	for i, t := range matches {
+		fmt.Fprintf(out, "  [%d] %s — %s\n", i+1, t.Name, t.Description)
+	}
+}
+
+func promptTemplatePick(cmd *cobra.Command, count int, yes bool) int {
+	if yes {
+		return 1
+	}
+	fmt.Fprintf(cmd.OutOrStdout(), "pick [1-%d] (default 1): ", count)
+	var raw string
+	_, _ = fmt.Fscanln(cmd.InOrStdin(), &raw)
+	if raw == "" {
+		return 1
+	}
+	n, err := strconv.Atoi(raw)
+	if err != nil || n < 1 || n > count {
+		return 1
+	}
+	return n
 }
 
 func hookInstallCmd() *cobra.Command {
