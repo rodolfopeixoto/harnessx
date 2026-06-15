@@ -3,6 +3,11 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-15 — v0.22.0 — Roadmap-done index + final polish (P56)
+
+- **`docs/ROADMAP-DONE.md`**: single source of truth for v0.4 → v0.21. Phase table, cumulative CLI surface, dashboard pages, HTTP API, bundled artifacts (17 install / 7 mcp / 5 hook / 4 skill / 9 agent / 5 runtime / 7 cleanup), cross-platform release matrix, quality gates green at v0.21, open list, operator update path.
+- **Quality gates verified once more** at the end of the 0.x cycle: `make lint` 0 issues, `go test ./...` green, `govulncheck` no vulns, `gitleaks detect` no leaks.
+
 ## 2026-06-15 — v0.21.0 — Master tutorial + SSE + skill templates + security pass (P51-P55)
 
 - **`docs/tutorial.md`**: master walkthrough consolidating v0.4 → v0.20. Per-OS install, 14 sections, 18-row validation checklist, honest gap list.
