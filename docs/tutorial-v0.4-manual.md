@@ -39,7 +39,7 @@ You can complete sections 1–4, 7, 11–14 with **zero agent CLIs installed** (
 ### Global install (recommended)
 
 ```bash
-$ curl -fsSL https://raw.githubusercontent.com/ropeixoto/harnessx/main/scripts/install.sh | bash
+$ curl -fsSL https://raw.githubusercontent.com/rodolfopeixoto/harnessx/main/scripts/install.sh | bash
 $ harness --version
 > harness vX.Y.Z (commit …, built …)
 ```
@@ -49,7 +49,7 @@ The script downloads the matching tarball from GitHub releases, verifies SHA-256
 ### Build from source (developer flow)
 
 ```bash
-$ git clone https://github.com/ropeixoto/harnessx.git
+$ git clone https://github.com/rodolfopeixoto/harnessx.git
 $ cd harnessx && make build
 $ sudo cp bin/harness /usr/local/bin/
 $ harness --version
