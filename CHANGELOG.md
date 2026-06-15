@@ -3,6 +3,13 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-15 — v0.17.0 — Quality-of-life batch (P47)
+
+- **`harness backup config show`**: print the resolved `.harness/config/backup.yaml` (default remote, compression, include + exclude lists) without opening the file.
+- **`harness backup config set-default-remote <name>`**: pin the default remote without editing YAML.
+- **Better error** on `harness backup list` / snapshot / etc. when no remote is chosen: prints a 4-line fix recipe pointing at `harness backup remotes`, `harness backup remote add`, `harness backup config set-default-remote`, or `--remote <name>`.
+- **`harness completion install`**: auto-detect `$SHELL`, write the completion script to the conventional path per OS (`/usr/local/etc/bash_completion.d`, `~/.zsh/completion/_harness`, `~/.config/fish/completions/harness.fish`, etc.). `--shell`, `--dry-run`. Prints the one-line post-install hint per shell.
+
 ## 2026-06-15 — v0.16.0 — Dog-food fixes (P46)
 
 - **Apple Container fallback**: `AppleContainer.Available` now runs a `container list --format json` probe in addition to the version check. When the probe fails (the daemon is unhealthy or the CLI flags do not match our shape), `Detect()` returns `docker` as the auto-pick. Resolves the `container list: exit status 1` operators saw when apple_container was the picked runtime but unable to actually list.

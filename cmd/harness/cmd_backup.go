@@ -34,7 +34,59 @@ Recommended: route the bucket through an rclone crypt overlay.`,
 	c.AddCommand(
 		newBackupSnapshotCmd(), newBackupRestoreCmd(), newBackupListCmd(),
 		newBackupSyncCmd(), newBackupRemotesCmd(), newBackupRemoteAddCmd(),
+		newBackupConfigCmd(),
 	)
+	return c
+}
+
+func newBackupConfigCmd() *cobra.Command {
+	c := &cobra.Command{Use: "config", Short: "Show or set backup config"}
+	c.AddCommand(&cobra.Command{
+		Use:   "show",
+		Short: "Print the resolved .harness/config/backup.yaml",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			root, err := cwd()
+			if err != nil {
+				return err
+			}
+			cfg, err := backup.LoadConfig(root)
+			if err != nil {
+				return err
+			}
+			out := cmd.OutOrStdout()
+			fmt.Fprintf(out, "default_remote: %q\n", cfg.DefaultRemote)
+			fmt.Fprintf(out, "compression:    %q\n", cfg.Compression)
+			fmt.Fprintln(out, "include:")
+			for _, i := range cfg.Include {
+				fmt.Fprintln(out, "  -", i)
+			}
+			fmt.Fprintln(out, "exclude:")
+			for _, e := range cfg.Exclude {
+				fmt.Fprintln(out, "  -", e)
+			}
+			return nil
+		},
+	}, &cobra.Command{
+		Use:   "set-default-remote <name>",
+		Short: "Pin the default rclone remote without editing YAML",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			root, err := cwd()
+			if err != nil {
+				return err
+			}
+			cfg, err := backup.LoadConfig(root)
+			if err != nil {
+				return err
+			}
+			cfg.DefaultRemote = args[0]
+			if err := backup.SaveConfig(root, cfg); err != nil {
+				return err
+			}
+			fmt.Fprintf(cmd.OutOrStdout(), "default_remote: %q\n", args[0])
+			return nil
+		},
+	})
 	return c
 }
 
@@ -305,7 +357,7 @@ func pickRemote(flag string, cfg backup.Config) (string, error) {
 	if cfg.DefaultRemote != "" {
 		return cfg.DefaultRemote, nil
 	}
-	return "", fmt.Errorf("backup: no remote chosen (pass --remote or set default_remote in backup.yaml)")
+	return "", fmt.Errorf("backup: no remote chosen\n  fix: harness backup remotes                              # list existing\n       harness backup remote add gdrive --provider drive --interactive\n       harness backup config set-default-remote gdrive\n  or pass --remote <name> per call")
 }
 
 func printManifest(out io.Writer, m backup.Manifest) error {
