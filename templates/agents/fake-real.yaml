@@ -1,0 +1,29 @@
+id: fake-real
+name: HarnessX deterministic fake agent
+description: Local-only adapter used by P31+ execution tests. Reads stdin prompt, writes files described by `create <path> with content: <text>` lines, emits a Claude-shaped JSON envelope.
+command:
+  binary: harness-fake-agent
+  check: harness-fake-agent --help
+capabilities:
+  text: true
+  files: true
+  folders: true
+  diff: true
+  json_output: true
+  max_context_tokens: 32000
+execution:
+  prompt_mode: stdin
+  working_directory: project
+  timeout_seconds: 60
+run:
+  args: []
+output:
+  format: json
+  final_message_json_path: "$.result"
+  usage_json_path: "$.usage"
+failure_detection:
+  transient:
+    - "fake-agent: read stdin"
+cost:
+  input_token_price_per_1m: 0.0
+  output_token_price_per_1m: 0.0
