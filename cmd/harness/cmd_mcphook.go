@@ -5,6 +5,8 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"text/tabwriter"
 
 	"github.com/spf13/cobra"
@@ -14,8 +16,61 @@ import (
 )
 
 func newMCPCmd() *cobra.Command {
-	c := &cobra.Command{Use: "mcp", Short: "MCP server discovery + listing"}
-	c.AddCommand(mcpListCmd(), mcpScanCmd())
+	c := &cobra.Command{Use: "mcp", Short: "MCP server discovery, listing, install"}
+	c.AddCommand(mcpListCmd(), mcpScanCmd(), mcpInstallCmd())
+	return c
+}
+
+func mcpInstallCmd() *cobra.Command {
+	var (
+		yes       bool
+		transport string
+		command   string
+		url       string
+	)
+	c := &cobra.Command{
+		Use:   "install <name>",
+		Short: "Write a deterministic MCP server config under .harness/mcp/<name>.json",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			name := args[0]
+			root, err := cwd()
+			if err != nil {
+				return err
+			}
+			dir := filepath.Join(root, ".harness", "mcp")
+			if err := os.MkdirAll(dir, 0o755); err != nil {
+				return err
+			}
+			target := filepath.Join(dir, name+".json")
+			if _, err := os.Stat(target); err == nil && !yes {
+				return fmt.Errorf("%s already exists (pass --yes to overwrite)", target)
+			}
+			cfg := map[string]any{
+				"name":      name,
+				"transport": transport,
+			}
+			if command != "" {
+				cfg["command"] = command
+			}
+			if url != "" {
+				cfg["url"] = url
+			}
+			data, err := json.MarshalIndent(cfg, "", "  ")
+			if err != nil {
+				return err
+			}
+			if err := os.WriteFile(target, data, 0o644); err != nil {
+				return err
+			}
+			fmt.Fprintf(cmd.OutOrStdout(), "Wrote %s\n", target)
+			return nil
+		},
+	}
+	c.Flags().BoolVar(&yes, "yes", false, "overwrite if exists")
+	c.Flags().StringVar(&transport, "transport", "stdio", "stdio|http")
+	c.Flags().StringVar(&command, "command", "", "binary command for stdio transport")
+	c.Flags().StringVar(&url, "url", "", "URL for http transport")
 	return c
 }
 

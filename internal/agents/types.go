@@ -51,6 +51,10 @@ type AgentRequest struct {
 	Stdin      string
 	// Extra is an opaque per-task hint bag (e.g. {"task":"implementation"}).
 	Extra map[string]string
+	// ExtraArgs are appended verbatim to the adapter's invocation. Used
+	// by the executor to inject capabilities the YAML spec opts in to
+	// (e.g. --mcp-config <path>) without templating the spec itself.
+	ExtraArgs []string
 }
 
 type AgentResult struct {

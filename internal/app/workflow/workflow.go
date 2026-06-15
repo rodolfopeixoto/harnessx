@@ -31,19 +31,26 @@ type Options struct {
 	BudgetUSD float64
 	Execute   bool
 	NoSensors bool
+	AgentID   string
+	Apply     bool
+	PlanOnly  bool
+	Autonomy  string
 }
 
 type Result struct {
-	Mode          domain.Mode
-	Intent        intent.Classification
-	SpecPath      string
-	PlanPath      string
-	ReportPath    string
-	ContextHash   string
-	SessionID     string
-	RunID         string
-	SensorSummary string
-	Confirmed     bool
+	Mode              domain.Mode
+	Intent            intent.Classification
+	SpecPath          string
+	PlanPath          string
+	ReportPath        string
+	ContextHash       string
+	SessionID         string
+	RunID             string
+	SensorSummary     string
+	Confirmed         bool
+	ExecutionRunID    string
+	ExecutionStatus   string
+	ExecutionDiffPath string
 }
 
 // Ask is Question mode (spec §7). It builds context, surfaces evidence,
@@ -189,7 +196,17 @@ func planThenMaybeExecute(ctx stdctx.Context, opts Options, execute bool, out io
 	}
 
 	if execute {
-		_ = executeAgents(ctx, rc, mode, opts.Prompt, opts.BudgetUSD, pack, out)
+		if opts.AgentID != "" {
+			exRes, exErr := runWithExecutor(ctx, rc, mode, opts, out)
+			if exErr != nil {
+				fmt.Fprintf(out, "Execute: %v\n", exErr)
+			}
+			res.ExecutionRunID = exRes.RunID
+			res.ExecutionStatus = string(exRes.Status)
+			res.ExecutionDiffPath = exRes.DiffPath
+		} else {
+			_ = executeAgents(ctx, rc, mode, opts.Prompt, opts.BudgetUSD, pack, out)
+		}
 	}
 
 	reportPath, err := writeReport(rc.root, reportcmd.Input{

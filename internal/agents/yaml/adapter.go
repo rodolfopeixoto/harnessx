@@ -92,6 +92,7 @@ func (a *Adapter) Run(ctx context.Context, req agents.AgentRequest) agents.Agent
 	defer cancel()
 
 	args := substituteArgs(a.Spec.Run.Args, req)
+	args = append(args, req.ExtraArgs...)
 	stdin := ""
 	if a.Spec.Execution.PromptMode == "" || a.Spec.Execution.PromptMode == "stdin" {
 		stdin = req.Stdin
