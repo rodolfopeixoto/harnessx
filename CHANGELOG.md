@@ -3,6 +3,17 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-15 — v0.12.0 — Dashboard read-only APIs (P42)
+
+- **`GET /api/runtime`** — currently selected runtime: id, binary, version, source (env|config|auto).
+- **`GET /api/runtimes`** — every known runtime with availability + selected flag.
+- **`GET /api/containers?all=true`** — cross-runtime container list via the resolved runtime.
+- **`GET /api/images`** — container images.
+- **`GET /api/install`** — bundled tool manifests with installed status per binary.
+- **`GET /api/secrets/names`** — secret names per backend (env / keychain / encrypted_file); values never returned.
+
+Wire-in via `s.registerP42(mux)` next to the existing `registerScans`. UI pages land in P44.
+
 ## 2026-06-15 — v0.11.0 — install.sh smoke + completion + tutorial v0.11 (P41)
 
 - **`scripts/tests/install_smoke.sh`**: runs the public installer against a clean `HARNESS_PREFIX` in a temp dir, verifies the resulting binary boots, reports the version, and exercises `harness update status` + `harness --help`.
