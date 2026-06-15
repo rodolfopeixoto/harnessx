@@ -1,3 +1,7 @@
+> **Superseded by `docs/tutorial-v0.29-manual.md`.** The v0.29 manual
+> adds brew install (`brew install harness`) + `harness uninstall`
+> commands and bumps every reference to v0.29.0.
+
 # HarnessX — Unified Manual Tutorial (v0.28)
 
 End-to-end walkthrough that exercises every CLI surface against a
