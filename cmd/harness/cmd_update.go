@@ -7,7 +7,6 @@ import (
 	"compress/gzip"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -16,54 +15,166 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"text/tabwriter"
 	"time"
 
 	"github.com/spf13/cobra"
 
+	"github.com/ropeixoto/harnessx/internal/update"
 	"github.com/ropeixoto/harnessx/internal/version"
 )
 
 const defaultRepo = "rodolfopeixoto/harnessx"
 
 func newUpdateCmd() *cobra.Command {
-	var (
-		repo    string
-		tag     string
-		dryRun  bool
-		channel string
-	)
 	c := &cobra.Command{
-		Use:   "update",
-		Short: "Self-update to the latest GitHub release",
-		Long: `Download the latest harness binary from GitHub releases, verify
-SHA-256, and replace the running binary in place. Use --channel develop
-to build from source instead (requires git + go).`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			out := cmd.OutOrStdout()
-			if channel == "develop" {
-				return updateFromSource(out, repo, dryRun)
-			}
-			return updateFromRelease(out, repo, tag, dryRun)
-		},
+		Use:     "update",
+		Aliases: []string{"upgrade", "self-update"},
+		Short:   "Self-update to the latest harness release",
+		Long: `Self-update fetches the latest release from GitHub, verifies its
+SHA-256, and replaces the running binary in place. Channels:
+
+  stable   — newest non-prerelease tag (default)
+  beta     — newest tag including pre-releases (vX.Y.Z-beta*, -rc*)
+  develop  — clone the develop branch and build from source (needs git + go)
+
+Examples:
+  harness update                       # latest stable
+  harness update --channel beta        # opt into pre-releases
+  harness update --tag v0.4.0          # pin a specific tag
+  harness update --dry-run             # see the plan without swapping
+  harness update status                # is there something newer?
+  harness update channels --json       # machine-readable channel listing`,
+		RunE: runDoUpdate,
 	}
-	c.Flags().StringVar(&repo, "repo", defaultRepo, "GitHub repo (owner/name)")
-	c.Flags().StringVar(&tag, "tag", "", "specific tag (default: latest)")
-	c.Flags().BoolVar(&dryRun, "dry-run", false, "print plan without replacing binary")
-	c.Flags().StringVar(&channel, "channel", "release", "release|develop")
+	addUpdateFlags(c)
+	c.AddCommand(newUpdateStatusCmd(), newUpdateChannelsCmd())
 	return c
 }
 
-func updateFromRelease(out io.Writer, repo, tag string, dryRun bool) error {
+var updateFlags struct {
+	repo    string
+	tag     string
+	channel string
+	dryRun  bool
+	jsonOut bool
+}
+
+func addUpdateFlags(c *cobra.Command) {
+	c.Flags().StringVar(&updateFlags.repo, "repo", defaultRepo, "GitHub repo (owner/name)")
+	c.Flags().StringVar(&updateFlags.tag, "tag", "", "pin a specific tag (overrides --channel)")
+	c.Flags().StringVar(&updateFlags.channel, "channel", "stable", "stable|beta|develop")
+	c.Flags().BoolVar(&updateFlags.dryRun, "dry-run", false, "print plan without replacing binary")
+}
+
+func newUpdateStatusCmd() *cobra.Command {
+	c := &cobra.Command{
+		Use:   "status",
+		Short: "Show whether a newer release is available",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			lister := update.NewGitHubLister()
+			rs, err := lister.List(updateFlags.repo)
+			if err != nil {
+				return err
+			}
+			channel := update.Channel(updateFlags.channel)
+			if channel == update.ChannelDevelop {
+				fmt.Fprintln(cmd.OutOrStdout(), "develop channel — always available via 'harness update --channel develop'")
+				return nil
+			}
+			latest, err := update.PickLatest(channel, rs)
+			if err != nil {
+				return err
+			}
+			current := version.Version
+			cmp := update.CompareVersions(current, latest.TagName)
+			w := tabwriter.NewWriter(cmd.OutOrStdout(), 0, 0, 2, ' ', 0)
+			fmt.Fprintf(w, "current\t%s\n", current)
+			fmt.Fprintf(w, "channel\t%s\n", channel)
+			fmt.Fprintf(w, "latest\t%s\n", latest.TagName)
+			fmt.Fprintf(w, "published\t%s\n", latest.PublishedAt.Format("2006-01-02 15:04"))
+			switch {
+			case cmp < 0:
+				fmt.Fprintf(w, "status\tupdate available — run: harness update --channel %s\n", channel)
+			case cmp == 0:
+				fmt.Fprintln(w, "status\tup to date")
+			default:
+				fmt.Fprintln(w, "status\tcurrent is newer than channel (development build?)")
+			}
+			return w.Flush()
+		},
+	}
+	c.Flags().StringVar(&updateFlags.channel, "channel", "stable", "stable|beta|develop")
+	c.Flags().StringVar(&updateFlags.repo, "repo", defaultRepo, "GitHub repo (owner/name)")
+	return c
+}
+
+func newUpdateChannelsCmd() *cobra.Command {
+	c := &cobra.Command{
+		Use:   "channels",
+		Short: "List releases per channel",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			lister := update.NewGitHubLister()
+			rs, err := lister.List(updateFlags.repo)
+			if err != nil {
+				return err
+			}
+			out := cmd.OutOrStdout()
+			for _, ch := range update.KnownChannels() {
+				if ch == update.ChannelDevelop {
+					fmt.Fprintf(out, "%s — source build from git develop branch\n\n", ch)
+					continue
+				}
+				rels := update.FilterChannel(ch, rs)
+				if len(rels) == 0 {
+					fmt.Fprintf(out, "%s — no releases\n\n", ch)
+					continue
+				}
+				fmt.Fprintf(out, "%s:\n", ch)
+				w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
+				for _, r := range rels {
+					tag := r.TagName
+					if r.Prerelease {
+						tag += " (prerelease)"
+					}
+					fmt.Fprintf(w, "  %s\t%s\t%s\n", tag, r.PublishedAt.Format("2006-01-02"), r.HTMLURL)
+				}
+				_ = w.Flush()
+				fmt.Fprintln(out)
+			}
+			return nil
+		},
+	}
+	c.Flags().StringVar(&updateFlags.repo, "repo", defaultRepo, "GitHub repo (owner/name)")
+	return c
+}
+
+func runDoUpdate(cmd *cobra.Command, _ []string) error {
+	out := cmd.OutOrStdout()
+	channel := update.Channel(updateFlags.channel)
+	if channel == update.ChannelDevelop {
+		return updateFromSource(out, updateFlags.repo, updateFlags.dryRun)
+	}
+	tag := updateFlags.tag
 	if tag == "" {
-		latest, err := resolveLatestTag(repo)
+		lister := update.NewGitHubLister()
+		rs, err := lister.List(updateFlags.repo)
 		if err != nil {
 			return err
 		}
-		tag = latest
+		latest, err := update.PickLatest(channel, rs)
+		if err != nil {
+			return err
+		}
+		tag = latest.TagName
 	}
+	return updateFromRelease(out, updateFlags.repo, tag, updateFlags.dryRun)
+}
+
+func updateFromRelease(out io.Writer, repo, tag string, dryRun bool) error {
 	current := version.Version
 	fmt.Fprintf(out, "current:  %s\ntarget:   %s\nrepo:     %s\n", current, tag, repo)
-	if normalizeVer(current) == normalizeVer(tag) {
+	if update.CompareVersions(current, tag) == 0 {
 		fmt.Fprintln(out, "already on target tag — nothing to do")
 		return nil
 	}
@@ -161,29 +272,6 @@ func updateFromSource(out io.Writer, repo string, dryRun bool) error {
 		return err
 	}
 	return runNew(out, dest, "version")
-}
-
-func resolveLatestTag(repo string) (string, error) {
-	url := fmt.Sprintf("https://api.github.com/repos/%s/releases/latest", repo)
-	client := &http.Client{Timeout: 15 * time.Second}
-	resp, err := client.Get(url)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		return "", fmt.Errorf("github api %s: status %d", url, resp.StatusCode)
-	}
-	var payload struct {
-		TagName string `json:"tag_name"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
-		return "", err
-	}
-	if payload.TagName == "" {
-		return "", fmt.Errorf("no tag_name in github response")
-	}
-	return payload.TagName, nil
 }
 
 func downloadFile(url, dest string) error {
@@ -312,16 +400,4 @@ func runNew(out io.Writer, bin, sub string) error {
 	cmd.Stdout = out
 	cmd.Stderr = out
 	return cmd.Run()
-}
-
-func normalizeVer(s string) string {
-	s = strings.TrimSpace(s)
-	s = strings.TrimPrefix(s, "v")
-	if i := strings.Index(s, " "); i > 0 {
-		s = s[:i]
-	}
-	if i := strings.Index(s, "-dev"); i > 0 {
-		s = s[:i]
-	}
-	return s
 }

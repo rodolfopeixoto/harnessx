@@ -61,6 +61,7 @@ func newRoot() *cobra.Command {
 		newMetricsCmd(),
 		newAuditCmd(),
 		newUpdateCmd(),
+		newHelpCmd(),
 		newFeatureCmd(),
 		newBugfixCmd(),
 		newReportCmd(),
