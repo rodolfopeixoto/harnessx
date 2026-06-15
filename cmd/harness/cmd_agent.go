@@ -5,6 +5,7 @@ package main
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -49,7 +50,10 @@ func newAgentCmd() *cobra.Command {
 		},
 	}
 
-	var skipRun bool
+	var (
+		skipRun       bool
+		simpleTimeout time.Duration
+	)
 	certifyC := &cobra.Command{
 		Use:   "certify <id>",
 		Short: "Run the certification suite against an adapter",
@@ -60,12 +64,13 @@ func newAgentCmd() *cobra.Command {
 				return err
 			}
 			_, err = agentcmd.Certify(cmd.Context(), cmd.OutOrStdout(), agentcmd.CertifyOptions{
-				ID: args[0], StartDir: dir, SkipRun: skipRun,
+				ID: args[0], StartDir: dir, SkipRun: skipRun, SimpleTimeout: simpleTimeout,
 			})
 			return err
 		},
 	}
 	certifyC.Flags().BoolVar(&skipRun, "skip-run", false, "skip checks that execute the CLI binary")
+	certifyC.Flags().DurationVar(&simpleTimeout, "simple-timeout", 90*time.Second, "bound on the simple_prompt round-trip (real LLMs need 30s+)")
 
 	c.AddCommand(listC, addC, discoverC, certifyC, newAgentLoginCmd(), newAgentInstallCmd())
 	return c

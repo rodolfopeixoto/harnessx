@@ -3,6 +3,13 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-15 — v0.25.0 — Certify simple_prompt timeout + agentcmd split (P59)
+
+- **`certify.Options.SimpleTimeout`** (default `90s`): bounds the simple_prompt round-trip independently from the short `PerCheckTimeout` (10s) used by healthcheck / timeout / cancellation probes. Real LLM round-trips take 5-60s; the old 10s ceiling killed Claude before it could answer.
+- **`harness agent certify --simple-timeout <duration>`**: override per call. Default 90s.
+- **`signal: killed` + `context deadline` remediation** now points the operator at `--simple-timeout 180s` plus the manual smoke command instead of the generic "waiting on interactive auth" message.
+- **`internal/app/agentcmd/agentcmd.go` split**: 462 → 323 LOC. Render + remediation + summary helpers moved to `certify_render.go` (140 LOC). Remediation table is now data-driven (`map[checkName]func(detail, adapter) string`) instead of a giant switch.
+
 ## 2026-06-15 — v0.24.0 — Certify output UX (P58)
 
 - **`harness agent certify <id>`** now prints, per check: a `what:` line (one-sentence description of what the check proves), the existing `detail:` line, and a `fix:` line on every failure with an actionable next step (login command, `harness install <name>`, manual smoke command).

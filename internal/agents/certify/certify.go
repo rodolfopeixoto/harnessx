@@ -52,14 +52,24 @@ type Options struct {
 	// SkipRun skips Run-dependent checks. Useful when binaries are not
 	// installed (e.g. cert preflight, CI without API keys).
 	SkipRun bool
-	// PerCheckTimeout bounds each network-bearing check.
+	// PerCheckTimeout bounds short checks (healthcheck, timeout probe,
+	// cancellation probe). The simple_prompt check uses SimpleTimeout
+	// because real LLM round-trips can take 30s+.
 	PerCheckTimeout time.Duration
+	SimpleTimeout   time.Duration
 }
 
-// Run executes the certification suite against adapter a.
+const (
+	defaultPerCheckTimeout = 10 * time.Second
+	defaultSimpleTimeout   = 90 * time.Second
+)
+
 func Run(ctx context.Context, a agents.AgentAdapter, opts Options) Result {
 	if opts.PerCheckTimeout <= 0 {
-		opts.PerCheckTimeout = 10 * time.Second
+		opts.PerCheckTimeout = defaultPerCheckTimeout
+	}
+	if opts.SimpleTimeout <= 0 {
+		opts.SimpleTimeout = defaultSimpleTimeout
 	}
 	r := Result{AgentID: a.ID()}
 
@@ -88,13 +98,12 @@ func Run(ctx context.Context, a agents.AgentAdapter, opts Options) Result {
 		r.Checks = append(r.Checks, Check{Name: "timeout_enforced", Status: StatusSkipped})
 		r.Checks = append(r.Checks, Check{Name: "cancellation_honored", Status: StatusSkipped})
 	} else {
-		// 3. Simple prompt works.
-		rctx, cancel := context.WithTimeout(ctx, opts.PerCheckTimeout)
+		rctx, cancel := context.WithTimeout(ctx, opts.SimpleTimeout)
 		prompt := opts.SimplePrompt
 		if prompt == "" {
 			prompt = "Reply with the single word OK."
 		}
-		res := a.Run(rctx, agents.AgentRequest{Prompt: prompt, Timeout: opts.PerCheckTimeout})
+		res := a.Run(rctx, agents.AgentRequest{Prompt: prompt, Timeout: opts.SimpleTimeout})
 		cancel()
 		if res.Err == nil && res.ExitCode == 0 {
 			r.Checks = append(r.Checks, Check{Name: "simple_prompt", Status: StatusPassed, Detail: truncate(res.Output.FinalMessage, 80)})
