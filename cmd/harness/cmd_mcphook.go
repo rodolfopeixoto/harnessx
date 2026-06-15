@@ -11,6 +11,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/ropeixoto/harnessx/internal/hookpkg"
 	"github.com/ropeixoto/harnessx/internal/hookscan"
 	"github.com/ropeixoto/harnessx/internal/mcppkg"
 	"github.com/ropeixoto/harnessx/internal/mcpscan"
@@ -138,9 +139,80 @@ func buildMCPConfig(name, transport, command, url string) map[string]any {
 }
 
 func newHookCmd() *cobra.Command {
-	c := &cobra.Command{Use: "hook", Short: "Hook discovery + listing"}
-	c.AddCommand(hookListCmd(), hookScanCmd())
+	c := &cobra.Command{Use: "hook", Short: "Hook discovery, install, listing"}
+	c.AddCommand(hookListCmd(), hookScanCmd(), hookInstallCmd(), hookTemplatesCmd())
 	return c
+}
+
+func hookInstallCmd() *cobra.Command {
+	var (
+		yes      bool
+		filename string
+	)
+	c := &cobra.Command{
+		Use:   "install <name>",
+		Short: "Drop a bundled hook script into .harness/hooks/",
+		Long: `Install a bundled hook template into .harness/hooks/<name>.sh
+and mark it executable. Templates carry the right shebang, env var
+contract (HARNESS_RUN_ID, HARNESS_AGENT, HARNESS_RUN_STATUS), and
+event name in a leading comment that 'harness hook scan' picks up.
+
+  --filename other-name.sh   write under a different name
+  --yes                      overwrite if exists`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			root, err := cwd()
+			if err != nil {
+				return err
+			}
+			t, err := hookpkg.Load(args[0])
+			if err != nil {
+				return err
+			}
+			dir := filepath.Join(root, ".harness", "hooks")
+			if err := os.MkdirAll(dir, 0o755); err != nil {
+				return err
+			}
+			name := filename
+			if name == "" {
+				name = t.Event + ".sh"
+				if t.Event == "" {
+					name = args[0] + ".sh"
+				}
+			}
+			target := filepath.Join(dir, name)
+			if _, err := os.Stat(target); err == nil && !yes {
+				return fmt.Errorf("%s already exists (pass --yes to overwrite)", target)
+			}
+			if err := os.WriteFile(target, t.Body, 0o755); err != nil {
+				return err
+			}
+			fmt.Fprintf(cmd.OutOrStdout(), "wrote %s\n  event: %s\n  source: bundled %s\n", target, t.Event, args[0])
+			return nil
+		},
+	}
+	c.Flags().BoolVar(&yes, "yes", false, "overwrite if exists")
+	c.Flags().StringVar(&filename, "filename", "", "override target filename (default: <event>.sh)")
+	return c
+}
+
+func hookTemplatesCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "templates",
+		Short: "List bundled hook templates available to `hook install`",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			all, err := hookpkg.List()
+			if err != nil {
+				return err
+			}
+			w := tabwriter.NewWriter(cmd.OutOrStdout(), 0, 0, 2, ' ', 0)
+			fmt.Fprintln(w, "NAME\tEVENT\tDESCRIPTION")
+			for _, t := range all {
+				fmt.Fprintf(w, "%s\t%s\t%s\n", t.Name, t.Event, t.Description)
+			}
+			return w.Flush()
+		},
+	}
 }
 
 func mcpScanCmd() *cobra.Command {

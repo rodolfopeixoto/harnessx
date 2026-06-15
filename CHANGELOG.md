@@ -3,6 +3,12 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-15 — v0.20.0 — Bundled hook templates (P50)
+
+- **`internal/hookpkg`**: 5 bundled hook scripts — `pre-tool-use-lint` (go vet + golangci-lint), `pre-tool-use-secrets` (refuse runs when .env exposes a key/token), `pre-tool-use-noforce` (refuse force-push prompts), `post-tool-use-test` (go test ./... or npm test), `post-tool-use-audit` (one-line log per run).
+- **`harness hook templates`**: lists the bundled scripts with the inferred event + description headers.
+- **`harness hook install <name>`**: writes `.harness/hooks/<event>.sh` (or `--filename <override>`), `chmod +x`, picked up by `harness hook scan` and the Executor's pre/post dispatch immediately.
+
 ## 2026-06-15 — v0.19.0 — Bundled MCP templates (P49)
 
 - **`internal/mcppkg`**: 7 bundled MCP server templates — `filesystem`, `github`, `postgres`, `sqlite`, `brave-search`, `fetch`, `memory`. Each carries transport / command / args / env / docs URL.
