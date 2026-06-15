@@ -11,3 +11,6 @@ export { DataExplorer } from "./DataExplorer";
 export type { Column } from "./DataExplorer";
 export { Shell } from "./Shell";
 export type { NavItem } from "./Shell";
+export { MetricCard } from "./MetricCard";
+export { PathCell } from "./PathCell";
+export { TerminalReflection } from "./TerminalReflection";

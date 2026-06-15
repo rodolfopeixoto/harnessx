@@ -108,7 +108,8 @@ describe("role × page grid", () => {
         );
         await waitFor(() => {
           const matches = screen.queryAllByText(page.awaitText);
-          expect(matches.length + (document.body.textContent ?? "").match(page.awaitText)?.length || 0).toBeGreaterThan(0);
+          const bodyMatches = (document.body.textContent ?? "").match(page.awaitText)?.length ?? 0;
+          expect(matches.length + bodyMatches).toBeGreaterThan(0);
         });
       });
     }

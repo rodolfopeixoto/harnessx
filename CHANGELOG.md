@@ -3,6 +3,18 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-15 — v0.3.0 — Stack Audit + Handoff parity + MCP/Hook scanners (P23–P29)
+
+- **P23 stack audit**: deterministic visual + functional audit pipeline.
+- **P24 audit bundle**: single zip + BUNDLE_INDEX.md for LLM consumption.
+- **P25 audit hardening**: pass-rate 23% → 100%.
+- **P26 handoff gap report**: 11 new routes, nav 7 → 17, audit features 10 → 22.
+- **P27 Home/Projects/Catalog rich content**: MetricCard, PathCell, TerminalReflection, ActionService.
+- **P28 MCP/Hook scanners + rich Cleanup page**: deterministic discovery + CLI + HTTP + UI.
+- **P29 finalise handoff**: 8 remaining stub pages rewritten; Catalog MCP/Hook tabs wired.
+
+Final audit: 34/34 passed, 0 console_error, 0 selector_missing, 0 layout_collapsed.
+
 ## 2026-06-14 — v0.2.0 — Workspace Hub + Capabilities + Stack Tour (P11–P22)
 
 - **P11 Workspace Hub** — Multi-project registry at `~/.harness/registry.sqlite`;

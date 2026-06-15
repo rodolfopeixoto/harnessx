@@ -76,6 +76,7 @@ export function DataExplorer<T extends Record<string, unknown>>({
           {filtered.length}
         </span>
       </div>
+      <div style={{ overflowX: "auto" }}>
       <table
         style={{ width: "100%", borderCollapse: "collapse" }}
         data-testid="data-explorer-table"
@@ -124,6 +125,7 @@ export function DataExplorer<T extends Record<string, unknown>>({
           ))}
         </tbody>
       </table>
+      </div>
       {totalPages > 1 && (
         <div
           style={{
