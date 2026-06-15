@@ -3,6 +3,13 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-15 — v0.21.0 — Master tutorial + SSE + skill templates + security pass (P51-P55)
+
+- **`docs/tutorial.md`**: master walkthrough consolidating v0.4 → v0.20. Per-OS install, 14 sections, 18-row validation checklist, honest gap list.
+- **`GET /api/events/runs/<id>`**: Server-Sent Events tail of `.harness/runs/<id>/events.jsonl`. 15s keepalive, 500ms poll, scoped path so it does not collide with the existing `/api/runs/<id>` REST handler.
+- **`internal/skillpkg`** + **`harness skill templates|install <name>`**: 4 bundled deterministic skill snippets (`security-rule`, `clean-code`, `go-feature`, `bugfix-loop`) installed via `.harness/skills/<name>.md`.
+- **Security pass**: `govulncheck ./...` no vulns; `gitleaks detect` no leaks; `go test ./...` green; lint zero.
+
 ## 2026-06-15 — v0.20.0 — Bundled hook templates (P50)
 
 - **`internal/hookpkg`**: 5 bundled hook scripts — `pre-tool-use-lint` (go vet + golangci-lint), `pre-tool-use-secrets` (refuse runs when .env exposes a key/token), `pre-tool-use-noforce` (refuse force-push prompts), `post-tool-use-test` (go test ./... or npm test), `post-tool-use-audit` (one-line log per run).
