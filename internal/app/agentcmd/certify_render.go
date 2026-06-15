@@ -30,6 +30,9 @@ func renderCertification(out io.Writer, a agents.AgentAdapter, res certify.Resul
 	}
 	fmt.Fprintln(out)
 	fmt.Fprintln(out, summariseCertification(a, res))
+	if x, ok := a.(interface{ IsExperimental() bool }); ok && x.IsExperimental() {
+		fmt.Fprintln(out, "experimental — REPL surface is undocumented; may break on Claude Code upgrades")
+	}
 }
 
 func iconFor(s certify.CheckStatus) string {

@@ -64,6 +64,25 @@ type Spec struct {
 	} `yaml:"auth"`
 
 	API APISpec `yaml:"api"`
+
+	Interactive InteractiveSpec `yaml:"interactive"`
+
+	Experimental bool `yaml:"experimental"`
+}
+
+type InteractiveSpec struct {
+	Strategy           string   `yaml:"strategy"`
+	Binary             string   `yaml:"binary"`
+	Args               []string `yaml:"args"`
+	IdleMs             int      `yaml:"idle_ms"`
+	HardTimeoutSeconds int      `yaml:"hard_timeout_seconds"`
+	BannerPattern      string   `yaml:"banner_pattern"`
+	Tmux               struct {
+		SessionName string `yaml:"session_name"`
+	} `yaml:"tmux"`
+	ITerm2 struct {
+		Profile string `yaml:"profile"`
+	} `yaml:"iterm2"`
 }
 
 type APISpec struct {
@@ -146,8 +165,17 @@ func (s Spec) validate() error {
 		if s.API.Endpoint == "" {
 			return fmt.Errorf("type=api: missing api.endpoint")
 		}
+	case "interactive":
+		if s.Interactive.Binary == "" {
+			return fmt.Errorf("type=interactive: missing interactive.binary")
+		}
+		switch s.Interactive.Strategy {
+		case "", "pty", "tmux", "iterm2":
+		default:
+			return fmt.Errorf("type=interactive: unknown strategy %q (pty|tmux|iterm2)", s.Interactive.Strategy)
+		}
 	default:
-		return fmt.Errorf("unknown type %q (cli|api)", s.Type)
+		return fmt.Errorf("unknown type %q (cli|api|interactive)", s.Type)
 	}
 	return nil
 }

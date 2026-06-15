@@ -3,6 +3,14 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-15 — v0.27.0 — Interactive Claude Code adapter (P61) [experimental]
+
+- **`--agent claude-interactive`**: drives Claude Code's interactive REPL programmatically so runs draw from the operator's Pro/Max subscription bucket instead of the Agent SDK monthly credit. Three strategies: `pty` (default, via `github.com/creack/pty`), `tmux` (opt-in, uses `send-keys` + `capture-pane`), `iterm2` (macOS opt-in, via `osascript`).
+- **`type: interactive` YAML spec**: new top-level adapter type with `interactive:` block (`strategy`, `binary`, `args`, `idle_ms`, `hard_timeout_seconds`, `banner_pattern`, `tmux.session_name`, `iterm2.profile`). Validator rejects unknown strategies and missing `binary`.
+- **`experimental: true` flag**: surfaces in `harness agent list` (new `EXP` column with `★`) and as the final line of `harness agent certify` output. REPL surface is undocumented; can break on Claude Code upgrades. `ParseUsage` returns `mode: estimated` because the interactive REPL emits no usage block.
+- **Bundled `claude-interactive.yaml`**: defaults to PTY, idle 1500ms, hard timeout 180s. Install with `harness agent install claude-interactive`.
+- **Billing doc + `harness help billing`**: every dollar amount now tagged `as of 2026-06-15` plus a "cross-check at anthropic.com/pricing" line; subscription-stream row now points at `claude-interactive`.
+
 ## 2026-06-15 — v0.26.0 — Anthropic billing guide (P60)
 
 - **`docs/anthropic-billing.md`**: explains the three Anthropic spending streams (subscription / Agent SDK monthly credit / pay-as-you-go API), maps `--agent claude` to the Agent SDK credit ($20-$200/month) and `--agent anthropic-api` to pay-as-you-go, lists per-plan credit amounts, and gives a workload-based adapter pick.
