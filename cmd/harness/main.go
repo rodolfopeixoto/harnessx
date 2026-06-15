@@ -88,6 +88,7 @@ func newRoot() *cobra.Command {
 		newSkillCmd(),
 		newSpecCmd(),
 		newListCmd(),
+		newUninstallCmd(),
 		newCompletionCmd(),
 	)
 	root.Args = cobra.ArbitraryArgs

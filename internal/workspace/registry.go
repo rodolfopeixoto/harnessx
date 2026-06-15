@@ -136,65 +136,80 @@ func (r *Registry) Add(ctx context.Context, rootPath, displayName, slug string) 
 	if err := r.inTx(ctx, func(tx *sql.Tx) error {
 		existing, terr := txByRoot(ctx, tx, abs)
 		if terr == nil {
-			newSlug := existing.Slug
-			if slug != "" && slug != existing.Slug {
-				if other, serr := txBySlug(ctx, tx, slug); serr == nil && other.ID != existing.ID {
-					return fmt.Errorf("workspace: slug %q already used by %s", slug, other.RootPath)
-				} else if serr != nil && !errors.Is(serr, ErrNotFound) {
-					return serr
-				}
-				newSlug = slug
+			p, uerr := updateExisting(ctx, tx, existing, slug, displayName, now)
+			if uerr != nil {
+				return uerr
 			}
-			if _, terr := tx.ExecContext(ctx,
-				`update projects set last_seen_at = ?, display_name = ?, slug = ? where id = ?`,
-				now, displayName, newSlug, existing.ID); terr != nil {
-				return fmt.Errorf("workspace: refresh: %w", terr)
-			}
-			existing.LastSeenAt = parseTimePtr(now)
-			existing.DisplayName = displayName
-			existing.Slug = newSlug
-			result = existing
+			result = p
 			return nil
 		}
 		if !errors.Is(terr, ErrNotFound) {
 			return terr
 		}
-		if other, serr := txBySlug(ctx, tx, slug); serr == nil {
-			return fmt.Errorf("workspace: slug %q already used by %s", slug, other.RootPath)
-		} else if !errors.Is(serr, ErrNotFound) {
-			return serr
+		p, ierr := insertNew(ctx, tx, abs, slug, displayName, dbPath, now)
+		if ierr != nil {
+			return ierr
 		}
-		p := Project{
-			ID:          ids.New(),
-			Slug:        slug,
-			DisplayName: displayName,
-			RootPath:    abs,
-			DBPath:      dbPath,
-			AddedAt:     time.Now().UTC(),
-			LastSeenAt:  parseTimePtr(now),
-			SchemaVer:   1,
-		}
-		if _, terr := tx.ExecContext(ctx, `
-			insert into projects (id, slug, display_name, root_path, db_path, added_at, last_seen_at, schema_version)
-			values (?, ?, ?, ?, ?, ?, ?, ?)
-			on conflict(root_path) do update set
-				display_name = excluded.display_name,
-				last_seen_at = excluded.last_seen_at`,
-			p.ID, p.Slug, p.DisplayName, p.RootPath, p.DBPath,
-			p.AddedAt.Format(timeFmt), now, p.SchemaVer); terr != nil {
-			return fmt.Errorf("workspace: insert: %w", terr)
-		}
-		// Re-read so concurrent winners surface the canonical row.
-		canonical, terr := txByRoot(ctx, tx, abs)
-		if terr != nil {
-			return terr
-		}
-		result = canonical
+		result = p
 		return nil
 	}); err != nil {
 		return Project{}, err
 	}
 	return result, nil
+}
+
+func updateExisting(ctx context.Context, tx *sql.Tx, existing Project, slug, displayName, now string) (Project, error) {
+	newSlug := existing.Slug
+	if slug != "" && slug != existing.Slug {
+		if other, serr := txBySlug(ctx, tx, slug); serr == nil && other.ID != existing.ID {
+			return Project{}, fmt.Errorf("workspace: slug %q already used by %s", slug, other.RootPath)
+		} else if serr != nil && !errors.Is(serr, ErrNotFound) {
+			return Project{}, serr
+		}
+		newSlug = slug
+	}
+	if _, err := tx.ExecContext(ctx,
+		`update projects set last_seen_at = ?, display_name = ?, slug = ? where id = ?`,
+		now, displayName, newSlug, existing.ID); err != nil {
+		return Project{}, fmt.Errorf("workspace: refresh: %w", err)
+	}
+	existing.LastSeenAt = parseTimePtr(now)
+	existing.DisplayName = displayName
+	existing.Slug = newSlug
+	return existing, nil
+}
+
+func insertNew(ctx context.Context, tx *sql.Tx, abs, slug, displayName, dbPath, now string) (Project, error) {
+	if other, serr := txBySlug(ctx, tx, slug); serr == nil {
+		return Project{}, fmt.Errorf("workspace: slug %q already used by %s", slug, other.RootPath)
+	} else if !errors.Is(serr, ErrNotFound) {
+		return Project{}, serr
+	}
+	p := Project{
+		ID:          ids.New(),
+		Slug:        slug,
+		DisplayName: displayName,
+		RootPath:    abs,
+		DBPath:      dbPath,
+		AddedAt:     time.Now().UTC(),
+		LastSeenAt:  parseTimePtr(now),
+		SchemaVer:   1,
+	}
+	if _, err := tx.ExecContext(ctx, `
+		insert into projects (id, slug, display_name, root_path, db_path, added_at, last_seen_at, schema_version)
+		values (?, ?, ?, ?, ?, ?, ?, ?)
+		on conflict(root_path) do update set
+			display_name = excluded.display_name,
+			last_seen_at = excluded.last_seen_at`,
+		p.ID, p.Slug, p.DisplayName, p.RootPath, p.DBPath,
+		p.AddedAt.Format(timeFmt), now, p.SchemaVer); err != nil {
+		return Project{}, fmt.Errorf("workspace: insert: %w", err)
+	}
+	canonical, err := txByRoot(ctx, tx, abs)
+	if err != nil {
+		return Project{}, err
+	}
+	return canonical, nil
 }
 
 // inTx runs fn inside a single deferred transaction. With WAL + UPSERT,

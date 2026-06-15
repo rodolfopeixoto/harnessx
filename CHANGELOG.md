@@ -3,6 +3,13 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-15 — v0.29.0 — harness uninstall + brew formula renamed harness
+
+- **`harness uninstall project`**: wipes `./.harness/` in the current directory (after confirmation).
+- **`harness uninstall global`**: wipes the cross-project registry under `GlobalHarnessDir()` (`$HARNESS_HOME`, `$XDG_DATA_HOME/harness`, `~/Library/Application Support/harness` on macOS, `~/.local/share/harness` on Linux, `%LOCALAPPDATA%/harness` on Windows).
+- **`harness uninstall all`**: runs both, then removes the `harness` binary from `$PATH` (falls back to printing `sudo rm <path>` when the install dir isn't writable). When `brew` is detected, prints the matching `brew uninstall harness && brew untap rodolfopeixoto/harnessx` commands.
+- **Brew formula renamed `harnessx` → `harness`**: install command is now `brew install harness` (formerly `brew install harnessx`). Tap URL unchanged: `brew tap rodolfopeixoto/harnessx https://github.com/rodolfopeixoto/harnessx.git`.
+
 ## 2026-06-15 — v0.28.1 — Slug update honored on project re-add (hotfix)
 
 - **`harness project add <path> --slug <new>`** now updates the slug when the project root is already registered, instead of silently keeping the original slug. Collision against another row still rejects with the existing `slug %q already used by %s` error.
