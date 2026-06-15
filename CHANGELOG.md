@@ -3,6 +3,11 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-15 — v0.18.0 — Doctor --fix + harness worktree cleanup detector (P48)
+
+- **`harness doctor --fix [--dry-run]`**: walks every ⚠/✗ probe that ships a bundled install manifest and runs `harness install <name>` for each. `--dry-run` prints the chosen strategy per tool without executing. Reuses the same `install.NewRegistry()` strategy picker so the per-platform behaviour matches one-shot `harness install`.
+- **`internal/cleanup/detectors/harness_worktrees.go`**: new detector picks up orphan `.harness/worktrees/<run-id>/` directories left over when a run was killed mid-flight or the operator skipped `harness runs discard`. Risk = medium by default, high after the stale threshold. Surfaces in `harness cleanup scan` and `GET /api/cleanup/scan`.
+
 ## 2026-06-15 — v0.17.0 — Quality-of-life batch (P47)
 
 - **`harness backup config show`**: print the resolved `.harness/config/backup.yaml` (default remote, compression, include + exclude lists) without opening the file.
