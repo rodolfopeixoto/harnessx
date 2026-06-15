@@ -1,4 +1,5 @@
 import { Route, Routes } from "react-router-dom";
+import { HomePage } from "./pages/Home";
 import { SessionsPage } from "./pages/Sessions";
 import { SessionDetailPage } from "./pages/SessionDetail";
 import { RunDetailPage } from "./pages/RunDetail";
@@ -47,7 +48,8 @@ export function App() {
     <Shell title="HarnessX" nav={navItems}>
       <CommandPalette />
       <Routes>
-        <Route path="/" element={<SessionsPage />} />
+        <Route path="/" element={<HomePage />} />
+        <Route path="/sessions" element={<SessionsPage />} />
         <Route path="/sessions/:id" element={<SessionDetailPage />} />
         <Route path="/runs/:id" element={<RunDetailPage />} />
         <Route path="/projects" element={<ProjectsPage />} />

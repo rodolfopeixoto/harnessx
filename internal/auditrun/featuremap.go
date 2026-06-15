@@ -39,11 +39,19 @@ func DefaultFeatures(_ string) []Feature {
 		}
 	}
 	uiHomePage := Feature{
-		ID: "home", Name: "Sessions / Home", Route: "/", Role: RoleOperator,
+		ID: "home", Name: "Home", Route: "/", Role: RoleOperator,
 		Category: "ui", Priority: constants.AuditSeverityP0,
 		ExpectedHTTPStatus: 200,
-		ExpectedSelectors:  []string{"[data-testid='shell']", "[data-testid='nav-home']"},
-		Viewports:          uiAll,
+		ExpectedSelectors: []string{
+			"[data-testid='shell']",
+			"[data-testid='page-home']",
+			"[data-testid='workspace-summary']",
+			"[data-testid='health-score-card']",
+			"[data-testid='next-action-card']",
+			"[data-testid='recent-runs']",
+			"[data-testid='terminal-reflection']",
+		},
+		Viewports: uiAll,
 	}
 	apiCheck := func(id, name, route string, priority string) Feature {
 		return Feature{
@@ -55,7 +63,17 @@ func DefaultFeatures(_ string) []Feature {
 	}
 	return []Feature{
 		uiHomePage,
-		uiPage("projects", "Projects hub", "/projects", RoleOperator, constants.AuditSeverityP0, uiAll),
+		{
+			ID: "projects", Name: "Projects hub", Route: "/projects", Role: RoleOperator,
+			Category: "ui", Priority: constants.AuditSeverityP0, ExpectedHTTPStatus: 200,
+			ExpectedSelectors: []string{
+				"[data-testid='shell']",
+				"[data-testid='page-projects']",
+				"[data-testid='project-switcher']",
+				"[data-testid='projects-explorer']",
+			},
+			Viewports: uiAll,
+		},
 		uiPage("command", "Command", "/command", RoleOperator, constants.AuditSeverityP0, uiAll),
 		uiPage("plan", "Plan", "/plan", RoleOperator, constants.AuditSeverityP0, uiDesk),
 		uiPage("activerun", "Active run", "/run", RoleOperator, constants.AuditSeverityP0, uiDesk),
@@ -77,7 +95,17 @@ func DefaultFeatures(_ string) []Feature {
 			ExpectedSelectors: []string{"[data-testid='shell']", "[data-testid='nav-agents']"},
 			Viewports:         uiDesk,
 		},
-		uiPage("catalog", "Capabilities", "/catalog", RoleOperator, constants.AuditSeverityP0, uiAll),
+		{
+			ID: "catalog", Name: "Capabilities", Route: "/catalog", Role: RoleOperator,
+			Category: "ui", Priority: constants.AuditSeverityP0, ExpectedHTTPStatus: 200,
+			ExpectedSelectors: []string{
+				"[data-testid='shell']",
+				"[data-testid='page-catalog']",
+				"[data-testid='capabilities-tabs']",
+				"[data-testid='tabs']",
+			},
+			Viewports: uiAll,
+		},
 		{
 			ID: "sensors", Name: "Sensors", Route: "/sensors", Role: RoleOperator,
 			Category: "ui", Priority: constants.AuditSeverityP1, ExpectedHTTPStatus: 200,
