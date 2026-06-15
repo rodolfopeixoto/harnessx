@@ -50,3 +50,8 @@ cost:
   mode: estimated
   input_token_price_per_1m: 2.5
   output_token_price_per_1m: 10.0
+
+auth:
+  login_command: codex auth login
+  doc_url: https://github.com/openai/codex#authentication
+  check: codex chat 'ok'

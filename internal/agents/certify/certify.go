@@ -213,3 +213,13 @@ func truncate(s string, n int) string {
 	}
 	return s[:n] + "…"
 }
+
+func looksLikeAuth(s string) bool {
+	low := strings.ToLower(s)
+	for _, hint := range []string{"unauthorized", "not logged in", "401", "invalid api key", "authentication failed", "auth required"} {
+		if strings.Contains(low, hint) {
+			return true
+		}
+	}
+	return false
+}

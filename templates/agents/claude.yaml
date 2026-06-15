@@ -50,3 +50,8 @@ cost:
   mode: estimated
   input_token_price_per_1m: 3.0
   output_token_price_per_1m: 15.0
+
+auth:
+  login_command: claude login
+  doc_url: https://docs.claude.com/en/docs/claude-code/quickstart#authentication
+  check: claude --print 'ok'

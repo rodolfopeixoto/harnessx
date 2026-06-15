@@ -53,6 +53,15 @@ type Spec struct {
 		InputTokenPricePer1M  float64 `yaml:"input_token_price_per_1m"`
 		OutputTokenPricePer1M float64 `yaml:"output_token_price_per_1m"`
 	} `yaml:"cost"`
+
+	// Auth describes how the user logs into this adapter's CLI. Harness
+	// never wraps the login itself; it just prints the command + doc URL
+	// when healthcheck / certify detects an auth failure.
+	Auth struct {
+		LoginCommand string `yaml:"login_command"`
+		DocURL       string `yaml:"doc_url"`
+		Check        string `yaml:"check"`
+	} `yaml:"auth"`
 }
 
 // Load reads a YAML file and validates it well enough to fail fast on
@@ -78,6 +87,12 @@ func Load(path string) (Spec, error) {
 	}
 	if len(s.Capabilities.Strengths) == 0 {
 		s.Capabilities.Strengths = s.Strengths
+	}
+	if s.Capabilities.LoginCommand == "" {
+		s.Capabilities.LoginCommand = s.Auth.LoginCommand
+	}
+	if s.Capabilities.AuthDocURL == "" {
+		s.Capabilities.AuthDocURL = s.Auth.DocURL
 	}
 	return s, nil
 }

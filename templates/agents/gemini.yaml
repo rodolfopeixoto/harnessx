@@ -47,3 +47,8 @@ cost:
   mode: estimated
   input_token_price_per_1m: 1.25
   output_token_price_per_1m: 5.0
+
+auth:
+  login_command: gemini auth login
+  doc_url: https://github.com/google-gemini/gemini-cli#auth
+  check: gemini -p 'ok'

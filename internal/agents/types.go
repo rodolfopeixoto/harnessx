@@ -33,6 +33,10 @@ type Capabilities struct {
 	MaxContextTokens int               `json:"max_context_tokens" yaml:"max_context_tokens"`
 	Strengths        []string          `json:"strengths,omitempty" yaml:"strengths,omitempty"`
 	Models           map[string]string `json:"models,omitempty"    yaml:"models,omitempty"`
+	// LoginCommand + AuthDocURL come from the adapter's `auth:` block and
+	// are surfaced by certify/doctor when an auth failure is detected.
+	LoginCommand string `json:"login_command,omitempty" yaml:"login_command,omitempty"`
+	AuthDocURL   string `json:"auth_doc_url,omitempty"  yaml:"auth_doc_url,omitempty"`
 }
 
 type HealthcheckResult struct {
