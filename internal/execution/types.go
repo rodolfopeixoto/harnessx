@@ -96,6 +96,9 @@ type Result struct {
 	ExactUsageAvailable    bool            `json:"exact_usage_available"`
 	MCPDetectedNotActive   []string        `json:"mcp_detected_not_active,omitempty"`
 	HooksDetectedNotActive []string        `json:"hooks_detected_not_active,omitempty"`
+	MCPInjected            []string        `json:"mcp_injected,omitempty"`
+	MCPConfigPath          string          `json:"mcp_config_path,omitempty"`
+	Hooks                  []HookOutcome   `json:"hooks,omitempty"`
 	ErrorType              string          `json:"error_type,omitempty"`
 	ErrorMessage           string          `json:"error_message,omitempty"`
 }

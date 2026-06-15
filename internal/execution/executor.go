@@ -101,7 +101,31 @@ func (e *DefaultExecutor) Execute(ctx context.Context, req Request) (Result, err
 		Prompt:     req.Prompt,
 		WorkingDir: wt.Path,
 		Timeout:    5 * time.Minute,
+		Extra:      map[string]string{},
 	}
+	if e.Adapter.Capabilities().MCP {
+		if path, names, err := BuildMCPConfig(e.ProjectRoot, runDir); err == nil && path != "" {
+			res.MCPConfigPath = path
+			res.MCPInjected = names
+			agentReq.Extra["mcp_config"] = path
+			agentReq.ExtraArgs = append(agentReq.ExtraArgs, "--mcp-config", path)
+		}
+	}
+
+	preHooks, _ := DispatchHooks(ctx, e.ProjectRoot, HookPreToolUse, []string{"HARNESS_RUN_ID=" + res.RunID, "HARNESS_AGENT=" + e.Adapter.ID()})
+	res.Hooks = append(res.Hooks, preHooks...)
+	if failures := FormatHookFailures(preHooks); failures != "" && req.Autonomy != AutonomyFullProjectLoop {
+		res.Status = StatusAutonomyDenied
+		res.ErrorType = "pre_hook_blocked"
+		res.ErrorMessage = failures
+		res.FinishedAt = e.Clock()
+		_ = e.Manager.Cleanup(ctx, wt)
+		res.WorktreePath = ""
+		res.ReportPath = writeReport(runDir, req, res, "pre-tool-use hook blocked execution")
+		writeMeta(runDir, res)
+		return res, fmt.Errorf("pre-tool-use hook blocked: %s", failures)
+	}
+
 	agentRes := e.Adapter.Run(ctx, agentReq)
 	if err := os.WriteFile(stdoutPath, agentRes.Output.Stdout, 0o644); err != nil {
 		return res, fmt.Errorf("execution: write stdout: %w", err)
@@ -157,6 +181,8 @@ func (e *DefaultExecutor) Execute(ctx context.Context, req Request) (Result, err
 	}
 
 	res.Sensors = RunSensors(ctx, e.Sensors, e.Profile, wt.Path, runDir)
+	postHooks, _ := DispatchHooks(ctx, e.ProjectRoot, HookPostToolUse, []string{"HARNESS_RUN_ID=" + res.RunID, "HARNESS_AGENT=" + e.Adapter.ID()})
+	res.Hooks = append(res.Hooks, postHooks...)
 	risk := ClassifyRisk(changed)
 	dec, reason := GateApply(req.Autonomy, risk, res.Sensors)
 
@@ -290,14 +316,25 @@ func writeReport(runDir string, req Request, res Result, summary string) string 
 	}
 	b = append(b, []byte(fmt.Sprintf("## Cost and Tokens\n\nInput: %d | Output: %d | Estimated: $%.4f | Exact: %t\n\n",
 		res.InputTokens, res.OutputTokens, res.EstimatedCostUSD, res.ExactUsageAvailable))...)
-	if len(res.MCPDetectedNotActive) > 0 {
-		b = append(b, []byte("## MCP\n\nMCP configs detected but not injected yet. P32 required.\n\n")...)
+	if len(res.MCPInjected) > 0 {
+		b = append(b, []byte(fmt.Sprintf("## MCP\n\nInjected %d MCP server(s) via %s\n\n", len(res.MCPInjected), res.MCPConfigPath))...)
+		j, _ := json.MarshalIndent(res.MCPInjected, "", "  ")
+		b = append(b, j...)
+		b = append(b, '\n', '\n')
+	} else if len(res.MCPDetectedNotActive) > 0 {
+		b = append(b, []byte("## MCP\n\nDetected but not injected (adapter capability mcp=false)\n\n")...)
 		j, _ := json.MarshalIndent(res.MCPDetectedNotActive, "", "  ")
 		b = append(b, j...)
 		b = append(b, '\n', '\n')
 	}
-	if len(res.HooksDetectedNotActive) > 0 {
-		b = append(b, []byte("## Hooks\n\nHooks detected but not executed yet. P32 required.\n\n")...)
+	if len(res.Hooks) > 0 {
+		b = append(b, []byte("## Hooks\n\n| Name | Event | Exit | Duration (ms) | Skipped |\n|---|---|---|---|---|\n")...)
+		for _, h := range res.Hooks {
+			b = append(b, []byte(fmt.Sprintf("| %s | %s | %d | %d | %t |\n", h.Name, h.Event, h.ExitCode, h.DurationMs, h.Skipped))...)
+		}
+		b = append(b, '\n')
+	} else if len(res.HooksDetectedNotActive) > 0 {
+		b = append(b, []byte("## Hooks\n\nDetected but no pre/post-tool-use scripts executable\n\n")...)
 		j, _ := json.MarshalIndent(res.HooksDetectedNotActive, "", "  ")
 		b = append(b, j...)
 		b = append(b, '\n', '\n')
