@@ -3,6 +3,13 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-15 — v0.15.0 — Windows binaries + Homebrew formula generator (P45)
+
+- **Windows binaries**: `make release` now cross-builds `windows/amd64` and `windows/arm64`. Windows artifacts ship as `harness-windows-<arch>.zip` (instead of tar.gz) plus matching `.sha256`. Same size budget enforcement; 18 MiB on amd64, 17 MiB on arm64.
+- **`scripts/gen-brew-formula.sh`** emits a Homebrew formula keyed off the release tag and the per-platform sha256 values in `dist/`. Drop the generated `Formula/harnessx.rb` into `rodolfopeixoto/homebrew-tap` and operators get `brew tap rodolfopeixoto/tap && brew install harnessx`.
+- **`Formula/harnessx.rb`** committed in this repo as the source of truth (regenerated per release); the tap repo mirrors it.
+- **`docs/install.md`** rewritten as a per-OS install guide (install.sh / Homebrew tap / Windows unzip / Scoop bucket template / build-from-source) with verification and update steps.
+
 ## 2026-06-15 — v0.14.0 — Dashboard UI pages for runtime / containers / images / install / secrets / backup (P44)
 
 - **`/runtime`** lists detected runtimes with selected ★, plus current binary / version / source.

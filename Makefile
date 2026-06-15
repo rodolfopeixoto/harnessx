@@ -17,7 +17,7 @@ LDFLAGS := -s -w \
 
 # Local release matrix (no GitHub Actions). Override on the command line
 # to slice down: `PLATFORMS="darwin/arm64" make release`.
-PLATFORMS ?= darwin/amd64 darwin/arm64 linux/amd64 linux/arm64
+PLATFORMS ?= darwin/amd64 darwin/arm64 linux/amd64 linux/arm64 windows/amd64 windows/arm64
 
 .PHONY: all build test test-short vet lint fmt tidy check ci cd release \
         e2e e2e-all bench coverage coverage-gate security licenses sbom \
@@ -121,17 +121,23 @@ release: build
 	@rm -rf dist && mkdir -p dist
 	@for p in $(PLATFORMS); do \
 	  os=$${p%/*}; arch=$${p#*/}; \
+	  ext=""; [ "$$os" = "windows" ] && ext=".exe"; \
 	  target="harness-$${os}-$${arch}"; \
 	  echo "→ $$target"; \
 	  GOOS="$$os" GOARCH="$$arch" CGO_ENABLED=0 \
-	    $(GO) build -trimpath -ldflags "$(LDFLAGS)" -o "dist/$$target" ./cmd/harness; \
-	  size=$$(stat -f %z "dist/$$target" 2>/dev/null || stat -c %s "dist/$$target"); \
+	    $(GO) build -trimpath -ldflags "$(LDFLAGS)" -o "dist/$${target}$${ext}" ./cmd/harness; \
+	  size=$$(stat -f %z "dist/$${target}$${ext}" 2>/dev/null || stat -c %s "dist/$${target}$${ext}"); \
 	  printf "  %-30s %8d bytes\n" "$$target" "$$size"; \
 	  if [ "$$size" -gt 41943040 ]; then \
 	    echo "  ✗ $$target exceeds 40 MiB binary-size budget"; exit 1; \
 	  fi; \
-	  (cd dist && tar -czf "$$target.tar.gz" "$$target" && \
-	    shasum -a 256 "$$target.tar.gz" > "$$target.tar.gz.sha256"); \
+	  if [ "$$os" = "windows" ]; then \
+	    (cd dist && zip -q "$${target}.zip" "$${target}$${ext}" && \
+	      shasum -a 256 "$${target}.zip" > "$${target}.zip.sha256"); \
+	  else \
+	    (cd dist && tar -czf "$${target}.tar.gz" "$${target}" && \
+	      shasum -a 256 "$${target}.tar.gz" > "$${target}.tar.gz.sha256"); \
+	  fi; \
 	done
 	@echo
 	@echo "dist/ contents:"
