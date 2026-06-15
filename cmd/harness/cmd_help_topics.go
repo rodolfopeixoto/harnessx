@@ -128,6 +128,30 @@ Channels:
 Aggregates per-run state from .harness/runs/*/meta.json
 and the audit JSONL at .harness/audit/events.jsonl.
 `,
+	"billing": `Billing — Anthropic streams and which adapter hits which
+
+Anthropic splits spending into three buckets (post 2026-06-15):
+
+  Subscription usage        interactive claude in terminal/IDE, claude.ai chat
+  Agent SDK monthly credit  claude -p / Agent SDK / GitHub Action
+  Pay-as-you-go API         calls with an Anthropic API key (x-api-key)
+
+How HarnessX adapters map:
+
+  --agent claude            uses 'claude --print --output-format json' -> Agent SDK credit
+                            ($20-$200/month depending on plan)
+  --agent anthropic-api     direct API key -> pay-as-you-go, no monthly cap
+
+Pick by workload:
+
+  automation-heavy          use anthropic-api with --budget-usd per run
+  exploration + a bit       use claude CLI, opt in Agent SDK credit at
+                            https://console.anthropic.com -> plan settings
+
+Set a per-run cap with --budget-usd 0.50. Watch harness metrics --since 1d.
+
+Full breakdown: docs/anthropic-billing.md
+`,
 }
 
 func newHelpCmd() *cobra.Command {

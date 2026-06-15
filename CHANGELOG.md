@@ -3,6 +3,12 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-15 — v0.26.0 — Anthropic billing guide (P60)
+
+- **`docs/anthropic-billing.md`**: explains the three Anthropic spending streams (subscription / Agent SDK monthly credit / pay-as-you-go API), maps `--agent claude` to the Agent SDK credit ($20-$200/month) and `--agent anthropic-api` to pay-as-you-go, lists per-plan credit amounts, and gives a workload-based adapter pick.
+- **`harness help billing`**: in-CLI summary with the same mapping plus the per-run `--budget-usd` recommendation and `harness metrics --since 1d` tracking hint.
+- **Practical advice baked in**: automation-heavy → API key + `anthropic-api`; exploration + a bit of automation → opt in Agent SDK credit at console.anthropic.com.
+
 ## 2026-06-15 — v0.25.0 — Certify simple_prompt timeout + agentcmd split (P59)
 
 - **`certify.Options.SimpleTimeout`** (default `90s`): bounds the simple_prompt round-trip independently from the short `PerCheckTimeout` (10s) used by healthcheck / timeout / cancellation probes. Real LLM round-trips take 5-60s; the old 10s ceiling killed Claude before it could answer.
