@@ -64,6 +64,12 @@ type Request struct {
 	ContextPackID string
 	SpecPath      string
 	PlanPath      string
+	// Model picked by the router (e.g. claude-haiku-4-5 for trivial,
+	// claude-opus-4-7 for complex). Empty -> adapter default.
+	Model string
+	// EnhancedPrompt overrides Prompt when non-empty; the executor still
+	// records the original Prompt on the Result for audit.
+	EnhancedPrompt string
 }
 
 type SensorOutcome struct {

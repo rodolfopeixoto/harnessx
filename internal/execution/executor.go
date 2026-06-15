@@ -97,8 +97,13 @@ func (e *DefaultExecutor) Execute(ctx context.Context, req Request) (Result, err
 	res.StdoutPath = stdoutPath
 	res.StderrPath = stderrPath
 
+	prompt := req.Prompt
+	if req.EnhancedPrompt != "" {
+		prompt = req.EnhancedPrompt
+	}
 	agentReq := agents.AgentRequest{
-		Prompt:     req.Prompt,
+		Prompt:     prompt,
+		Model:      req.Model,
 		WorkingDir: wt.Path,
 		Timeout:    5 * time.Minute,
 		Extra:      map[string]string{},
@@ -184,7 +189,8 @@ func (e *DefaultExecutor) Execute(ctx context.Context, req Request) (Result, err
 	postHooks, _ := DispatchHooks(ctx, e.ProjectRoot, HookPostToolUse, []string{"HARNESS_RUN_ID=" + res.RunID, "HARNESS_AGENT=" + e.Adapter.ID()})
 	res.Hooks = append(res.Hooks, postHooks...)
 	risk := ClassifyRisk(changed)
-	dec, reason := GateApply(req.Autonomy, risk, res.Sensors)
+	policy, _ := autonomy.LoadPolicy(e.ProjectRoot)
+	dec, reason := GateApplyWithPolicy(req.Autonomy, risk, res.Sensors, policy, changed)
 
 	switch {
 	case dec == autonomy.DecisionDeny:
