@@ -112,20 +112,19 @@ func matchGlob(pattern, target string) bool {
 
 func matchDoubleStar(pattern, target string) bool {
 	parts := strings.Split(pattern, "**")
-	switch len(parts) {
-	case 2:
-		left := strings.TrimSuffix(parts[0], "/")
-		right := strings.TrimPrefix(parts[1], "/")
-		if left == "" && right == "" {
-			return true
-		}
-		if left == "" {
-			return strings.Contains(target, right) || strings.HasSuffix(target, right)
-		}
-		if right == "" {
-			return strings.HasPrefix(target, left+"/") || target == left
-		}
+	if len(parts) != 2 {
+		return false
+	}
+	left := strings.TrimSuffix(parts[0], "/")
+	right := strings.TrimPrefix(parts[1], "/")
+	switch {
+	case left == "" && right == "":
+		return true
+	case left == "":
+		return strings.Contains(target, right) || strings.HasSuffix(target, right)
+	case right == "":
+		return strings.HasPrefix(target, left+"/") || target == left
+	default:
 		return strings.HasPrefix(target, left+"/") && strings.Contains(target, right)
 	}
-	return false
 }

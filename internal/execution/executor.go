@@ -97,38 +97,10 @@ func (e *DefaultExecutor) Execute(ctx context.Context, req Request) (Result, err
 	res.StdoutPath = stdoutPath
 	res.StderrPath = stderrPath
 
-	prompt := req.Prompt
-	if req.EnhancedPrompt != "" {
-		prompt = req.EnhancedPrompt
-	}
-	agentReq := agents.AgentRequest{
-		Prompt:     prompt,
-		Model:      req.Model,
-		WorkingDir: wt.Path,
-		Timeout:    5 * time.Minute,
-		Extra:      map[string]string{},
-	}
-	if e.Adapter.Capabilities().MCP {
-		if path, names, err := BuildMCPConfig(e.ProjectRoot, runDir); err == nil && path != "" {
-			res.MCPConfigPath = path
-			res.MCPInjected = names
-			agentReq.Extra["mcp_config"] = path
-			agentReq.ExtraArgs = append(agentReq.ExtraArgs, "--mcp-config", path)
-		}
-	}
+	agentReq := e.buildAgentRequest(req, wt, runDir, &res)
 
-	preHooks, _ := DispatchHooks(ctx, e.ProjectRoot, HookPreToolUse, []string{"HARNESS_RUN_ID=" + res.RunID, "HARNESS_AGENT=" + e.Adapter.ID()})
-	res.Hooks = append(res.Hooks, preHooks...)
-	if failures := FormatHookFailures(preHooks); failures != "" && req.Autonomy != AutonomyFullProjectLoop {
-		res.Status = StatusAutonomyDenied
-		res.ErrorType = "pre_hook_blocked"
-		res.ErrorMessage = failures
-		res.FinishedAt = e.Clock()
-		_ = e.Manager.Cleanup(ctx, wt)
-		res.WorktreePath = ""
-		res.ReportPath = writeReport(runDir, req, res, "pre-tool-use hook blocked execution")
-		writeMeta(runDir, res)
-		return res, fmt.Errorf("pre-tool-use hook blocked: %s", failures)
+	if blocked, err := e.dispatchPreHooks(ctx, req, wt, runDir, &res); blocked {
+		return res, err
 	}
 
 	agentRes := e.Adapter.Run(ctx, agentReq)
@@ -144,45 +116,17 @@ func (e *DefaultExecutor) Execute(ctx context.Context, req Request) (Result, err
 	res.ExactUsageAvailable = agentRes.Usage.Mode == "reported"
 
 	if agentRes.Failure != agents.FailureNone || agentRes.Err != nil {
-		res.Status = StatusAgentFailed
-		res.ErrorType = string(agentRes.Failure)
-		if agentRes.Err != nil {
-			res.ErrorMessage = agentRes.Err.Error()
-		}
-		res.FinishedAt = e.Clock()
-		_ = e.Manager.Cleanup(ctx, wt)
-		res.WorktreePath = ""
-		res.ReportPath = writeReport(runDir, req, res, "agent failed")
-		writeMeta(runDir, res)
+		e.finalizeAgentFailure(ctx, req, wt, runDir, &res, agentRes)
 		return res, nil
 	}
 
-	changed, err := CaptureDiff(ctx, wt, runDir)
+	changed, err := e.captureAndRecordDiff(ctx, wt, runDir, &res)
 	if err != nil {
-		res.Status = StatusAgentFailed
-		res.ErrorType = "diff_capture"
-		res.ErrorMessage = err.Error()
-		res.FinishedAt = e.Clock()
 		return res, err
 	}
-	res.ChangedFiles = changed
-	if wt.Kind == "git_worktree" {
-		res.DiffPath = filepath.Join(runDir, "diff.patch")
-		res.DiffStatPath = filepath.Join(runDir, "diff-stat.txt")
-	}
-	res.ChangedFilesPath = filepath.Join(runDir, "changed-files.json")
 
 	if len(changed) == 0 {
-		res.Status = StatusNoChanges
-		res.FinishedAt = e.Clock()
-		_ = e.Manager.Cleanup(ctx, wt)
-		res.WorktreePath = ""
-		res.ReportPath = writeReport(runDir, req, res, "agent produced no changes")
-		writeMeta(runDir, res)
-		if req.Mode == ModeFeature || req.Mode == ModeBugfix {
-			return res, fmt.Errorf("agent produced no changes for %s mode", req.Mode)
-		}
-		return res, nil
+		return e.finalizeNoChanges(ctx, req, wt, runDir, &res)
 	}
 
 	res.Sensors = RunSensors(ctx, e.Sensors, e.Profile, wt.Path, runDir)
@@ -191,7 +135,37 @@ func (e *DefaultExecutor) Execute(ctx context.Context, req Request) (Result, err
 	risk := ClassifyRisk(changed)
 	policy, _ := autonomy.LoadPolicy(e.ProjectRoot)
 	dec, reason := GateApplyWithPolicy(req.Autonomy, risk, res.Sensors, policy, changed)
+	e.applyGate(ctx, req, wt, runDir, &res, dec, reason)
+	if hasFailedSensor(res.Sensors) && res.Status != StatusAutonomyDenied {
+		res.Status = StatusSensorFailed
+	}
 
+	res.FinishedAt = e.Clock()
+	summary := fmt.Sprintf("status=%s files=%d risk=%s decision=%s", res.Status, len(changed), risk, dec)
+	res.ReportPath = writeReport(runDir, req, res, summary)
+	writeMeta(runDir, res)
+	return res, nil
+}
+
+func (e *DefaultExecutor) captureAndRecordDiff(ctx context.Context, wt Worktree, runDir string, res *Result) ([]string, error) {
+	changed, err := CaptureDiff(ctx, wt, runDir)
+	if err != nil {
+		res.Status = StatusAgentFailed
+		res.ErrorType = "diff_capture"
+		res.ErrorMessage = err.Error()
+		res.FinishedAt = e.Clock()
+		return nil, err
+	}
+	res.ChangedFiles = changed
+	if wt.Kind == "git_worktree" {
+		res.DiffPath = filepath.Join(runDir, "diff.patch")
+		res.DiffStatPath = filepath.Join(runDir, "diff-stat.txt")
+	}
+	res.ChangedFilesPath = filepath.Join(runDir, "changed-files.json")
+	return changed, nil
+}
+
+func (e *DefaultExecutor) applyGate(ctx context.Context, req Request, wt Worktree, runDir string, res *Result, dec autonomy.Decision, reason string) {
 	switch {
 	case dec == autonomy.DecisionDeny:
 		res.Status = StatusAutonomyDenied
@@ -211,23 +185,83 @@ func (e *DefaultExecutor) Execute(ctx context.Context, req Request) (Result, err
 			res.WorktreePath = ""
 		}
 	}
+}
 
-	hasFailedSensor := false
-	for _, s := range res.Sensors {
+func hasFailedSensor(ss []SensorOutcome) bool {
+	for _, s := range ss {
 		if s.Status == "failed" {
-			hasFailedSensor = true
-			break
+			return true
 		}
 	}
-	if hasFailedSensor && res.Status != StatusAutonomyDenied {
-		res.Status = StatusSensorFailed
-	}
+	return false
+}
 
+func (e *DefaultExecutor) finalizeAgentFailure(ctx context.Context, req Request, wt Worktree, runDir string, res *Result, agentRes agents.AgentResult) {
+	res.Status = StatusAgentFailed
+	res.ErrorType = string(agentRes.Failure)
+	if agentRes.Err != nil {
+		res.ErrorMessage = agentRes.Err.Error()
+	}
 	res.FinishedAt = e.Clock()
-	summary := fmt.Sprintf("status=%s files=%d risk=%s decision=%s", res.Status, len(changed), risk, dec)
-	res.ReportPath = writeReport(runDir, req, res, summary)
-	writeMeta(runDir, res)
-	return res, nil
+	_ = e.Manager.Cleanup(ctx, wt)
+	res.WorktreePath = ""
+	res.ReportPath = writeReport(runDir, req, *res, "agent failed")
+	writeMeta(runDir, *res)
+}
+
+func (e *DefaultExecutor) finalizeNoChanges(ctx context.Context, req Request, wt Worktree, runDir string, res *Result) (Result, error) {
+	res.Status = StatusNoChanges
+	res.FinishedAt = e.Clock()
+	_ = e.Manager.Cleanup(ctx, wt)
+	res.WorktreePath = ""
+	res.ReportPath = writeReport(runDir, req, *res, "agent produced no changes")
+	writeMeta(runDir, *res)
+	if req.Mode == ModeFeature || req.Mode == ModeBugfix {
+		return *res, fmt.Errorf("agent produced no changes for %s mode", req.Mode)
+	}
+	return *res, nil
+}
+
+func (e *DefaultExecutor) buildAgentRequest(req Request, wt Worktree, runDir string, res *Result) agents.AgentRequest {
+	prompt := req.Prompt
+	if req.EnhancedPrompt != "" {
+		prompt = req.EnhancedPrompt
+	}
+	r := agents.AgentRequest{
+		Prompt:     prompt,
+		Model:      req.Model,
+		WorkingDir: wt.Path,
+		Timeout:    5 * time.Minute,
+		Extra:      map[string]string{},
+	}
+	if e.Adapter.Capabilities().MCP {
+		if path, names, err := BuildMCPConfig(e.ProjectRoot, runDir); err == nil && path != "" {
+			res.MCPConfigPath = path
+			res.MCPInjected = names
+			r.Extra["mcp_config"] = path
+			r.ExtraArgs = append(r.ExtraArgs, "--mcp-config", path)
+		}
+	}
+	return r
+}
+
+func (e *DefaultExecutor) dispatchPreHooks(ctx context.Context, req Request, wt Worktree, runDir string, res *Result) (bool, error) {
+	preHooks, _ := DispatchHooks(ctx, e.ProjectRoot, HookPreToolUse,
+		[]string{"HARNESS_RUN_ID=" + res.RunID, "HARNESS_AGENT=" + e.Adapter.ID()})
+	res.Hooks = append(res.Hooks, preHooks...)
+	failures := FormatHookFailures(preHooks)
+	if failures == "" || req.Autonomy == AutonomyFullProjectLoop {
+		return false, nil
+	}
+	res.Status = StatusAutonomyDenied
+	res.ErrorType = "pre_hook_blocked"
+	res.ErrorMessage = failures
+	res.FinishedAt = e.Clock()
+	_ = e.Manager.Cleanup(ctx, wt)
+	res.WorktreePath = ""
+	res.ReportPath = writeReport(runDir, req, *res, "pre-tool-use hook blocked execution")
+	writeMeta(runDir, *res)
+	return true, fmt.Errorf("pre-tool-use hook blocked: %s", failures)
 }
 
 func writeMeta(runDir string, res Result) {

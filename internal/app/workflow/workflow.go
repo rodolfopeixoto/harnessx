@@ -210,7 +210,8 @@ func planThenMaybeExecute(ctx stdctx.Context, opts Options, execute bool, out io
 	}
 
 	if execute {
-		if opts.AgentID != "" && res.Intent.Complexity == intent.ComplexityTrivial && !opts.Apply {
+		switch {
+		case opts.AgentID != "" && res.Intent.Complexity == intent.ComplexityTrivial && !opts.Apply:
 			fmt.Fprintln(out, "Routing: trivial prompt — using AskAgent fast path (no diff, no worktree)")
 			exRes, exErr := askAgent(ctx, rc, opts, out)
 			if exErr != nil {
@@ -218,7 +219,7 @@ func planThenMaybeExecute(ctx stdctx.Context, opts Options, execute bool, out io
 			}
 			res.ExecutionRunID = exRes.RunID
 			res.ExecutionStatus = string(exRes.Status)
-		} else if opts.AgentID != "" {
+		case opts.AgentID != "":
 			exRes, exErr := runWithExecutorAndComplexity(ctx, rc, mode, opts, res.Intent.Complexity, pack, out)
 			if exErr != nil {
 				fmt.Fprintf(out, "Execute: %v\n", exErr)
@@ -226,7 +227,7 @@ func planThenMaybeExecute(ctx stdctx.Context, opts Options, execute bool, out io
 			res.ExecutionRunID = exRes.RunID
 			res.ExecutionStatus = string(exRes.Status)
 			res.ExecutionDiffPath = exRes.DiffPath
-		} else {
+		default:
 			_ = executeAgents(ctx, rc, mode, opts.Prompt, opts.BudgetUSD, pack, out)
 		}
 	}

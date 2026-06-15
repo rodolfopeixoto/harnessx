@@ -24,10 +24,6 @@ import (
 //
 // P34 additions: enriches the prompt via promptenh.Enhance and selects
 // the adapter model with router.PickModel based on intent.Complexity.
-func runWithExecutor(ctx stdctx.Context, rc runtimeCtx, mode domain.Mode, opts Options, out io.Writer) (execution.Result, error) {
-	return runWithExecutorAndComplexity(ctx, rc, mode, opts, intent.ComplexityStandard, nil, out)
-}
-
 func runWithExecutorAndComplexity(ctx stdctx.Context, rc runtimeCtx, mode domain.Mode, opts Options, complexity intent.Complexity, pack *hxcontext.Pack, out io.Writer) (execution.Result, error) {
 	reg, _, err := agentcmd.LoadAll(rc.root)
 	if err != nil {

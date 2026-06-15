@@ -100,7 +100,17 @@ func Run(ctx context.Context, a agents.AgentAdapter, opts Options) Result {
 			r.Checks = append(r.Checks, Check{Name: "simple_prompt", Status: StatusPassed, Detail: truncate(res.Output.FinalMessage, 80)})
 			r.Checks = append(r.Checks, Check{Name: "output_parseable", Status: StatusPassed})
 		} else {
-			r.Checks = append(r.Checks, Check{Name: "simple_prompt", Status: StatusFailed, Detail: combine(errString(res.Err), truncate(string(res.Output.Stderr), 200))})
+			detail := combine(errString(res.Err), truncate(string(res.Output.Stderr), 200))
+			if res.Failure == agents.FailureAuth || looksLikeAuth(string(res.Output.Stderr)) {
+				caps := a.Capabilities()
+				if caps.LoginCommand != "" {
+					detail += " | run: " + caps.LoginCommand
+				}
+				if caps.AuthDocURL != "" {
+					detail += " | docs: " + caps.AuthDocURL
+				}
+			}
+			r.Checks = append(r.Checks, Check{Name: "simple_prompt", Status: StatusFailed, Detail: detail})
 			r.Checks = append(r.Checks, Check{Name: "output_parseable", Status: StatusSkipped})
 		}
 
