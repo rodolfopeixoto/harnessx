@@ -169,13 +169,20 @@ type jsonStep struct {
 	Lang       string   `json:"lang,omitempty"`
 }
 
+// JSONSchemaVersion is bumped whenever the shape of jsonPlan or
+// jsonDoResult changes. v1 covers v0.39/v0.40 layout plus this version
+// field (added in v0.43). Consumers should refuse versions they do not
+// know.
+const JSONSchemaVersion = 1
+
 type jsonPlan struct {
-	Prompt string     `json:"prompt"`
-	Steps  []jsonStep `json:"steps"`
+	SchemaVersion int        `json:"schema_version"`
+	Prompt        string     `json:"prompt"`
+	Steps         []jsonStep `json:"steps"`
 }
 
 func emitJSON(out io.Writer, prompt string, steps []plannedStep) error {
-	js := jsonPlan{Prompt: prompt}
+	js := jsonPlan{SchemaVersion: JSONSchemaVersion, Prompt: prompt}
 	for i, s := range steps {
 		js.Steps = append(js.Steps, jsonStep{
 			Index: i + 1, Kind: string(s.task.Kind), Tags: s.task.Tags,
@@ -264,14 +271,15 @@ func runDo(ctx context.Context, out io.Writer, prompt string, opts doOpts) error
 }
 
 type jsonDoResult struct {
-	Prompt     string     `json:"prompt"`
-	ReportPath string     `json:"report_path"`
-	Steps      []jsonStep `json:"steps"`
-	Results    []string   `json:"results"`
+	SchemaVersion int        `json:"schema_version"`
+	Prompt        string     `json:"prompt"`
+	ReportPath    string     `json:"report_path"`
+	Steps         []jsonStep `json:"steps"`
+	Results       []string   `json:"results"`
 }
 
 func emitDoJSON(out io.Writer, prompt string, steps []plannedStep, results []string, reportPath string) error {
-	js := jsonDoResult{Prompt: prompt, ReportPath: reportPath, Results: results}
+	js := jsonDoResult{SchemaVersion: JSONSchemaVersion, Prompt: prompt, ReportPath: reportPath, Results: results}
 	for i, s := range steps {
 		js.Steps = append(js.Steps, jsonStep{
 			Index: i + 1, Kind: string(s.task.Kind), Tags: s.task.Tags,
