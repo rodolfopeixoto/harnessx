@@ -38,6 +38,7 @@ func runWithExecutorAndComplexity(ctx stdctx.Context, rc runtimeCtx, mode domain
 		autonomyLevel = "safe_execute"
 	}
 	ex := execution.NewDefaultExecutor(rc.root, adapter, defaultSensors(opts.NoSensors), rc.profile)
+	ex.Status = func(msg string) { fmt.Fprintf(out, "  [agent] %s\n", msg) }
 	enhancement := promptenh.Enhance(opts.Prompt, mode, pack, nil)
 	model := router.PickModel(adapter, complexity)
 	if model != "" {

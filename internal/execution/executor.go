@@ -32,6 +32,11 @@ type DefaultExecutor struct {
 	Profile     index.Profile
 	Clock       func() time.Time
 	IDGen       func() string
+	// Status receives "calling <adapter>" / "<adapter> returned in <dur>"
+	// notices around the adapter.Run call. nil = silent. Workflow wires
+	// this to a stderr-writing closure so the operator sees a heartbeat
+	// while the LLM is working.
+	Status func(string)
 }
 
 func NewDefaultExecutor(root string, adapter agents.AgentAdapter, ss []sensors.Sensor, p index.Profile) *DefaultExecutor {
@@ -223,15 +228,25 @@ func (e *DefaultExecutor) finalizeNoChanges(ctx context.Context, req Request, wt
 }
 
 func (e *DefaultExecutor) invokeAdapter(ctx context.Context, req Request, wt Worktree, agentReq agents.AgentRequest) agents.AgentResult {
-	if SandboxMode(req.Sandbox) != SandboxContainer {
-		return e.Adapter.Run(ctx, agentReq)
+	if e.Status != nil {
+		e.Status("calling " + e.Adapter.ID() + "...")
 	}
-	binary := e.Adapter.ID()
-	sb := SandboxSpec{Mode: SandboxContainer, Image: req.SandboxImage}
-	res, err := runInContainer(ctx, e.ProjectRoot, sb, wt, agentReq, binary)
-	if err != nil {
-		res.Err = err
-		res.Failure = agents.FailureTransient
+	start := time.Now()
+	var res agents.AgentResult
+	if SandboxMode(req.Sandbox) != SandboxContainer {
+		res = e.Adapter.Run(ctx, agentReq)
+	} else {
+		binary := e.Adapter.ID()
+		sb := SandboxSpec{Mode: SandboxContainer, Image: req.SandboxImage}
+		r, err := runInContainer(ctx, e.ProjectRoot, sb, wt, agentReq, binary)
+		res = r
+		if err != nil {
+			res.Err = err
+			res.Failure = agents.FailureTransient
+		}
+	}
+	if e.Status != nil {
+		e.Status(fmt.Sprintf("%s returned in %s", e.Adapter.ID(), time.Since(start).Round(time.Millisecond)))
 	}
 	return res
 }
