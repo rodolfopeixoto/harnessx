@@ -10,7 +10,7 @@ terminal against the doc. This is the single canonical tutorial —
 older versions are not kept; check `git log docs/tutorial.md` if you
 need historical commands.
 
-Tested against **v0.30.0** (see `harness version` in section 0).
+Tested against **v0.32.0** (see `harness version` in section 0).
 
 ---
 
@@ -21,7 +21,7 @@ Tested against **v0.30.0** (see `harness version` in section 0).
 ```bash
 brew tap rodolfopeixoto/harnessx https://github.com/rodolfopeixoto/harnessx.git
 brew install harness                  # ← v0.29 renamed harnessx → harness
-harness version                       # expect: 0.30.0
+harness version                       # expect: 0.32.0
 ```
 
 ### B — Install via curl (no brew dependency)
@@ -60,7 +60,7 @@ non-writable dir; copy-paste and run.
 
 | Tool | Need | Install hint |
 |---|---|---|
-| `harness` ≥ 0.30.0 | always | section 0 |
+| `harness` ≥ 0.32.0 | always | section 0 |
 | `python3` ≥ 3.11 | sample app | system Python or pyenv |
 | `pipx` | install ruff / pytest cleanly | `brew install pipx` |
 | `git` | gitflow demo | system git |
@@ -171,6 +171,45 @@ harness scaffold apply react  --name demo --apply --with-deps
 
 Each language ships an idiomatic `/healthz` server + tests + lint
 config + Makefile/Rakefile.
+
+---
+
+## 3b. `harness do` — multi-agent routing (new in v0.32)
+
+Decompose one prompt into typed tasks and run each through the best
+adapter — or skip the LLM entirely when a deterministic scaffold or
+sensor matches.
+
+```bash
+# dry-run plan (no LLM, <500ms)
+harness route show "scaffold python and add a /healthz endpoint then generate a hero image"
+```
+
+**Expected:**
+
+```
+#  KIND      TAGS           ROUTING                        PROMPT
+1  scaffold  scaffold,code  deterministic:scaffold:python  scaffold python
+2  code      code           adapter:claude                 add a /healthz endpoint
+3  image     image          adapter:gemini                 generate a hero image
+```
+
+```bash
+# execute the plan
+harness do "scaffold python and add a /healthz endpoint" --yes --budget-usd 0.30
+```
+
+The router scores each task by `intersection(task.tags,
+adapter.strengths) / len(task.tags)`. Deterministic tasks (scaffold,
+lint, test, secrets) bypass the LLM by default
+(`--deterministic=true`). Report lands at
+`.harness/runs/_do/do-<ts>.md`.
+
+Flags:
+- `--deterministic` (default `true`): prefer scaffold/sensor over LLM
+- `--budget-usd`: max USD across all routed tasks
+- `--max-tasks`: hard cap (default 10)
+- `--yes`: skip the confirmation prompt
 
 ---
 
