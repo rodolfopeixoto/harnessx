@@ -3,6 +3,11 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-15 — v0.34.0 — Sensor confidence + low-confidence task warning (P66)
+
+- **`sensors.Result.Confidence` (0..1)**: addresses the paper's "verification with incomplete feedback" open challenge. Renderers show `~conf N.NN` for any non-deterministic verdict (between 0 and 1). 0 = unknown / not set; 1.0 = deterministic (default, hidden).
+- **`harness do` plan now includes a CONF column** and emits a warning when any task has classification confidence < 0.5: `⚠ one or more tasks have low classification confidence — review before --yes`.
+
 ## 2026-06-15 — v0.33.0 — Regression-aware loop + cross-session memory + multimodal auto-route (P65)
 
 - **`harness loop` now captures a baseline** before the first attempt by running `lint_command` + `test_command` once. If a later attempt breaks something the baseline had green, the loop flags it as a regression and the canonical-error block prepends `## Regression detected\n<reason>\n\nFix this before anything else.` Closes the paper's "regression-free improvements" open challenge.
