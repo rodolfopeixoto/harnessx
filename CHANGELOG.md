@@ -3,6 +3,11 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-16 — v0.39.0 — harness route show --json (P71)
+
+- **`harness route show "<prompt>" --json`**: emits the planned task graph as JSON for programmatic consumers (IDE plugins, scripts, CI). Schema: `{prompt, steps:[{index, kind, tags, routing, adapter_id, prompt, confidence, lang}]}`. No LLM call, <500ms, stable schema versioned via the v0.39 tag.
+- First building block toward an IDE plugin contract — plugins can ask harness to plan a multi-agent run without executing and surface the chosen adapter per task in the editor.
+
 ## 2026-06-15 — v0.38.0 — Cross-task handoff in harness do (P70)
 
 - **`harness do` now prepends a "Past steps in this run" block** to every task after the first. Each task sees the list of previously-routed steps with their adapter + result so a later code task can build on what the earlier scaffold + image task produced. Implements the paper's "shared code artifacts support multi-agent coordination" without a new shared-memory abstraction.
