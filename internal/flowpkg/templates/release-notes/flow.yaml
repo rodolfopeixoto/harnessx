@@ -1,0 +1,19 @@
+name: release-notes
+description: Generate release notes from git log plus CHANGELOG plus open PRs via LLM
+domain: devops
+
+phases:
+  - name: collect-commits
+    kind: deterministic
+    cmd: ["sh", "-c", "git log --pretty=format:'%h %s' -n 50 > .release-commits.txt"]
+    timeout_seconds: 10
+  - name: collect-changelog
+    kind: deterministic
+    cmd: ["sh", "-c", "head -60 CHANGELOG.md > .release-changelog.txt"]
+    timeout_seconds: 10
+  - name: draft-notes
+    kind: llm
+    prompt: "combine .release-commits.txt + .release-changelog.txt into RELEASE_NOTES.md, grouped by Features/Fixes/Docs"
+  - name: secrets
+    kind: sensor
+    sensor_id: secrets_scan

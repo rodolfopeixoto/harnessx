@@ -1,0 +1,23 @@
+name: rails-api
+description: Bootstrap a Rails API project (rails new) + bundle + first /healthz endpoint
+domain: software
+
+phases:
+  - name: rails-new
+    kind: deterministic
+    cmd: ["rails", "new", ".", "--api", "--skip-test", "--force"]
+    timeout_seconds: 120
+  - name: bundle-install
+    kind: deterministic
+    cmd: ["bundle", "install"]
+    timeout_seconds: 180
+  - name: scaffold-healthz
+    kind: llm
+    prompt: "add a HealthzController#index returning {status:ok} routed at GET /healthz"
+  - name: rspec
+    kind: deterministic
+    cmd: ["bundle", "exec", "rspec"]
+    timeout_seconds: 120
+  - name: secrets
+    kind: sensor
+    sensor_id: secrets_scan

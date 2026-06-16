@@ -1,0 +1,20 @@
+name: go-cli
+description: Scaffold a Go CLI project via harness scaffold + lint + test
+domain: software
+
+phases:
+  - name: scaffold
+    kind: deterministic
+    cmd: ["harness", "scaffold", "apply", "go", "--apply", "--with-git"]
+    timeout_seconds: 120
+  - name: tidy
+    kind: deterministic
+    cmd: ["go", "mod", "tidy"]
+    timeout_seconds: 60
+  - name: test
+    kind: deterministic
+    cmd: ["go", "test", "./..."]
+    timeout_seconds: 120
+  - name: secrets
+    kind: sensor
+    sensor_id: secrets_scan

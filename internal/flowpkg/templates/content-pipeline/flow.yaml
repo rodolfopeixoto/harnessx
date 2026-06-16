@@ -1,0 +1,21 @@
+name: content-pipeline
+description: Draft + critique + publish a long-form post through routed adapters plus sensors
+domain: marketing
+
+phases:
+  - name: outline
+    kind: llm
+    prompt: "produce an outline.md with H2 sections for the brief in brief.md"
+  - name: draft
+    kind: llm
+    prompt: "expand outline.md into draft.md (1500 words)"
+  - name: critique
+    kind: llm
+    prompt: "review draft.md for fact accuracy and structural flow; return concerns + suggestions"
+  - name: secrets
+    kind: sensor
+    sensor_id: secrets_scan
+  - name: lint-md
+    kind: deterministic
+    cmd: ["sh", "-c", "ls *.md > /dev/null"]
+    timeout_seconds: 5

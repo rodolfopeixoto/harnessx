@@ -1,0 +1,16 @@
+name: python-fastapi
+description: Scaffold a FastAPI app via harness scaffold + first endpoint + tests
+domain: software
+
+phases:
+  - name: scaffold
+    kind: deterministic
+    cmd: ["harness", "scaffold", "apply", "python", "--apply", "--with-git", "--with-deps"]
+    timeout_seconds: 300
+  - name: pytest
+    kind: deterministic
+    cmd: [".venv/bin/pytest", "-q"]
+    timeout_seconds: 120
+  - name: secrets
+    kind: sensor
+    sensor_id: secrets_scan

@@ -1,0 +1,19 @@
+name: meta-ads-campaign
+description: Build a Meta Ads campaign via MCP plus LLM-augmented copy generation plus sensor gating
+domain: marketing
+
+phases:
+  - name: validate-objective
+    kind: deterministic
+    cmd: ["sh", "-c", "test -f campaign.yaml || (echo 'campaign.yaml missing'; exit 1)"]
+    timeout_seconds: 10
+  - name: generate-copy
+    kind: llm
+    prompt: "given campaign.yaml objective + audience, write 5 ad variants (headline, body, cta) in copy.json"
+  - name: brand-safety
+    kind: sensor
+    sensor_id: secrets_scan
+  - name: dry-run-publish
+    kind: deterministic
+    cmd: ["sh", "-c", "echo 'would call Meta MCP publish_campaign with copy.json'"]
+    timeout_seconds: 10
