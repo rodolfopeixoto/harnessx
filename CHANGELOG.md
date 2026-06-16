@@ -3,6 +3,11 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-15 — v0.37.0 — Agent-call heartbeat (P69)
+
+- **`DefaultExecutor.Status func(string)`** field receives a notice immediately before and after `adapter.Run`. Workflow wires it to `[agent] calling <id>...` / `[agent] <id> returned in <dur>` lines on the same stream as the rest of the output. Closes the "no visual cue when LLM is being called" complaint from v0.27 dog-food testing without taking a new dep (no spinner library).
+- Field is optional: when `Status` is nil, executor is silent (no behaviour change for unit tests / library consumers).
+
 ## 2026-06-15 — v0.36.0 — Runs + project prune (P68)
 
 - **`harness runs prune --older-than <dur> --keep-last <n>`**: deletes run directories under `.harness/runs/` matching either policy. Default dry-run; pass `--apply` to delete. Reports total bytes freed. Duration accepts `Nd` (days) plus standard Go duration suffixes.
