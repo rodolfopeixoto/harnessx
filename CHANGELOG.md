@@ -3,6 +3,13 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-15 — v0.36.0 — Runs + project prune (P68)
+
+- **`harness runs prune --older-than <dur> --keep-last <n>`**: deletes run directories under `.harness/runs/` matching either policy. Default dry-run; pass `--apply` to delete. Reports total bytes freed. Duration accepts `Nd` (days) plus standard Go duration suffixes.
+- **`harness project prune --older-than <dur>`**: archives projects whose `last_seen_at` is older than the threshold. Default dry-run; pass `--apply` to archive. Archived projects stay in the registry — use `harness project unarchive` to restore.
+- **`internal/execution.PruneCandidates`** + **`DeletePaths`**: shared helpers so both commands share retention logic.
+- **`projectcmd.StaleSince`**: returns projects with `last_seen_at` before a threshold.
+
 ## 2026-06-15 — v0.35.0 — Help topics for do/loop/scaffold + tutorial polish (P67)
 
 - **`harness help do`**, **`harness help loop`**, **`harness help scaffold`**: new in-CLI tutorial topics covering the v0.30–v0.34 surface. `harness help` lists them in the topic index.
