@@ -3,10 +3,15 @@
 package main
 
 import (
+	"fmt"
+	"strings"
+	"text/tabwriter"
+
 	"github.com/spf13/cobra"
 
 	"github.com/ropeixoto/harnessx/internal/app/memorycmd"
 	"github.com/ropeixoto/harnessx/internal/platform/constants"
+	"github.com/ropeixoto/harnessx/internal/recall"
 )
 
 func newMemoryCmd() *cobra.Command {
@@ -54,6 +59,35 @@ func newMemoryCmd() *cobra.Command {
 	promoteC.Flags().StringVar(&mRunID, "run-id", "", "evidence run id (required)")
 	promoteC.Flags().Float64Var(&mConf, "confidence", 0.7, "confidence 0..1 (>= 0.4 required)")
 
-	c.AddCommand(listC, promoteC)
+	var recallLimit int
+	recallC := &cobra.Command{
+		Use:   "recall \"<query>\"",
+		Short: "Search past run reports by keyword overlap (no LLM)",
+		Args:  cobra.MinimumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			dir, err := cwd()
+			if err != nil {
+				return err
+			}
+			hits, err := recall.Recall(dir, strings.Join(args, " "), recallLimit)
+			if err != nil {
+				return err
+			}
+			out := cmd.OutOrStdout()
+			if len(hits) == 0 {
+				fmt.Fprintln(out, "no matches")
+				return nil
+			}
+			tw := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
+			fmt.Fprintln(tw, "SCORE\tRUN\tSNIPPET")
+			for _, h := range hits {
+				fmt.Fprintf(tw, "%.2f\t%s\t%s\n", h.Score, h.RunID, h.Snippet)
+			}
+			return tw.Flush()
+		},
+	}
+	recallC.Flags().IntVar(&recallLimit, "limit", 5, "max matches")
+
+	c.AddCommand(listC, promoteC, recallC)
 	return c
 }
