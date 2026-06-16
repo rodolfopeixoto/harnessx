@@ -150,11 +150,18 @@ func runRouteShow(ctx context.Context, out io.Writer, prompt string) error {
 
 func printPlan(out io.Writer, steps []plannedStep) {
 	tw := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(tw, "#\tKIND\tTAGS\tROUTING\tPROMPT")
+	fmt.Fprintln(tw, "#\tKIND\tCONF\tTAGS\tROUTING\tPROMPT")
+	lowConf := false
 	for i, s := range steps {
-		fmt.Fprintf(tw, "%d\t%s\t%s\t%s\t%s\n", i+1, s.task.Kind, strings.Join(s.task.Tags, ","), s.chosen, truncStr(s.task.Prompt, 50))
+		fmt.Fprintf(tw, "%d\t%s\t%.2f\t%s\t%s\t%s\n", i+1, s.task.Kind, s.task.Confidence, strings.Join(s.task.Tags, ","), s.chosen, truncStr(s.task.Prompt, 50))
+		if s.task.Confidence < 0.5 {
+			lowConf = true
+		}
 	}
 	_ = tw.Flush()
+	if lowConf {
+		fmt.Fprintln(out, "⚠ one or more tasks have low classification confidence — review before --yes")
+	}
 }
 
 func truncStr(s string, n int) string {
