@@ -19,7 +19,7 @@ capabilities:
   mcp: true
   max_context_tokens: 200000
 
-strengths: [planning, react_design_system, security_review, design_to_product]
+strengths: [code, reasoning, refactor, review, docs]
 
 models:
   default: claude-sonnet-4-6

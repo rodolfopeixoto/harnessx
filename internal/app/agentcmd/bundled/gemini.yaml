@@ -19,7 +19,7 @@ capabilities:
   mcp: false
   max_context_tokens: 1000000
 
-strengths: [prompt_refinement, cheap_review, codebase_exploration]
+strengths: [code, vision, image, search, docs]
 
 models:
   default: gemini-2.5-pro

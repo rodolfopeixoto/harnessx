@@ -19,7 +19,7 @@ capabilities:
   mcp: false
   max_context_tokens: 128000
 
-strengths: [implementation, tests, rails_api]
+strengths: [code, tests, refactor]
 
 models:
   default: gpt-5-codex
