@@ -10,7 +10,9 @@ terminal against the doc. This is the single canonical tutorial —
 older versions are not kept; check `git log docs/tutorial.md` if you
 need historical commands.
 
-Tested against **v0.32.0** (see `harness version` in section 0).
+Tested against **v0.42.0** (see `harness version` in section 0). Run
+`harness help` to list all in-CLI tutorial topics (do/loop/scaffold
+added in v0.35).
 
 ---
 
@@ -440,6 +442,28 @@ harness memory show
 No remote configured ⇒ prints a four-line fix recipe.
 
 ---
+
+## 15b. Retention (v0.36+)
+
+```bash
+harness runs prune --older-than 7d                 # dry-run
+harness runs prune --keep-last 20 --apply          # delete
+harness project prune --older-than 30d --apply     # archive stale projects
+```
+
+Default dry-run. Pass `--apply` to delete / archive. `--older-than`
+accepts `Nd`, `Nh`, `Nm`.
+
+## 15c. JSON output for IDE plugins (v0.39 + v0.40)
+
+```bash
+harness route show "scaffold python and add /healthz" --json
+harness do "scaffold python" --yes --json | jq .
+```
+
+Schema: `{prompt, steps:[{index, kind, tags, routing, adapter_id,
+prompt, confidence, lang}], results, report_path}`. Stable across
+v0.39+; gains `schema_version` field in v0.43.
 
 ## 16. Cleanup primer
 
