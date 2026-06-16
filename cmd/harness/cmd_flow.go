@@ -12,7 +12,48 @@ import (
 
 func newFlowCmd() *cobra.Command {
 	c := &cobra.Command{Use: "flow", Short: "Domain-agnostic deterministic flow registry"}
-	c.AddCommand(flowListCmd(), flowShowCmd(), flowApplyCmd())
+	c.AddCommand(flowListCmd(), flowShowCmd(), flowApplyCmd(), flowInitCmd())
+	return c
+}
+
+func flowInitCmd() *cobra.Command {
+	var yes bool
+	c := &cobra.Command{
+		Use:   "init <name>",
+		Short: "One-shot dry-run plan (pass --yes to execute)",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			dir, err := cwd()
+			if err != nil {
+				return err
+			}
+			out := cmd.OutOrStdout()
+			f, err := flowpkg.Load(args[0])
+			if err != nil {
+				return err
+			}
+			fmt.Fprintf(out, "→ flow init: %s (%d phases)\n", f.Name, len(f.Phases))
+			if !yes {
+				fmt.Fprintln(out, "  dry-run only; pass --yes to execute")
+			}
+			res, err := flowpkg.Apply(cmd.Context(), f, flowpkg.ApplyOptions{Root: dir, Dry: !yes}, out)
+			if err != nil {
+				return err
+			}
+			for _, r := range res {
+				icon := "✓"
+				switch {
+				case r.Err != nil:
+					icon = "✗"
+				case r.Skipped:
+					icon = "·"
+				}
+				fmt.Fprintf(out, "  %s %s\n", icon, r.Name)
+			}
+			return nil
+		},
+	}
+	c.Flags().BoolVar(&yes, "yes", false, "execute phases (default dry-run)")
 	return c
 }
 
