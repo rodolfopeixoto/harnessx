@@ -143,11 +143,10 @@ func parseDuration(s string) (time.Duration, error) {
 	if s == "" {
 		return 0, nil
 	}
-	// support Nd suffix
+	// support Nd / ND suffix
 	if l := len(s); l > 1 && (s[l-1] == 'd' || s[l-1] == 'D') {
 		var days int
-		_, err := fmt.Sscanf(s, "%dd", &days)
-		if err != nil {
+		if _, err := fmt.Sscanf(s[:l-1], "%d", &days); err != nil {
 			return 0, fmt.Errorf("parse duration %q: %w", s, err)
 		}
 		return time.Duration(days) * 24 * time.Hour, nil
