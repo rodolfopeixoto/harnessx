@@ -78,10 +78,13 @@ type Result struct {
 	OutputPath string
 	Detail     string
 	ExitCode   int
-	// Confidence in the verdict, 0..1. 1.0 = deterministic signal
-	// (exit-code based, finder hit a real artifact). Lower means the
-	// sensor inferred a likely problem from partial evidence (regex
-	// match in stderr, heuristic). Paper open challenge:
-	// "verification with incomplete feedback".
 	Confidence float64
+	Scope      []string
+	Verified   []string
+	Unverified []string
+	Risks      []string
+}
+
+func MakeBundle(scope, verified, unverified, risks []string) (sc, v, u, r []string) {
+	return scope, verified, unverified, risks
 }

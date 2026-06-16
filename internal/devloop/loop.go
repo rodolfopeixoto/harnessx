@@ -160,6 +160,26 @@ func runShell(ctx context.Context, root, cmdline string) (bool, string) {
 	return err == nil, string(out)
 }
 
+type VerificationVerdict struct {
+	Passed bool
+	Reason string
+}
+
+type VerificationSample struct {
+	SensorID        string
+	Confidence      float64
+	UnverifiedCount int
+}
+
+func checkVerification(samples []VerificationSample) VerificationVerdict {
+	for _, s := range samples {
+		if s.Confidence > 0 && s.Confidence < 0.5 && s.UnverifiedCount > 0 {
+			return VerificationVerdict{Passed: false, Reason: fmt.Sprintf("sensor %s confidence=%.2f unverified=%d", s.SensorID, s.Confidence, s.UnverifiedCount)}
+		}
+	}
+	return VerificationVerdict{Passed: true}
+}
+
 func checkRegression(baseLint, attLint, baseTest, attTest bool) (bool, string) {
 	var parts []string
 	if baseLint && !attLint {

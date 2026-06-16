@@ -80,7 +80,11 @@ func (ForbiddenFilesSensor) AppliesTo(p index.Profile) bool { return true }
 
 func (s ForbiddenFilesSensor) Run(rc RunCtx) Result {
 	start := time.Now()
-	res := Result{ID: s.ID(), Category: s.Category(), Kind: s.Kind()}
+	res := Result{
+		ID: s.ID(), Category: s.Category(), Kind: s.Kind(),
+		Confidence: 1.0,
+		Scope:      []string{"./** (excluding .gitignore + scan-excluded dirs)"},
+	}
 	ig, _ := ignore.Load(rc.Root)
 	var hits []string
 	_ = filepath.WalkDir(rc.Root, func(p string, d fs.DirEntry, err error) error {
@@ -143,7 +147,12 @@ var scanCommandNames = map[string]bool{
 
 func (s ForbiddenCommandsSensor) Run(rc RunCtx) Result {
 	start := time.Now()
-	res := Result{ID: s.ID(), Category: s.Category(), Kind: s.Kind()}
+	res := Result{
+		ID: s.ID(), Category: s.Category(), Kind: s.Kind(),
+		Confidence: 0.9,
+		Scope:      []string{"text files under root (scripts, Makefile, CI)"},
+		Unverified: []string{"binary blobs"},
+	}
 	ig, _ := ignore.Load(rc.Root)
 	var hits []string
 	_ = filepath.WalkDir(rc.Root, func(p string, d fs.DirEntry, err error) error {
@@ -216,7 +225,12 @@ var scanSecretExtIgnored = map[string]bool{
 
 func (s SecretsScanSensor) Run(rc RunCtx) Result {
 	start := time.Now()
-	res := Result{ID: s.ID(), Category: s.Category(), Kind: s.Kind()}
+	res := Result{
+		ID: s.ID(), Category: s.Category(), Kind: s.Kind(),
+		Confidence: 0.85,
+		Scope:      []string{"text files under root (binaries skipped)"},
+		Unverified: []string{"binary blobs", "vendored archives"},
+	}
 	ig, _ := ignore.Load(rc.Root)
 	var hits []string
 	_ = filepath.WalkDir(rc.Root, func(p string, d fs.DirEntry, err error) error {
@@ -287,13 +301,19 @@ func (ChangedFilesSensor) AppliesTo(p index.Profile) bool { return true }
 
 func (s ChangedFilesSensor) Run(rc RunCtx) Result {
 	start := time.Now()
-	res := Result{ID: s.ID(), Category: s.Category(), Kind: s.Kind(), Status: StatusPassed}
+	res := Result{
+		ID: s.ID(), Category: s.Category(), Kind: s.Kind(), Status: StatusPassed,
+		Confidence: 1.0,
+		Scope:      []string{"git diff HEAD"},
+	}
 	out := runGitCapture(rc.Root, "diff", "--name-only", "HEAD")
 	res.OutputPath = writeOutput(rc.OutputDir, s.ID(), []byte(out), nil)
 	if out = strings.TrimSpace(out); out == "" {
 		res.Detail = "no changes vs HEAD"
+		res.Verified = []string{"clean tree"}
 	} else {
 		res.Detail = "changes detected"
+		res.Verified = strings.Split(out, "\n")
 	}
 	res.Duration = time.Since(start)
 	return res
