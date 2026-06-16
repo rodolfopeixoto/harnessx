@@ -3,6 +3,12 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-15 — v0.33.0 — Regression-aware loop + cross-session memory + multimodal auto-route (P65)
+
+- **`harness loop` now captures a baseline** before the first attempt by running `lint_command` + `test_command` once. If a later attempt breaks something the baseline had green, the loop flags it as a regression and the canonical-error block prepends `## Regression detected\n<reason>\n\nFix this before anything else.` Closes the paper's "regression-free improvements" open challenge.
+- **`harness memory recall "<query>"`**: bag-of-words search over every `.harness/runs/*/report.md`. Scores by `intersection(query_terms, report_terms) / len(query_terms)`. No LLM, no external index. Lives in `internal/recall`.
+- **`harness do --image <path>`**: attaching an image adds the `vision` tag to every task, so the router automatically picks a vision-capable adapter (`gemini`, `claude`) instead of defaulting to text-only.
+
 ## 2026-06-15 — v0.32.0 — Multi-agent routing + composability (P64)
 
 Implements Layer 3 of the "Code as Agent Harness" paper (arXiv 2605.18747): composability via deterministic per-task adapter routing.
