@@ -3,6 +3,9 @@
 package devloop
 
 import (
+	"context"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -69,5 +72,63 @@ func TestTrimToLinesShorterPasses(t *testing.T) {
 	in := "a\nb\nc"
 	if trimToLines(in, 80) != in {
 		t.Error("short input should pass through")
+	}
+}
+
+func TestOkOrFail(t *testing.T) {
+	if okOrFail(true) != "✓" || okOrFail(false) != "✗" {
+		t.Error("okOrFail mapping wrong")
+	}
+}
+
+func TestRunShellSuccessAndFailure(t *testing.T) {
+	ctx := context.Background()
+	dir := t.TempDir()
+	ok, _ := runShell(ctx, dir, "true")
+	if !ok {
+		t.Error("'true' should succeed")
+	}
+	bad, out := runShell(ctx, dir, "false")
+	if bad {
+		t.Error("'false' should fail")
+	}
+	_ = out
+}
+
+func TestRunShellEmptyCmd(t *testing.T) {
+	ok, out := runShell(context.Background(), "/tmp", "")
+	if !ok || out != "" {
+		t.Errorf("empty cmd should noop: ok=%v out=%q", ok, out)
+	}
+}
+
+func TestResolveCommandsMissingScaffoldErrors(t *testing.T) {
+	opts := Options{StartDir: t.TempDir()}
+	err := resolveCommands(opts.StartDir, &opts)
+	if err == nil {
+		t.Fatal("expected error when no scaffold/lint/test cmd")
+	}
+}
+
+func TestResolveCommandsUsesOpts(t *testing.T) {
+	opts := Options{LintCmd: "echo ok", TestCmd: "echo ok"}
+	if err := resolveCommands("/tmp", &opts); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestDetectScaffoldMetaPython(t *testing.T) {
+	dir := t.TempDir()
+	_ = os.WriteFile(filepath.Join(dir, "requirements.txt"), []byte(""), 0o644)
+	m := detectScaffoldMeta(dir)
+	if m == nil || m.Language != "python" {
+		t.Errorf("want python meta, got %+v", m)
+	}
+}
+
+func TestDetectScaffoldMetaNone(t *testing.T) {
+	m := detectScaffoldMeta(t.TempDir())
+	if m != nil {
+		t.Errorf("want nil for empty dir, got %+v", m)
 	}
 }
