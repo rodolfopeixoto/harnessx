@@ -3,6 +3,10 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-15 — v0.29.1 — Single canonical docs/tutorial.md (drop versioned manuals)
+
+- **`docs/tutorial.md`** is now the only manual. Per-version files (`tutorial-v0.4-manual.md`, `v0.11`, `v0.27`, `v0.28`, `v0.29`) are deleted. Historical commands live in `git log docs/tutorial.md` for anyone who needs them. Stops the accumulation of redirect notices and stale walkthroughs.
+
 ## 2026-06-15 — v0.29.0 — harness uninstall + brew formula renamed harness
 
 - **`harness uninstall project`**: wipes `./.harness/` in the current directory (after confirmation).

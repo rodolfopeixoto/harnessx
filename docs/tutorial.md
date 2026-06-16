@@ -1,314 +1,428 @@
-# HarnessX — Master Tutorial (v0.20)
+# HarnessX — Manual Tutorial
 
-End-to-end walkthrough for every surface shipped between v0.4 and v0.20.
-Per-OS, real CLIs, no fakes. Tick the 18-row validation checklist at the
-end to declare the install green.
+End-to-end walkthrough that exercises every CLI surface against a
+brand-new **FastAPI / Python** sample app. Python (not Go) is the
+target on purpose: HarnessX is written in Go, so driving a Python
+project proves the tool is language-independent.
 
-> Stay on `0.x.x` — no v1.0 yet. Dog-food first.
+Each section ends with **Expected output** so you can diff your
+terminal against the doc. This is the single canonical tutorial —
+older versions are not kept; check `git log docs/tutorial.md` if you
+need historical commands.
 
----
-
-## 0. Install
-
-| OS | Command |
-|---|---|
-| macOS / Linux (recommended) | `curl -fsSL https://raw.githubusercontent.com/rodolfopeixoto/harnessx/main/scripts/install.sh \| bash` |
-| macOS / Linux (Homebrew) | `brew tap rodolfopeixoto/tap && brew install harnessx` |
-| Windows | see `docs/install.md` (manual unzip from the GitHub release `.zip` artifacts) |
-
-Already installed (v0.6+):
-
-```bash
-harness update                  # stable
-harness update --channel beta
-harness update status
-```
-
-Shell completion (auto-detect):
-
-```bash
-harness completion install
-```
+Tested against **v0.29.0** (see `harness version` in section 0).
 
 ---
 
-## 1. Doctor + tool install
+## 0. Install / reinstall / uninstall
+
+### A — Install via Homebrew (recommended, auto-upgrades)
 
 ```bash
-harness doctor                  # probes every required + recommended binary
-harness doctor --fix --dry-run  # plan to install every missing tool
-harness doctor --fix            # run the plan
+brew tap rodolfopeixoto/harnessx https://github.com/rodolfopeixoto/harnessx.git
+brew install harness                  # ← v0.29 renamed harnessx → harness
+harness version                       # expect: 0.29.0
 ```
 
-Per-tool override:
+### B — Install via curl (no brew dependency)
 
 ```bash
-harness install list                  # 17 bundled manifests
-harness install gopls
-harness install --upgrade golangci-lint
-harness install rclone                # required for harness backup
+curl -fsSL https://raw.githubusercontent.com/rodolfopeixoto/harnessx/main/scripts/install.sh | bash
+harness version
 ```
 
-Strategies per platform: `brew → apt → dnf → pacman → go install → npm -g → cargo install → pip --user`. First viable wins.
+### C — Upgrade
+
+```bash
+# brew
+brew update && brew upgrade harness
+
+# curl (re-fetches latest release)
+curl -fsSL https://raw.githubusercontent.com/rodolfopeixoto/harnessx/main/scripts/install.sh | bash
+```
+
+### D — Uninstall (new in v0.29)
+
+```bash
+harness uninstall project             # wipe ./.harness/ only
+harness uninstall global              # wipe cross-project registry
+harness uninstall all --yes           # wipe project + global + binary
+brew uninstall harness                # if installed via brew
+brew untap rodolfopeixoto/harnessx
+```
+
+`uninstall all` prints `sudo rm <path>` when the binary lives in a
+non-writable dir; copy-paste and run.
 
 ---
 
-## 2. Container runtime selection
+## 1. Prerequisites
+
+| Tool | Need | Install hint |
+|---|---|---|
+| `harness` ≥ 0.29.0 | always | section 0 |
+| `python3` ≥ 3.11 | sample app | system Python or pyenv |
+| `pipx` | install ruff / pytest cleanly | `brew install pipx` |
+| `git` | gitflow demo | system git |
+| `claude` (Claude Code CLI) | section 5+ | `npm i -g @anthropic-ai/claude-code` |
+| `tmux` | optional (claude-interactive tmux strategy) | `brew install tmux` |
+
+Sample-app working dir:
 
 ```bash
-harness runtime list                  # detected with ★ on selected
-harness runtime info
-harness runtime set docker            # override auto-pick
-HARNESS_RUNTIME=podman harness ...    # one-shot env override
-```
-
-Preference order (auto-pick):
-
-| OS | Order |
-|---|---|
-| macOS | apple_container → docker → orbstack → podman → colima |
-| Linux | docker → podman → orbstack → colima |
-
-`apple_container` is auto-disabled when its CLI cannot run `container list --format json`; fallback is `docker`.
-
-### Container + image ops
-
-```bash
-harness containers list [--all]
-harness containers kill <id>
-HARNESS_CONTAINERS_I_UNDERSTAND=1 harness containers prune --stopped --older-than 720h
-harness images list
-HARNESS_CONTAINERS_I_UNDERSTAND=1 harness images prune --older-than 720h
-```
-
-Two-key safety: prune always needs interactive `yes` or the env var.
-
----
-
-## 3. Cross-platform secrets
-
-```bash
-harness secret info                       # backends active per OS
-harness secret list                       # names per backend
-harness secret set ANTHROPIC_API_KEY      # hidden stdin prompt
-echo "v" | harness secret set X --from-file /dev/stdin
-harness secret set X --from-env MY_VAR
-harness secret get X                      # redacted by default
-harness secret get X --reveal
-harness secret unset X
-```
-
-Backend priority: env > Keychain (macOS) / Secret Service (Linux) > AES-GCM encrypted file fallback.
-
----
-
-## 4. Agents
-
-### CLI adapters (login via the CLI itself)
-
-```bash
-harness install claude            # or codex / gemini / kimi
-harness agent login claude        # prints `claude login` + docs URL
-claude login                      # do it
-harness agent certify claude
-```
-
-### API adapters (no CLI required, just an API key)
-
-```bash
-harness agent install anthropic-api   # bundled: anthropic / openai / gemini-api / moonshot / minimax
-harness agent login anthropic-api --from-env ANTHROPIC_API_KEY
-harness agent certify anthropic-api
+mkdir -p ~/dev/harness-fastapi-demo && cd ~/dev/harness-fastapi-demo
+git init && git checkout -b main
 ```
 
 ---
 
-## 5. MCP servers
+## 2. Initialise + register
 
 ```bash
-harness mcp templates              # 7 bundled: filesystem, github, postgres, sqlite, brave-search, fetch, memory
-harness mcp install filesystem     # auto-fill from template
-harness mcp install github         # needs GITHUB_PERSONAL_ACCESS_TOKEN
-harness mcp install my-server --command /bin/x --transport stdio
-harness mcp scan                   # what's wired
-```
-
-When the chosen agent declares `capabilities.mcp: true`, the Executor merges every `.harness/mcp/*.json` into a single `runs/<id>/mcp-config.json` and passes `--mcp-config <path>` to the adapter automatically.
-
----
-
-## 6. Hooks
-
-```bash
-harness hook templates             # 5 bundled
-harness hook install pre-tool-use-lint
-harness hook install post-tool-use-test
-harness hook scan                  # confirm event + status
-```
-
-Failing pre-tool-use hook routes the run to `autonomy_denied` under `safe_execute`; `full_project_loop` bypasses with explicit operator opt-in.
-
----
-
-## 7. Autonomy + policy
-
-```bash
-harness autonomy get
-harness autonomy set --level safe_execute    # default
-```
-
-Per-project `.harness/config/autonomy.yaml`:
-
-```yaml
-level: safe_execute
-allow_paths: ["src/**", "docs/**"]
-deny_paths:  ["secrets/**", ".env*", "infra/prod/**"]
-allow_commands: ["go test", "npm test"]
-deny_commands:  ["rm -rf /", "git push --force"]
-```
-
-| Level | Low-risk apply | High-risk apply | Hook block bypass |
-|---|---|---|---|
-| manual | deny | deny | no |
-| plan_and_ask | approval | approval | no |
-| safe_execute | allow | approval | no |
-| full_project_loop | allow | approval | yes |
-| scheduled_maintenance | approval | deny | no |
-
----
-
-## 8. Real agentic run
-
-```bash
-mkdir ~/dev/harness-tutorial && cd $_
-git init -q && git config user.email t@t && git config user.name t \
-  && git config commit.gpgsign false
-echo "# init" > README.md && git add -A && git commit -q -m seed
-
 harness init
-harness project add . --slug tutorial
-harness feature "create HELLO.md with content: hi" \
+harness project add . --slug fastapi-demo
+```
+
+**Expected:**
+
+```
+harness: initialised .../.harness
+  config:  .../.harness/config/harness.yaml
+  db:      .../.harness/db/harness.sqlite
+  log:     .../.harness/logs/events.jsonl
+
+registered harness-fastapi-demo
+  slug: fastapi-demo
+  root: .../harness-fastapi-demo
+  db:   .../harness-fastapi-demo/.harness/db/harness.sqlite
+```
+
+> Re-running `project add . --slug other-name` now updates the slug
+> (v0.28.1 fix). Previously the second add silently kept the
+> original slug.
+
+Confirm hook scaffold:
+
+```bash
+cat .harness/hooks/pre-tool-use.sh | head -8
+```
+
+`exit 0` stub with commented list of installable templates.
+
+---
+
+## 3. `harness list` — composite read-only view
+
+```bash
+harness list
+```
+
+**Expected:**
+
+```
+## projects
+  SLUG          NAME                  STATUS  LAST SEEN         ROOT
+* fastapi-demo  harness-fastapi-demo  active  2026-06-15 22:30  .../harness-fastapi-demo
+
+## recent runs
+  (no runs yet)
+
+## agents
+ID                 NAME                            CERT  EXP  SOURCE
+claude             Claude Code                     —          bundled:claude.yaml
+anthropic-api      Anthropic API                   —          bundled:anthropic-api.yaml
+claude-interactive Claude Code (interactive REPL)  —     ★    bundled:claude-interactive.yaml
+fake               fake                            —          bundled:fake.yaml
+```
+
+No LLM call. `★` flags experimental adapters.
+
+---
+
+## 4. Doctor + agents
+
+```bash
+harness doctor
+harness install claude
+harness agent install claude
+claude login                          # one-time OAuth
+harness agent certify claude --simple-timeout 180s
+```
+
+**Expected:** doctor reports your toolchain, certify shows
+`✓ ready — claude is usable end-to-end.`
+
+---
+
+## 5. Billing primer
+
+```bash
+harness help billing
+```
+
+Three Anthropic buckets, one adapter per bucket:
+
+| Adapter | Bucket |
+|---|---|
+| `--agent claude` | Agent SDK monthly credit ($20–$200/mo as of 2026-06-15) |
+| `--agent claude-interactive` (experimental ★) | Pro/Max subscription |
+| `--agent anthropic-api` | pay-as-you-go API |
+
+Full details: `docs/anthropic-billing.md`.
+
+---
+
+## 6. Bootstrap the FastAPI app
+
+```bash
+harness feature "scaffold a FastAPI app with a /healthz endpoint that returns 200, plus pytest tests, plus a requirements.txt with fastapi + uvicorn + pytest" \
   --agent claude --apply --autonomy safe_execute --budget-usd 0.50
 ```
 
-Multi-input:
+**Expected:** `Execute: ... status=applied files=N cost=$0.0xxx`.
+
+Verify:
 
 ```bash
-harness feature "summarize" --pdf brief.pdf --agent claude --apply
-harness feature "redo this layout" --image mockup.png --agent claude
-harness feature "..." --prompt-file ./prompt.md --agent claude --apply
-```
+ls
+# app.py  requirements.txt  tests/  README.md
 
-Sandboxed execution (runs the adapter inside the selected runtime):
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+pytest -q
+uvicorn app:app --reload &
+curl -sf http://localhost:8000/healthz
+kill %1
 
-```bash
-harness execute "..." --agent claude --apply --sandbox container \
-  --sandbox-image alpine:3.20
+git add . && git commit -m "feat(api): scaffold via harness"
 ```
 
 ---
 
-## 9. Run inspection + tracker
+## 7. Iterate
+
+```bash
+harness feature "add /metrics endpoint that returns a JSON dict with requests_total counter, plus a test" \
+  --agent claude --apply --autonomy safe_execute --budget-usd 0.30
+
+harness bugfix "/healthz returns 500 when the env var ENV is missing — set a default of 'dev'" \
+  --agent claude --apply --autonomy safe_execute --budget-usd 0.30
+
+pytest -q
+git add . && git commit -m "feat(api): /metrics + healthz default env"
+```
+
+---
+
+## 8. Sensors + checks
+
+```bash
+harness sensor list
+harness sensor run secrets_scan --root .        # --root accepts relative paths (v0.28)
+harness check
+```
+
+---
+
+## 9. Autonomy + budget gates
+
+```bash
+harness autonomy get
+
+# manual mode denies every execute
+harness feature "delete app.py" --agent claude --apply --autonomy manual
+# expect: autonomy_denied
+
+# budget cap demo
+harness feature "rewrite the entire test suite" --agent claude --apply --autonomy safe_execute --budget-usd 0.01
+# expect: budget_exceeded after the first call
+```
+
+---
+
+## 10. Deterministic routing demo
+
+```bash
+PROMPT="explain in 50 words what /healthz does in this repo"
+
+harness feature "$PROMPT" --agent claude               --autonomy plan_only
+harness feature "$PROMPT" --agent anthropic-api        --autonomy plan_only
+harness feature "$PROMPT" --agent claude-interactive   --autonomy plan_only
+
+harness metrics --since 1d
+```
+
+`claude-interactive` rows show `mode: estimated` (REPL emits no usage
+block). Anthropic console: confirm each adapter hit its declared
+bucket.
+
+---
+
+## 11. Hooks: managed install
+
+```bash
+harness hook templates                # list bundled scripts
+harness hook add pre-tool-use         # interactive selector (--yes for first match)
+harness hook scan
+```
+
+Trigger a blocked run to verify the rich error:
+
+```bash
+printf '#!/bin/sh\nexit 1\n' > .harness/hooks/pre-tool-use.sh
+chmod +x .harness/hooks/pre-tool-use.sh
+harness feature "noop" --agent fake --apply --autonomy safe_execute
+```
+
+**Expected:**
+
+```
+Execute: pre-tool-use hook blocked: pre-tool-use blocked by .harness/hooks/pre-tool-use.sh (exit 1)
+  → make the script exit 0 to allow, or remove .harness/hooks/pre-tool-use.sh
+```
+
+Restore:
+
+```bash
+printf '#!/bin/sh\nexit 0\n' > .harness/hooks/pre-tool-use.sh
+```
+
+---
+
+## 12. MCP
+
+```bash
+harness mcp templates
+harness mcp install filesystem --command npx --yes
+harness mcp scan
+```
+
+---
+
+## 13. Reports + runs
 
 ```bash
 harness runs list
-harness runs inspect <run-id>
-harness runs report  <run-id>
-harness runs sensors <run-id>
-harness runs approve <run-id>    # waiting_approval → applied
-harness runs discard <run-id>
-
-harness metrics --since 7d
-harness audit --kind sensor --limit 20
+harness runs inspect $(ls -t .harness/runs | head -1)
+cat .harness/runs/$(ls -t .harness/runs | head -1)/report.md
+harness report                        # prints last run report
 ```
+
+v0.28+ ships **one** report per run at `.harness/runs/<id>/report.md`.
+`.harness/artifacts/reports/*` is reserved for user-triggered artefact
+reports (`harness security-audit`, etc.).
 
 ---
 
-## 10. Cleanup
+## 14. Dashboard + logs
 
 ```bash
-harness cleanup scan             # worktrees (git + .harness), caches, abandoned dirs, leftovers, containers, large files
-harness cleanup apply --policy .harness/cleanup/policy.yaml
-```
-
-Two-key safety: policy match + interactive `y` or `HARNESS_CLEANUP_I_UNDERSTAND=1`.
-
----
-
-## 11. Portable backup + sync (rclone)
-
-```bash
-harness install rclone
-rclone config                                      # one-time provider auth
-harness backup remote add gdrive --provider drive --interactive
-harness backup config set-default-remote gdrive
-harness backup config show
-harness backup snapshot --tag pre-experiment
-harness backup list
-harness backup restore <snapshot> --target /tmp/restored
-harness backup sync push --dry-run
-harness backup sync pull
-```
-
-Default config excludes secrets. Opt-in via `--include-secrets` requires `HARNESS_BACKUP_I_UNDERSTAND_SECRETS=1`; route the bucket through an rclone `crypt` overlay.
-
----
-
-## 12. Dashboard
-
-```bash
-harness dashboard --addr :7373
+harness dashboard --addr :7373 &
 open http://localhost:7373
+harness logs --follow
+kill %1
 ```
 
-Real-backed pages: Sessions, SessionDetail, RunDetail, Sensors, Agents, Catalog, MCP, Hooks, Runtime, Containers, Images, Install, Secrets, Backup.
+React UI loads from `web/dashboard/dist` when present (`make
+dashboard-build`); else built-in HTML.
 
 ---
 
-## 13. Release channels + help topics
+## 15. Backup + memory
 
 ```bash
-harness update --channel stable|beta|develop
-harness update channels
-harness update status
+harness backup config show
+harness memory show
+```
 
-harness help                 # list topics
-harness help quickstart agents sensors hooks autonomy mcp update input tracker
+No remote configured ⇒ prints a four-line fix recipe.
+
+---
+
+## 16. Cleanup primer
+
+```bash
+harness cleanup scan
+harness cleanup apply --dry-run
+```
+
+v0.29 ships workspace-level cleanup only. Project prune + runs prune
+(`harness project prune --older-than 30d`, `harness runs prune
+--keep-last 20`) land in **v0.30 (P63)**.
+
+---
+
+## 17. Gitflow demo
+
+```bash
+git checkout -b feature/health-detail
+harness feature "expand /healthz to return uptime_seconds and git_commit" \
+  --agent claude --apply --autonomy safe_execute --budget-usd 0.30
+pytest -q
+git add . && git commit -m "feat(api): healthz detail"
+git checkout main && git merge --no-ff feature/health-detail
 ```
 
 ---
 
-## 14. Validation checklist (tick locally)
+## 18. Uninstall (new in v0.29)
 
-- [ ] `harness version` reports v0.20.0+
-- [ ] `harness update status` is up-to-date
-- [ ] `harness doctor` — every desired CLI ✓
-- [ ] `harness doctor --fix --dry-run` lists the plan
-- [ ] `harness install list` shows ≥ 17 manifests
-- [ ] `harness runtime list` has at least one ✓ runtime
-- [ ] `harness containers list` returns a table
-- [ ] `harness images list` returns a table
-- [ ] `harness secret info` shows ≥ 2 backends
-- [ ] `harness mcp templates` lists 7 servers
-- [ ] `harness hook templates` lists 5 hooks
-- [ ] `harness agent list` shows ≥ 9 adapters
-- [ ] `harness feature "..." --agent <id> --apply --autonomy safe_execute` produces `status=applied`
-- [ ] High-risk file (Dockerfile / go.mod / .env*) routes to `waiting_approval`
-- [ ] `harness runs approve <id>` merges into project root
-- [ ] `harness backup snapshot --remote <name>` round-trips with `restore`
-- [ ] Dashboard `/runtime`, `/install`, `/secrets`, `/backup` all load
-- [ ] `scripts/tests/install_smoke.sh` runs to completion
+When done with the tutorial:
+
+```bash
+# project only
+harness uninstall project --yes        # wipes ./.harness/
+
+# global registry too (apaga lista de projetos)
+harness uninstall global --yes
+
+# nuke everything (project + global + binary)
+harness uninstall all --yes
+brew uninstall harness                 # if brew install was used
+brew untap rodolfopeixoto/harnessx
+```
+
+Verify:
+
+```bash
+which harness                          # nada
+ls ~/Library/Application\ Support/harness 2>/dev/null   # macOS: nada
+ls ~/.local/share/harness 2>/dev/null                   # Linux: nada
+```
 
 ---
 
-## What is **not** shipped yet (transparent gap list)
+## 19. Final state
 
-- v1.0.0 release ritual
-- Apple Container `Run` (Available probe disables it until upstream stabilises)
-- SSE on `/api/runs/:id/events` for live Active Run page
-- Bundled skill snippets (`harness skill install` planned for v0.21)
-- Brew tap `rodolfopeixoto/homebrew-tap` requires the operator to create that repo + commit the generated `Formula/harnessx.rb`
-- Windows installer (no `install.ps1` yet — manual unzip works)
-- Dashboard mutate-actions (kill/prune/install) stay on the CLI
+```bash
+harness list                           # before uninstall
+```
 
-Updates land via `harness update` on the channel of your choice.
+Project still shows up, runs table contains every run from sections
+6–17, agents still listed. End-of-tutorial sanity check.
+
+---
+
+## What you proved
+
+- HarnessX is language-agnostic: full lifecycle on a FastAPI app
+  without Go-specific assumptions.
+- Two install paths (brew + curl) + one-shot `harness uninstall all`.
+- `harness list` gives a one-shot read-only summary — no LLM call.
+- `--budget-usd` works on every workflow command.
+- `harness sensor run --root .` accepts relative paths.
+- Every run writes **one** canonical report.
+- `harness init` scaffolds `.harness/hooks/pre-tool-use.sh`.
+- `harness hook add <event>` installs a bundled template
+  interactively.
+- Hook block messages name the script and the fix.
+- Three Anthropic billing buckets reachable.
+- `harness uninstall project|global|all` removes every trace.
+
+## Next
+
+- `docs/anthropic-billing.md` — per-plan credit table + pricing
+  cross-check.
+- `harness help <topic>` — in-CLI tutorials per surface.
+- v0.30 (P63): project + runs prune.
+- v0.31 (P64): markdown-driven runs + real-time streaming attach.
