@@ -5,6 +5,7 @@ package main
 import (
 	"fmt"
 	"strings"
+	"text/tabwriter"
 
 	"github.com/spf13/cobra"
 
@@ -67,5 +68,57 @@ and --test.`,
 	c.Flags().StringVar(&lintCmd, "lint", "", "lint command (default: auto-detect from scaffold)")
 	c.Flags().StringVar(&testCmd, "test", "", "test command (default: auto-detect from scaffold)")
 	c.Flags().BoolVar(&apply, "apply", true, "apply diff after each agent run")
+	c.AddCommand(newLoopListCmd(), newLoopResumeCmd())
 	return c
+}
+
+func newLoopListCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "list",
+		Short: "List resumable harness loop runs under .harness/runs/_loop/",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			dir, err := cwd()
+			if err != nil {
+				return err
+			}
+			runs, err := devloop.ListResumable(dir)
+			if err != nil {
+				return err
+			}
+			out := cmd.OutOrStdout()
+			if len(runs) == 0 {
+				fmt.Fprintln(out, "no resumable loops")
+				return nil
+			}
+			tw := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
+			fmt.Fprintln(tw, "RUN ID\tATTEMPTS\tBUDGET LEFT\tUPDATED\tPROMPT")
+			for _, r := range runs {
+				fmt.Fprintf(tw, "%s\t%d\t$%.4f\t%s\t%s\n", r.RunID, r.Attempts, r.Remaining, r.UpdatedAt.Format("01-02 15:04"), truncStr(r.Prompt, 40))
+			}
+			return tw.Flush()
+		},
+	}
+}
+
+func newLoopResumeCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "resume <run-id>",
+		Short: "Rehydrate a paused harness loop from .harness/runs/_loop/<id>/state.json",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			dir, err := cwd()
+			if err != nil {
+				return err
+			}
+			s, err := devloop.LoadState(dir, args[0])
+			if err != nil {
+				return err
+			}
+			out := cmd.OutOrStdout()
+			fmt.Fprintf(out, "resume %s: attempt %d/%d, budget left $%.4f\n", s.RunID, devloop.StartAttempt(s), s.MaxAttempts, s.BudgetUSDRemaining)
+			fmt.Fprintln(out, "(resume execution wiring lands in v0.75; state inspection works now)")
+			return nil
+		},
+	}
 }
