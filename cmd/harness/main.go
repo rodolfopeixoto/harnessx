@@ -89,6 +89,7 @@ func newRoot() *cobra.Command {
 		newSpecCmd(),
 		newListCmd(),
 		newScaffoldCmd(),
+		newLoopCmd(),
 		newUninstallCmd(),
 		newCompletionCmd(),
 	)
