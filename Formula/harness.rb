@@ -2,28 +2,28 @@
 class Harness < Formula
   desc "Deterministic agentic engineering harness with policy gates, sensors, MCPs, hooks, sandboxed runs, and portable backups"
   homepage "https://github.com/rodolfopeixoto/harnessx"
-  version "0.68.0"
+  version "0.69.0"
   license "MIT"
 
   on_macos do
     on_arm do
-      url "https://github.com/rodolfopeixoto/harnessx/releases/download/v0.68.0/harness-darwin-arm64.tar.gz"
-      sha256 "e5269bf4849999c66b067b494d0c5dbdb412d8038417af119e32f95b1f808e14"
+      url "https://github.com/rodolfopeixoto/harnessx/releases/download/v0.69.0/harness-darwin-arm64.tar.gz"
+      sha256 "d993f633ed7b894854d68a7a809185f8b57e82473a0369dfcdd095e9a67bdb04"
     end
     on_intel do
-      url "https://github.com/rodolfopeixoto/harnessx/releases/download/v0.68.0/harness-darwin-amd64.tar.gz"
-      sha256 "96031294d61a28f7d12eb5292fc320dd8928a90cc86beb563d4b45cd2923e6f2"
+      url "https://github.com/rodolfopeixoto/harnessx/releases/download/v0.69.0/harness-darwin-amd64.tar.gz"
+      sha256 "8d7fb8a9c5f82064b94835d4a9b69afc89ec0f4b310ac4db9e0d90308816f62b"
     end
   end
 
   on_linux do
     on_arm do
-      url "https://github.com/rodolfopeixoto/harnessx/releases/download/v0.68.0/harness-linux-arm64.tar.gz"
-      sha256 "4dfcc8dae15da5fc75272dbea7e936fa733ae6f69a3507f031dfdb3bd1585a91"
+      url "https://github.com/rodolfopeixoto/harnessx/releases/download/v0.69.0/harness-linux-arm64.tar.gz"
+      sha256 "bd8b7948699af5c86b5a4131d217f3be9888df1240ca1356e5d184e615e3649c"
     end
     on_intel do
-      url "https://github.com/rodolfopeixoto/harnessx/releases/download/v0.68.0/harness-linux-amd64.tar.gz"
-      sha256 "8cec4de8cd9beec19bf7c82342b975a04813b58a03229342e8e81c298083901e"
+      url "https://github.com/rodolfopeixoto/harnessx/releases/download/v0.69.0/harness-linux-amd64.tar.gz"
+      sha256 "a31988d6544b8de1a1eccd4a70c467ed77300a7c9ccd0c960cbdb3023c7172c4"
     end
   end
 
