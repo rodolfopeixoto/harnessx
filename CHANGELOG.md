@@ -3,6 +3,11 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-15 — v0.38.0 — Cross-task handoff in harness do (P70)
+
+- **`harness do` now prepends a "Past steps in this run" block** to every task after the first. Each task sees the list of previously-routed steps with their adapter + result so a later code task can build on what the earlier scaffold + image task produced. Implements the paper's "shared code artifacts support multi-agent coordination" without a new shared-memory abstraction.
+- Block ends with `Do not redo work that already succeeded.` to keep the LLM from regenerating files the deterministic step already wrote.
+
 ## 2026-06-15 — v0.37.0 — Agent-call heartbeat (P69)
 
 - **`DefaultExecutor.Status func(string)`** field receives a notice immediately before and after `adapter.Run`. Workflow wires it to `[agent] calling <id>...` / `[agent] <id> returned in <dur>` lines on the same stream as the rest of the output. Closes the "no visual cue when LLM is being called" complaint from v0.27 dog-food testing without taking a new dep (no spinner library).
