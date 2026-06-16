@@ -26,6 +26,9 @@ PLATFORMS ?= darwin/amd64 darwin/arm64 linux/amd64 linux/arm64 windows/amd64 win
         dashboard-install dashboard-dev dashboard-build dashboard-test \
         help
 
+audit-solid:
+	$(GO) run ./cmd/harness audit-solid --root .
+
 profile-mem:
 	@mkdir -p dist/profiles
 	$(GO) test -run '^$$' -bench=. -benchmem -memprofile=dist/profiles/mem.pprof ./internal/profile/... 2>/dev/null || true
