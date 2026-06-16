@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -67,14 +68,17 @@ func newRouteCmd() *cobra.Command {
 }
 
 func routeShowCmd() *cobra.Command {
-	return &cobra.Command{
+	var asJSON bool
+	c := &cobra.Command{
 		Use:   "show \"<prompt>\"",
 		Short: "Dry-run: print the task graph + chosen adapter per task",
 		Args:  cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runRouteShow(cmd.Context(), cmd.OutOrStdout(), strings.Join(args, " "))
+			return runRouteShow(cmd.Context(), cmd.OutOrStdout(), strings.Join(args, " "), asJSON)
 		},
 	}
+	c.Flags().BoolVar(&asJSON, "json", false, "emit JSON for programmatic consumers (IDE plugins, etc.)")
+	return c
 }
 
 type doOpts struct {
@@ -135,7 +139,7 @@ func deterministicMatch(t taskgraph.Task) string {
 	return ""
 }
 
-func runRouteShow(ctx context.Context, out io.Writer, prompt string) error {
+func runRouteShow(ctx context.Context, out io.Writer, prompt string, asJSON bool) error {
 	dir, err := cwd()
 	if err != nil {
 		return err
@@ -144,8 +148,41 @@ func runRouteShow(ctx context.Context, out io.Writer, prompt string) error {
 	if err != nil {
 		return err
 	}
+	if asJSON {
+		return emitJSON(out, prompt, steps)
+	}
 	printPlan(out, steps)
 	return nil
+}
+
+type jsonStep struct {
+	Index      int      `json:"index"`
+	Kind       string   `json:"kind"`
+	Tags       []string `json:"tags"`
+	Routing    string   `json:"routing"`
+	AdapterID  string   `json:"adapter_id,omitempty"`
+	Prompt     string   `json:"prompt"`
+	Confidence float64  `json:"confidence"`
+	Lang       string   `json:"lang,omitempty"`
+}
+
+type jsonPlan struct {
+	Prompt string     `json:"prompt"`
+	Steps  []jsonStep `json:"steps"`
+}
+
+func emitJSON(out io.Writer, prompt string, steps []plannedStep) error {
+	js := jsonPlan{Prompt: prompt}
+	for i, s := range steps {
+		js.Steps = append(js.Steps, jsonStep{
+			Index: i + 1, Kind: string(s.task.Kind), Tags: s.task.Tags,
+			Routing: s.chosen, AdapterID: s.choice.AdapterID,
+			Prompt: s.task.Prompt, Confidence: s.task.Confidence, Lang: s.task.Lang,
+		})
+	}
+	enc := json.NewEncoder(out)
+	enc.SetIndent("", "  ")
+	return enc.Encode(js)
 }
 
 func printPlan(out io.Writer, steps []plannedStep) {
