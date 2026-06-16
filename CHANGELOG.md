@@ -3,6 +3,11 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-16 — v0.41.0 — v1.0 readiness checklist (P73)
+
+- **`docs/v1-readiness.md`**: single-source checklist tracking what stands between v0.4x and a v1.0.0 cut. Maps every shipped surface to the paper principles + open challenges, lists quality / UX / docs gates, and pins the 7 items that block v1.0.0 today (stable JSON schema versioning, govulncheck re-run, coverage gate, tutorial refresh for v0.33–v0.40, architecture + JSON-schema docs, dashboard parity decision, LLM decomposer fallback decision).
+- Proposed cut criteria documented: ✗ → ◐/✓ on every blocker, dog-food test end-to-end, three cold-start operator runs report zero blockers.
+
 ## 2026-06-16 — v0.40.0 — harness do --json (P72)
 
 - **`harness do "<prompt>" --json`**: emits the executed plan + per-task results as JSON on stdout (implies `--yes`; routes human-facing logs to stderr so consumers can parse stdout cleanly). Schema: `{prompt, report_path, steps:[...], results:[...]}`. Completes the IDE-plugin contract started in v0.39: plugins can plan via `route show --json`, execute via `do --json`, and consume both with the same `jsonStep` schema.
