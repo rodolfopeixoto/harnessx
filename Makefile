@@ -21,9 +21,21 @@ PLATFORMS ?= darwin/amd64 darwin/arm64 linux/amd64 linux/arm64 windows/amd64 win
 
 .PHONY: all build test test-short vet lint fmt tidy check ci cd release \
         e2e e2e-all bench coverage coverage-gate security licenses sbom \
+        profile-mem profile-cpu \
         clean install-hooks uninstall-hooks \
         dashboard-install dashboard-dev dashboard-build dashboard-test \
         help
+
+profile-mem:
+	@mkdir -p dist/profiles
+	$(GO) test -run '^$$' -bench=. -benchmem -memprofile=dist/profiles/mem.pprof ./internal/profile/... 2>/dev/null || true
+	$(GO) test -bench=. -benchmem -memprofile=dist/profiles/router-mem.pprof -run '^$$' ./internal/router/... 2>/dev/null || true
+	@echo "heap profiles -> dist/profiles/"
+
+profile-cpu:
+	@mkdir -p dist/profiles
+	$(GO) test -run '^$$' -bench=. -cpuprofile=dist/profiles/cpu.pprof ./internal/profile/... 2>/dev/null || true
+	@echo "cpu profile -> dist/profiles/cpu.pprof"
 
 all: check
 
