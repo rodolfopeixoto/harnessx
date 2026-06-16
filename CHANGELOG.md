@@ -3,6 +3,14 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-15 — v0.31.0 — harness loop + budget ledger + presenter primitives (P63 part 2)
+
+- **`harness loop "<prompt>"`**: deterministic dev-loop. Runs `harness feature`, then the project's lint + test commands (auto-detected from scaffold or set via `--lint` / `--test`). On failure, packages the lint/test output as a canonical error block and feeds it back to the LLM as the follow-up prompt. Bounded by `--max-attempts` (default 3, hard cap 10) and `--budget-usd`. Final report at `.harness/runs/_loop/loop-<ts>.md`.
+- **`internal/devloop`**: new package with `Run`, `Canonicalise(prompt, attempt)`, auto-detection that maps `requirements.txt → python`, `Cargo.toml → rust`, `Gemfile → ruby`, `package.json → react`, `go.mod → go`.
+- **`budget.Guard.ChargeWith(Entry)` + `Guard.Entries()`**: per-call ledger so callers can render a breakdown table. `Entry{Label, USD, Tag, Note}` lets the renderer show `claude-sonnet-4-6  in=2140 out=512 $0.0144 (reported)` instead of a single mystery cost.
+- **`internal/ui/workflowview.go`**: presenter primitives (`Phase`, `Status`, `Presenter`) with rich (lipgloss colors) + plain (`[PHASE] ...` grep-friendly) implementations. Auto-picks via `ui.IsPlain()`. Workflow wiring lands incrementally in a follow-up release; primitives ship now so the loop + downstream code can already use them.
+- **`ui.IsPlain()`**: public accessor for plain-mode state (previously only `SetPlain` was exported).
+
 ## 2026-06-15 — v0.30.0 — init --git + deterministic language scaffolds (P63 part 1)
 
 - **`harness init --git`**: runs `git init -b main` when `.git/` is absent. `--git-branch <name>` to override. Skip noisily if a repo already exists.

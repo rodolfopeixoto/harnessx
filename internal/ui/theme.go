@@ -12,8 +12,11 @@ var (
 	Muted   = lipgloss.NewStyle().Faint(true)
 )
 
+var plainMode bool
+
 // SetPlain disables ANSI styling. Useful for CI snapshots and tests.
 func SetPlain(plain bool) {
+	plainMode = plain
 	if !plain {
 		return
 	}
@@ -24,3 +27,6 @@ func SetPlain(plain bool) {
 	Error = noop
 	Muted = noop
 }
+
+// IsPlain reports whether ANSI styling is currently disabled.
+func IsPlain() bool { return plainMode }
