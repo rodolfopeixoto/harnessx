@@ -3,6 +3,11 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-15 — v0.35.0 — Help topics for do/loop/scaffold + tutorial polish (P67)
+
+- **`harness help do`**, **`harness help loop`**, **`harness help scaffold`**: new in-CLI tutorial topics covering the v0.30–v0.34 surface. `harness help` lists them in the topic index.
+- **`docs/tutorial.md`** gains sections 10b (`harness loop`) and 10c (`harness memory recall`) with full examples + expected output. Version reference bumped to v0.35.0.
+
 ## 2026-06-15 — v0.34.0 — Sensor confidence + low-confidence task warning (P66)
 
 - **`sensors.Result.Confidence` (0..1)**: addresses the paper's "verification with incomplete feedback" open challenge. Renderers show `~conf N.NN` for any non-deterministic verdict (between 0 and 1). 0 = unknown / not set; 1.0 = deterministic (default, hidden).
