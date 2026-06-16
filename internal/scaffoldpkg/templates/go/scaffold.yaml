@@ -1,0 +1,32 @@
+language: go
+description: Net/http server with table-driven tests, golangci-lint, Makefile
+tested_against: "go 1.22+, golangci-lint 1.59+"
+
+required_tools:
+  - go
+
+files:
+  - path: main.go
+    template: main.go.tmpl
+  - path: handler/handler.go
+    template: handler/handler.go.tmpl
+  - path: handler/handler_test.go
+    template: handler/handler_test.go.tmpl
+  - path: go.mod
+    template: go.mod.tmpl
+  - path: .golangci.yml
+    template: .golangci.yml
+  - path: .gitignore
+    template: .gitignore
+  - path: Makefile
+    template: Makefile
+  - path: README.md
+    template: README.md.tmpl
+
+post_steps:
+  - name: go-mod-tidy
+    cmd: ["go", "mod", "tidy"]
+
+lint_command: "golangci-lint run"
+test_command: "go test ./..."
+run_command:  "go run ."

@@ -1,0 +1,8 @@
+# $NAME — minimal Sinatra app scaffolded by harness.
+require 'sinatra'
+require 'json'
+
+get '/healthz' do
+  content_type :json
+  { status: 'ok', env: ENV.fetch('ENV', 'dev') }.to_json
+end

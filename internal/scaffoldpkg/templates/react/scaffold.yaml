@@ -1,0 +1,39 @@
+language: react
+description: Vite + React + TypeScript + Vitest + ESLint
+tested_against: "node 20+, vite 5+, react 18+, vitest 1.6+"
+
+required_tools:
+  - node
+  - npm
+
+files:
+  - path: package.json
+    template: package.json.tmpl
+  - path: tsconfig.json
+    template: tsconfig.json
+  - path: vite.config.ts
+    template: vite.config.ts
+  - path: index.html
+    template: index.html.tmpl
+  - path: src/main.tsx
+    template: src/main.tsx
+  - path: src/App.tsx
+    template: src/App.tsx.tmpl
+  - path: src/App.test.tsx
+    template: src/App.test.tsx.tmpl
+  - path: src/vite-env.d.ts
+    template: src/vite-env.d.ts
+  - path: .eslintrc.json
+    template: .eslintrc.json
+  - path: .gitignore
+    template: .gitignore
+  - path: README.md
+    template: README.md.tmpl
+
+post_steps:
+  - name: npm-install
+    cmd: ["npm", "install"]
+
+lint_command: "npm run lint"
+test_command: "npm test -- --run"
+run_command:  "npm run dev"
