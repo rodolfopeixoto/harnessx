@@ -64,6 +64,13 @@ Download from the [Releases page](https://github.com/rodolfopeixoto/harnessx/rel
 
 ---
 
+## Full step-by-step tutorial
+
+[docs/tutorial-python-demo.md](docs/tutorial-python-demo.md) — builds a
+working Python FastAPI service from zero, exercises every layer +
+every adapter + every sensor + every flow + dashboard + profiling +
+audit-solid + backup. 45–60 min.
+
 ## Quickstart
 
 ```bash
@@ -275,7 +282,25 @@ Full rules: [CONTRIBUTING.md](CONTRIBUTING.md).
 | v0.100 | Phase D: full README rewrite (this doc) |
 
 **v1.0.0:** deferred indefinitely. Stays on `0.xx.xx` until operator
-explicitly green-lights cut. No timeline.
+explicitly green-lights cut.
+
+### Honest readiness snapshot (as of v0.104)
+
+| Gate | Target | Actual | Status |
+|---|---|---|---|
+| Tests | all pass | 759 / 759 pass | ✓ |
+| Lint | 0 issues | 0 issues | ✓ |
+| Coverage | ≥ 90% | 47.3% global | ✗ (gap remains) |
+| God files | 0 (LOC ≤ 400) | 6 over limit | ✗ |
+| Fan-out | ≤ 15 imports | 3 over limit | ✗ |
+| Pre-push gate | hard | installed | ✓ |
+| Brew tap | refreshed each release | up to date | ✓ |
+| 6-platform binaries | every release | shipping | ✓ |
+| Memory leak gate | ±10% drift | profiler exists, baseline not captured | ◐ |
+
+Coverage push + god-file refactor are the gates remaining before any
+v1.0.0 conversation. Use harness today — surfaces work — but do not
+treat it as a 1.0 release.
 
 ---
 
