@@ -10,7 +10,7 @@ terminal against the doc. This is the single canonical tutorial —
 older versions are not kept; check `git log docs/tutorial.md` if you
 need historical commands.
 
-Tested against **v0.29.0** (see `harness version` in section 0).
+Tested against **v0.30.0** (see `harness version` in section 0).
 
 ---
 
@@ -21,7 +21,7 @@ Tested against **v0.29.0** (see `harness version` in section 0).
 ```bash
 brew tap rodolfopeixoto/harnessx https://github.com/rodolfopeixoto/harnessx.git
 brew install harness                  # ← v0.29 renamed harnessx → harness
-harness version                       # expect: 0.29.0
+harness version                       # expect: 0.30.0
 ```
 
 ### B — Install via curl (no brew dependency)
@@ -41,7 +41,7 @@ brew update && brew upgrade harness
 curl -fsSL https://raw.githubusercontent.com/rodolfopeixoto/harnessx/main/scripts/install.sh | bash
 ```
 
-### D — Uninstall (new in v0.29)
+### D — Uninstall
 
 ```bash
 harness uninstall project             # wipe ./.harness/ only
@@ -60,7 +60,7 @@ non-writable dir; copy-paste and run.
 
 | Tool | Need | Install hint |
 |---|---|---|
-| `harness` ≥ 0.29.0 | always | section 0 |
+| `harness` ≥ 0.30.0 | always | section 0 |
 | `python3` ≥ 3.11 | sample app | system Python or pyenv |
 | `pipx` | install ruff / pytest cleanly | `brew install pipx` |
 | `git` | gitflow demo | system git |
@@ -71,47 +71,110 @@ Sample-app working dir:
 
 ```bash
 mkdir -p ~/dev/harness-fastapi-demo && cd ~/dev/harness-fastapi-demo
-git init && git checkout -b main
 ```
+
+> v0.30 ships `harness init --git` so you no longer need to run
+> `git init && git checkout -b main` manually.
 
 ---
 
-## 2. Initialise + register
+## 2. One-shot bootstrap: `harness init --all --scaffold` (new in v0.30)
 
 ```bash
-harness init
-harness project add . --slug fastapi-demo
+harness init --all                          # git init main + .harness/ + project register
+# or, full one-liner — git + .harness + project + Python scaffold:
+harness scaffold apply python --name fastapi-demo --apply --with-git --with-deps
+harness init --all
 ```
+
+`harness init --all` runs `git init -b main` (if `.git/` absent),
+creates `.harness/` (config, db, logs, hooks), then registers the
+project in the cross-project workspace registry with a slug derived
+from the directory basename.
 
 **Expected:**
 
 ```
+git: initialised on main
 harness: initialised .../.harness
-  config:  .../.harness/config/harness.yaml
-  db:      .../.harness/db/harness.sqlite
-  log:     .../.harness/logs/events.jsonl
-
 registered harness-fastapi-demo
-  slug: fastapi-demo
-  root: .../harness-fastapi-demo
-  db:   .../harness-fastapi-demo/.harness/db/harness.sqlite
+  slug: harness-fastapi-demo
 ```
 
-> Re-running `project add . --slug other-name` now updates the slug
-> (v0.28.1 fix). Previously the second add silently kept the
-> original slug.
-
-Confirm hook scaffold:
+Verify hook scaffold:
 
 ```bash
-cat .harness/hooks/pre-tool-use.sh | head -8
+cat .harness/hooks/pre-tool-use.sh | head -5
 ```
 
-`exit 0` stub with commented list of installable templates.
+`exit 0` stub with commented installable templates.
 
 ---
 
-## 3. `harness list` — composite read-only view
+## 3. Bootstrap project code: `harness scaffold` (new in v0.30)
+
+Deterministic, no LLM call, byte-identical output across runs.
+
+```bash
+harness scaffold list                       # 5 bundled: python, go, ruby, rust, react
+harness scaffold show python                # dumps scaffold.yaml
+harness scaffold apply python --name fastapi-demo --apply --with-git --with-deps
+```
+
+Flags:
+- `--name <str>` — project name (default: dir basename)
+- `--apply` — write files (default: dry-run, only lists what would be created)
+- `--with-git` — `git init` when `.git/` absent
+- `--with-deps` — runs `post_steps` from scaffold.yaml (`pip install`,
+  `go mod tidy`, `npm install`, `bundle install`, `cargo build`)
+- `--force` — overwrite existing files
+
+**Expected (Python):**
+
+```
+git: initialised on main
+scaffold: python (applied) — 9 files
+  + app.py
+  + requirements.txt
+  + tests/__init__.py
+  + tests/test_app.py
+  + ruff.toml
+  + pyproject.toml
+  + Makefile
+  + .gitignore
+  + README.md
+
+next:
+  lint:  .venv/bin/ruff check .
+  test:  .venv/bin/pytest -q
+  run:   .venv/bin/uvicorn app:app --reload
+```
+
+Verify the scaffold works without harness:
+
+```bash
+make setup                                  # creates .venv + installs deps
+make test                                   # pytest passes
+make run &                                  # uvicorn
+curl -sf http://localhost:8000/healthz
+kill %1
+```
+
+For the other languages:
+
+```bash
+harness scaffold apply go     --name demo --apply --with-deps
+harness scaffold apply ruby   --name demo --apply --with-deps
+harness scaffold apply rust   --name demo --apply --with-deps
+harness scaffold apply react  --name demo --apply --with-deps
+```
+
+Each language ships an idiomatic `/healthz` server + tests + lint
+config + Makefile/Rakefile.
+
+---
+
+## 4. `harness list` — composite read-only view
 
 ```bash
 harness list

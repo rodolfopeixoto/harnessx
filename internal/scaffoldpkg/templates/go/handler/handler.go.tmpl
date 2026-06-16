@@ -1,0 +1,19 @@
+package handler
+
+import (
+	"encoding/json"
+	"net/http"
+	"os"
+)
+
+func Healthz(w http.ResponseWriter, _ *http.Request) {
+	env := os.Getenv("ENV")
+	if env == "" {
+		env = "dev"
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]string{
+		"status": "ok",
+		"env":    env,
+	})
+}

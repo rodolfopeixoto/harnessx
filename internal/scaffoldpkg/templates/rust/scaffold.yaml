@@ -1,0 +1,31 @@
+language: rust
+description: Axum web server with integration tests and cargo lint setup
+tested_against: "rust 1.78+, axum 0.7+"
+
+required_tools:
+  - cargo
+  - rustc
+
+files:
+  - path: Cargo.toml
+    template: Cargo.toml.tmpl
+  - path: src/main.rs
+    template: src/main.rs.tmpl
+  - path: src/lib.rs
+    template: src/lib.rs.tmpl
+  - path: tests/it.rs
+    template: tests/it.rs.tmpl
+  - path: .gitignore
+    template: .gitignore
+  - path: Makefile
+    template: Makefile
+  - path: README.md
+    template: README.md.tmpl
+
+post_steps:
+  - name: cargo-build
+    cmd: ["cargo", "build"]
+
+lint_command: "cargo clippy --all-targets -- -D warnings"
+test_command: "cargo test"
+run_command:  "cargo run"

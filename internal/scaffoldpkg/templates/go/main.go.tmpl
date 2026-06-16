@@ -1,0 +1,22 @@
+package main
+
+import (
+	"log"
+	"net/http"
+	"os"
+
+	"$NAME/handler"
+)
+
+func main() {
+	addr := os.Getenv("ADDR")
+	if addr == "" {
+		addr = ":8080"
+	}
+	mux := http.NewServeMux()
+	mux.HandleFunc("/healthz", handler.Healthz)
+	log.Printf("$NAME listening on %s", addr)
+	if err := http.ListenAndServe(addr, mux); err != nil {
+		log.Fatal(err)
+	}
+}

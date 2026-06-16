@@ -1,0 +1,12 @@
+"""$NAME — minimal FastAPI app scaffolded by harness."""
+
+import os
+
+from fastapi import FastAPI
+
+app = FastAPI(title="$NAME")
+
+
+@app.get("/healthz")
+def healthz() -> dict[str, str]:
+    return {"status": "ok", "env": os.getenv("ENV", "dev")}

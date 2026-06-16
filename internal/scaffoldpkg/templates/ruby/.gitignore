@@ -1,0 +1,5 @@
+/.bundle/
+/vendor/bundle
+*.log
+*.gem
+.rspec_status
