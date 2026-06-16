@@ -31,6 +31,7 @@ func newDoCmd() *cobra.Command {
 		maxTasks      int
 		autonomy      string
 		image         string
+		asJSON        bool
 	)
 	c := &cobra.Command{
 		Use:   "do \"<prompt>\"",
@@ -45,7 +46,7 @@ test, secrets-scan) skip the LLM by default.
 		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runDo(cmd.Context(), cmd.OutOrStdout(), strings.Join(args, " "), doOpts{
-				yes: yes, det: deterministic, budget: budget, maxTasks: maxTasks, autonomy: autonomy, image: image,
+				yes: yes, det: deterministic, budget: budget, maxTasks: maxTasks, autonomy: autonomy, image: image, asJSON: asJSON,
 			})
 		},
 	}
@@ -55,6 +56,7 @@ test, secrets-scan) skip the LLM by default.
 	c.Flags().IntVar(&maxTasks, "max-tasks", 10, "hard cap on decomposed tasks")
 	c.Flags().StringVar(&autonomy, "autonomy", "safe_execute", "autonomy level for LLM tasks")
 	c.Flags().StringVar(&image, "image", "", "attach an image; auto-adds vision tag for routing")
+	c.Flags().BoolVar(&asJSON, "json", false, "emit final result as JSON (implies --yes)")
 	return c
 }
 
@@ -88,6 +90,7 @@ type doOpts struct {
 	maxTasks int
 	autonomy string
 	image    string
+	asJSON   bool
 }
 
 type plannedStep struct {
@@ -231,24 +234,54 @@ func runDo(ctx context.Context, out io.Writer, prompt string, opts doOpts) error
 	if err != nil {
 		return err
 	}
-	fmt.Fprintln(out, "plan:")
-	printPlan(out, steps)
-	if !opts.yes && !confirmYes(out, "execute? [y/N] ") {
-		fmt.Fprintln(out, "cancelled")
+	logOut := out
+	if opts.asJSON {
+		opts.yes = true
+		logOut = os.Stderr
+	}
+	fmt.Fprintln(logOut, "plan:")
+	printPlan(logOut, steps)
+	if !opts.yes && !confirmYes(logOut, "execute? [y/N] ") {
+		fmt.Fprintln(logOut, "cancelled")
 		return nil
 	}
 	results := make([]string, len(steps))
 	for i, s := range steps {
-		fmt.Fprintf(out, "\n[task %d/%d] %s — %s\n", i+1, len(steps), s.task.Kind, s.chosen)
+		fmt.Fprintf(logOut, "\n[task %d/%d] %s — %s\n", i+1, len(steps), s.task.Kind, s.chosen)
 		if i > 0 {
 			s.task.Prompt = handoff(prompt, steps[:i], results[:i]) + "\n\n" + s.task.Prompt
 		}
-		results[i] = executeStep(ctx, out, dir, s, opts)
+		results[i] = executeStep(ctx, logOut, dir, s, opts)
 	}
-	if rp, err := writeDoReport(dir, prompt, steps, results); err == nil {
-		fmt.Fprintf(out, "\ndo report: %s\n", rp)
+	rp, _ := writeDoReport(dir, prompt, steps, results)
+	if rp != "" {
+		fmt.Fprintf(logOut, "\ndo report: %s\n", rp)
+	}
+	if opts.asJSON {
+		return emitDoJSON(out, prompt, steps, results, rp)
 	}
 	return nil
+}
+
+type jsonDoResult struct {
+	Prompt     string     `json:"prompt"`
+	ReportPath string     `json:"report_path"`
+	Steps      []jsonStep `json:"steps"`
+	Results    []string   `json:"results"`
+}
+
+func emitDoJSON(out io.Writer, prompt string, steps []plannedStep, results []string, reportPath string) error {
+	js := jsonDoResult{Prompt: prompt, ReportPath: reportPath, Results: results}
+	for i, s := range steps {
+		js.Steps = append(js.Steps, jsonStep{
+			Index: i + 1, Kind: string(s.task.Kind), Tags: s.task.Tags,
+			Routing: s.chosen, AdapterID: s.choice.AdapterID,
+			Prompt: s.task.Prompt, Confidence: s.task.Confidence, Lang: s.task.Lang,
+		})
+	}
+	enc := json.NewEncoder(out)
+	enc.SetIndent("", "  ")
+	return enc.Encode(js)
 }
 
 func confirmYes(out io.Writer, prompt string) bool {
