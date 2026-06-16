@@ -209,5 +209,5 @@ func newProjectWorkspaceCmds() []*cobra.Command {
 		},
 	}
 
-	return []*cobra.Command{add, list, switchCmd, current, archive, unarchive, scan, forget, importC, staleC}
+	return []*cobra.Command{add, list, switchCmd, current, archive, unarchive, scan, forget, importC, staleC, newProjectPruneCmd()}
 }

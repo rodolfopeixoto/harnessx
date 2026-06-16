@@ -17,7 +17,7 @@ import (
 
 func newRunsCmd() *cobra.Command {
 	c := &cobra.Command{Use: "runs", Short: "Inspect / approve / discard agentic runs"}
-	c.AddCommand(newRunListCmd(), newRunInspectCmd(), newRunReportCmd(), newRunSensorsCmd(), newRunApproveCmd(), newRunDiscardCmd())
+	c.AddCommand(newRunListCmd(), newRunInspectCmd(), newRunReportCmd(), newRunSensorsCmd(), newRunApproveCmd(), newRunDiscardCmd(), newRunsPruneCmd())
 	return c
 }
 

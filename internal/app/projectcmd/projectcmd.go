@@ -15,6 +15,7 @@ import (
 	"sort"
 	"strings"
 	"text/tabwriter"
+	"time"
 
 	"github.com/ropeixoto/harnessx/internal/platform/constants"
 	"github.com/ropeixoto/harnessx/internal/workspace"
@@ -49,6 +50,30 @@ func Add(ctx context.Context, opts Options, path, displayName, slug string, out 
 	}
 	fmt.Fprintf(out, "registered %s\n  slug: %s\n  root: %s\n  db:   %s\n", p.DisplayName, p.Slug, p.RootPath, p.DBPath)
 	return nil
+}
+
+// StaleSince returns projects whose LastSeenAt is older than the
+// given threshold. Archived projects are excluded.
+func StaleSince(ctx context.Context, opts Options, threshold time.Time) ([]workspace.Project, error) {
+	r, err := openRegistry(opts)
+	if err != nil {
+		return nil, err
+	}
+	defer r.Close()
+	projects, err := r.List(ctx, false)
+	if err != nil {
+		return nil, err
+	}
+	var stale []workspace.Project
+	for _, p := range projects {
+		if p.LastSeenAt == nil {
+			continue
+		}
+		if p.LastSeenAt.Before(threshold) {
+			stale = append(stale, p)
+		}
+	}
+	return stale, nil
 }
 
 // List prints registered projects.
