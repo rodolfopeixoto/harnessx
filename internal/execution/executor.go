@@ -146,10 +146,30 @@ func (e *DefaultExecutor) Execute(ctx context.Context, req Request) (Result, err
 	}
 
 	res.FinishedAt = e.Clock()
+	populateMetrics(&res)
 	summary := fmt.Sprintf("status=%s files=%d risk=%s decision=%s", res.Status, len(changed), risk, dec)
 	res.ReportPath = writeReport(runDir, req, res, summary)
 	writeMeta(runDir, res)
 	return res, nil
+}
+
+// populateMetrics derives Trajectory / Verification / Recovery /
+// Replayability from data the executor already collected. Pure
+// function over res so unit tests can call it directly.
+func populateMetrics(res *Result) {
+	res.Trajectory.ToolCalls = len(res.Hooks)
+	res.Trajectory.EditCount = len(res.ChangedFiles)
+	if !res.FinishedAt.IsZero() && !res.StartedAt.IsZero() {
+		res.Trajectory.WallMs = res.FinishedAt.Sub(res.StartedAt).Milliseconds()
+	}
+	res.Verification.SensorsRun = len(res.Sensors)
+	for _, s := range res.Sensors {
+		if s.Status == "passed" {
+			res.Verification.SensorsPassed++
+		}
+	}
+	res.Verification.OracleCount = len(res.Sensors)
+	res.Replayability.EventsComplete = res.JSONLPath != "" || res.StdoutPath != "" || res.StderrPath != ""
 }
 
 func (e *DefaultExecutor) captureAndRecordDiff(ctx context.Context, wt Worktree, runDir string, res *Result) ([]string, error) {

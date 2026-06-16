@@ -18,12 +18,13 @@ import (
 
 func newMetricsCmd() *cobra.Command {
 	var (
-		since   string
-		jsonOut bool
+		since    string
+		jsonOut  bool
+		withTraj bool
 	)
 	c := &cobra.Command{
 		Use:   "metrics",
-		Short: "Aggregate cost/tokens/sensor pass-rate across recent runs",
+		Short: "Aggregate cost/tokens/sensor pass-rate (+ trajectory with --trajectory)",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			root, err := cwd()
 			if err != nil {
@@ -35,6 +36,9 @@ func newMetricsCmd() *cobra.Command {
 				return err
 			}
 			agg := aggregateMetrics(runs, cutoff)
+			if withTraj {
+				agg.Trajectory = aggregateTrajectory(runs, cutoff)
+			}
 			if jsonOut {
 				return json.NewEncoder(cmd.OutOrStdout()).Encode(agg)
 			}
@@ -43,6 +47,7 @@ func newMetricsCmd() *cobra.Command {
 	}
 	c.Flags().StringVar(&since, "since", "7d", "1d|7d|30d|all")
 	c.Flags().BoolVar(&jsonOut, "json", false, "emit JSON")
+	c.Flags().BoolVar(&withTraj, "trajectory", false, "include process-effort metrics (tool calls, edits, wall ms, sensors, events)")
 	return c
 }
 
@@ -59,6 +64,36 @@ type Aggregate struct {
 	OutputTokens   int            `json:"output_tokens"`
 	TotalCostUSD   float64        `json:"total_cost_usd"`
 	ByAgent        map[string]int `json:"by_agent"`
+	Trajectory     TrajectoryAgg  `json:"trajectory,omitempty"`
+}
+
+// TrajectoryAgg aggregates per-run trajectory metrics so operators
+// can answer "how efficient was this window of work?" (paper § 5.2.1).
+type TrajectoryAgg struct {
+	ToolCalls      int   `json:"tool_calls"`
+	EditCount      int   `json:"edit_count"`
+	WallMs         int64 `json:"wall_ms"`
+	SensorsRun     int   `json:"sensors_run"`
+	SensorsPassed  int   `json:"sensors_passed"`
+	EventsComplete int   `json:"events_complete"`
+}
+
+func aggregateTrajectory(runs []execution.Result, cutoff time.Time) TrajectoryAgg {
+	var agg TrajectoryAgg
+	for _, r := range runs {
+		if !cutoff.IsZero() && r.StartedAt.Before(cutoff) {
+			continue
+		}
+		agg.ToolCalls += r.Trajectory.ToolCalls
+		agg.EditCount += r.Trajectory.EditCount
+		agg.WallMs += r.Trajectory.WallMs
+		agg.SensorsRun += r.Verification.SensorsRun
+		agg.SensorsPassed += r.Verification.SensorsPassed
+		if r.Replayability.EventsComplete {
+			agg.EventsComplete++
+		}
+	}
+	return agg
 }
 
 func aggregateMetrics(runs []execution.Result, cutoff time.Time) Aggregate {
@@ -109,6 +144,15 @@ func renderMetrics(out interface{ Write(p []byte) (int, error) }, a Aggregate) e
 		for k, v := range a.ByAgent {
 			fmt.Fprintf(w, "  %s\t%d\n", k, v)
 		}
+	}
+	if a.Trajectory.SensorsRun > 0 || a.Trajectory.ToolCalls > 0 || a.Trajectory.EditCount > 0 {
+		fmt.Fprintln(w, "trajectory:")
+		fmt.Fprintf(w, "  tool_calls\t%d\n", a.Trajectory.ToolCalls)
+		fmt.Fprintf(w, "  edit_count\t%d\n", a.Trajectory.EditCount)
+		fmt.Fprintf(w, "  wall_ms\t%d\n", a.Trajectory.WallMs)
+		fmt.Fprintf(w, "  sensors_run\t%d\n", a.Trajectory.SensorsRun)
+		fmt.Fprintf(w, "  sensors_passed\t%d\n", a.Trajectory.SensorsPassed)
+		fmt.Fprintf(w, "  events_complete\t%d\n", a.Trajectory.EventsComplete)
 	}
 	return w.Flush()
 }

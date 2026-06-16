@@ -85,6 +85,34 @@ type SensorOutcome struct {
 	DurationMs int64  `json:"duration_ms"`
 }
 
+// Trajectory captures process-effort signals so operators can answer
+// "was this run efficient?" (paper § 5.2.1 "evaluation beyond task
+// completion"). Populated automatically by the executor.
+type Trajectory struct {
+	ToolCalls int   `json:"tool_calls"`
+	EditCount int   `json:"edit_count"`
+	WallMs    int64 `json:"wall_ms"`
+}
+
+// Verification reports oracle adequacy.
+type Verification struct {
+	SensorsRun    int `json:"sensors_run"`
+	SensorsPassed int `json:"sensors_passed"`
+	OracleCount   int `json:"oracle_count"`
+}
+
+// Recovery reports how much the run wobbled.
+type Recovery struct {
+	Retries     int `json:"retries"`
+	Regressions int `json:"regressions"`
+}
+
+// Replayability flags whether the run's event stream is complete
+// enough to replay later.
+type Replayability struct {
+	EventsComplete bool `json:"events_complete"`
+}
+
 type Result struct {
 	SessionID              string          `json:"session_id"`
 	RunID                  string          `json:"run_id"`
@@ -113,6 +141,10 @@ type Result struct {
 	Hooks                  []HookOutcome   `json:"hooks,omitempty"`
 	ErrorType              string          `json:"error_type,omitempty"`
 	ErrorMessage           string          `json:"error_message,omitempty"`
+	Trajectory             Trajectory      `json:"trajectory"`
+	Verification           Verification    `json:"verification"`
+	Recovery               Recovery        `json:"recovery"`
+	Replayability          Replayability   `json:"replayability"`
 }
 
 type Executor interface {
