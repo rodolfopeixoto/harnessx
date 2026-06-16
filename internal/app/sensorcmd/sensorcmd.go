@@ -126,7 +126,11 @@ func Run(ctx context.Context, opts RunOptions, out io.Writer) ([]sensors.Result,
 	runner := &sensors.Runner{
 		OnResult: func(res sensors.Result) {
 			if !opts.Quiet {
-				fmt.Fprintf(out, "  [%s] %-22s %s %s\n", icon(res.Status), res.ID, res.Duration.Round(time.Millisecond), detail(res))
+				conf := ""
+				if res.Confidence > 0 && res.Confidence < 1.0 {
+					conf = fmt.Sprintf(" (~conf %.2f)", res.Confidence)
+				}
+				fmt.Fprintf(out, "  [%s] %-22s %s %s%s\n", icon(res.Status), res.ID, res.Duration.Round(time.Millisecond), detail(res), conf)
 			}
 			if hasDB {
 				_ = repo.WriteSensorResult(ctx, run.ID, res.ID, string(res.Status), res.Duration.Milliseconds(), res.OutputPath, time.Now().UTC())
