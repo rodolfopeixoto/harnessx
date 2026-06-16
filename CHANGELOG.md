@@ -3,6 +3,10 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-16 — v0.40.0 — harness do --json (P72)
+
+- **`harness do "<prompt>" --json`**: emits the executed plan + per-task results as JSON on stdout (implies `--yes`; routes human-facing logs to stderr so consumers can parse stdout cleanly). Schema: `{prompt, report_path, steps:[...], results:[...]}`. Completes the IDE-plugin contract started in v0.39: plugins can plan via `route show --json`, execute via `do --json`, and consume both with the same `jsonStep` schema.
+
 ## 2026-06-16 — v0.39.0 — harness route show --json (P71)
 
 - **`harness route show "<prompt>" --json`**: emits the planned task graph as JSON for programmatic consumers (IDE plugins, scripts, CI). Schema: `{prompt, steps:[{index, kind, tags, routing, adapter_id, prompt, confidence, lang}]}`. No LLM call, <500ms, stable schema versioned via the v0.39 tag.
