@@ -90,6 +90,7 @@ func newRoot() *cobra.Command {
 		newListCmd(),
 		newFlowCmd(),
 		newScaffoldCmd(),
+		newInstallGitHooksCmd(),
 		newLoopCmd(),
 		newDoCmd(),
 		newRouteCmd(),
