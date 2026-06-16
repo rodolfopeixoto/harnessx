@@ -128,6 +128,66 @@ Channels:
 Aggregates per-run state from .harness/runs/*/meta.json
 and the audit JSONL at .harness/audit/events.jsonl.
 `,
+	"do": `harness do — multi-agent routing per task
+
+Single prompt, multiple adapters, deterministic when possible.
+
+  harness route show "<prompt>"     # dry-run: see the plan, no LLM call
+  harness do "<prompt>" --yes       # execute the plan
+
+How it works:
+  1. Decompose: rule-based splitter classifies each clause as one of
+     scaffold | lint | test | format | secrets | code | refactor |
+     docs | review | image | vision | search | data | shell | generic
+  2. Route: score each task tag against adapter.strengths
+     (intersection / len(task.tags)); ties broken by adapter id
+  3. Deterministic-first: scaffold/lint/test/secrets bypass the LLM
+     via scaffoldpkg / sensorcmd when --deterministic is on (default)
+  4. Execute in order; one report at .harness/runs/_do/do-<ts>.md
+
+Flags:
+  --yes              skip confirmation
+  --deterministic    prefer scaffold/sensor over LLM (default true)
+  --budget-usd       USD cap across all routed tasks
+  --max-tasks        hard cap on decomposed tasks (default 10)
+  --image <path>     auto-adds vision tag, picks vision-capable adapter
+
+Example:
+  harness do "scaffold python and add a /healthz endpoint" \
+    --yes --budget-usd 0.30
+`,
+	"loop": `harness loop — deterministic dev-loop
+
+Agent runs feature workflow, then the project's lint + test commands.
+On failure, canonicalises output into a follow-up prompt and re-runs.
+
+  harness loop "<prompt>" --agent claude --apply \\
+    --max-attempts 3 --budget-usd 0.30
+
+Auto-detects lint/test from a scaffolded project (requirements.txt ->
+python; go.mod -> go; Gemfile -> ruby; Cargo.toml -> rust;
+package.json -> react).
+
+Regression detection (v0.33+): baseline lint+test captured before the
+first attempt; any later attempt that breaks something previously
+green is flagged and the canonical error tells the LLM to fix the
+regression before anything else.
+`,
+	"scaffold": `harness scaffold — deterministic language skeletons
+
+  harness scaffold list                     # 5 bundled languages
+  harness scaffold show python              # dump the scaffold.yaml
+  harness scaffold apply <lang> --apply \\
+    --name myapp --with-git --with-deps
+
+Bundled: python (FastAPI), go (net/http), ruby (Sinatra), rust (Axum),
+react (Vite + Vitest). Each ships an idiomatic /healthz, lint config,
+test config, and a Makefile/Rakefile.
+
+Default is dry-run; --apply writes files. --with-git runs git init -b
+main when .git/ is absent. --with-deps runs post_steps (pip install,
+go mod tidy, npm install, ...).
+`,
 	"billing": `Billing — Anthropic streams and which adapter hits which
 
 Anthropic splits spending into three buckets (post 2026-06-15):
