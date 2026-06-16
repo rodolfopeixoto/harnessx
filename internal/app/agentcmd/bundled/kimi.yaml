@@ -19,7 +19,7 @@ capabilities:
   mcp: false
   max_context_tokens: 256000
 
-strengths: [codebase_exploration, dependency_audit, cheap_review]
+strengths: [code, search, review]
 
 models:
   default: kimi-k2

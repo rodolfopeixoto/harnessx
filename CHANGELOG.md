@@ -3,6 +3,17 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-15 — v0.32.0 — Multi-agent routing + composability (P64)
+
+Implements Layer 3 of the "Code as Agent Harness" paper (arXiv 2605.18747): composability via deterministic per-task adapter routing.
+
+- **`harness do "<prompt>"`**: decomposes a free-form prompt into typed tasks ("scaffold X and add Y then generate Z" → 3 tasks) and routes each to the best adapter (or to a deterministic implementation when one exists). Per-task report at `.harness/runs/_do/do-<ts>.md`. Flags: `--yes`, `--deterministic` (default on; prefers scaffold/sensor over LLM), `--budget-usd`, `--max-tasks`, `--autonomy`.
+- **`harness route show "<prompt>"`**: dry-run that prints the planned task graph + chosen adapter per task without executing. <500ms, no LLM call.
+- **`internal/taskgraph`**: rule-based decomposer. Splits by `and`/`then`/`,`/`;`, classifies each clause against ~20 regex rules covering 14 task kinds (scaffold, lint, test, format, secrets, code, refactor, docs, review, image, vision, search, data, shell, generic). Returns `Task{Kind, Tags, Prompt, Lang, Confidence}`.
+- **`internal/router`**: deterministic strengths matcher. Scores adapter via `intersection(task.tags, adapter.strengths) / len(task.tags)`; ties broken by adapter id (stable). `router.Pick(tags, registry)` returns the top adapter.
+- **Bundled adapter strengths unified** to controlled vocabulary (code, refactor, reasoning, search, docs, tests, image, vision, audio, data, sql, shell, review). Updated: `claude` (code/reasoning/refactor/review/docs), `codex` (code/tests/refactor), `gemini` (code/vision/image/search/docs), `kimi` (code/search/review), `fake` (code/tests).
+- **Deterministic-first** (paper principle: executability). Tasks of kind `scaffold`/`lint`/`test`/`secrets` map to `scaffoldpkg`/`sensorcmd` and skip the LLM entirely when `--deterministic` is on (default).
+
 ## 2026-06-15 — v0.31.0 — harness loop + budget ledger + presenter primitives (P63 part 2)
 
 - **`harness loop "<prompt>"`**: deterministic dev-loop. Runs `harness feature`, then the project's lint + test commands (auto-detected from scaffold or set via `--lint` / `--test`). On failure, packages the lint/test output as a canonical error block and feeds it back to the LLM as the follow-up prompt. Bounded by `--max-attempts` (default 3, hard cap 10) and `--budget-usd`. Final report at `.harness/runs/_loop/loop-<ts>.md`.
