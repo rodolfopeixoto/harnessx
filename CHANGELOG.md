@@ -3,6 +3,19 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-15 — v0.30.0 — init --git + deterministic language scaffolds (P63 part 1)
+
+- **`harness init --git`**: runs `git init -b main` when `.git/` is absent. `--git-branch <name>` to override. Skip noisily if a repo already exists.
+- **`harness init --all`**: implies `--git` plus registers the project in the cross-project workspace registry (slug derived from dir basename, override via `--slug`).
+- **`harness scaffold {list,show,apply}`**: new top-level command that drops deterministic language scaffolds with **zero LLM calls**. Bundled languages: `python` (FastAPI + pytest + ruff + Makefile), `go` (net/http + table-driven tests + golangci-lint), `ruby` (Sinatra + rspec + rubocop + Rakefile), `rust` (Axum + integration tests + clippy), `react` (Vite + React 18 + TypeScript + Vitest + ESLint). Each scaffold ships a `scaffold.yaml` declaring `required_tools`, `files`, `post_steps`, `lint_command`, `test_command`, `run_command`. Output is byte-identical for the same `(lang, name)`.
+- **`harness scaffold apply <lang> --apply --with-git --with-deps`** writes files, optionally initialises git, and runs `post_steps` (venv + pip install, go mod tidy, bundle install, npm install, cargo build).
+- **`internal/scm/git.go`**: tiny helper (`HasRepo`, `Init`, `CurrentBranch`) wrapping the only git calls harness needs.
+- **`internal/scaffoldpkg/`** mirrors the `hookpkg` / `mcppkg` pattern (embed.FS + List/Load/Apply). New languages = drop a directory under `templates/<lang>/`.
+- **Tutorial rewritten** (`docs/tutorial.md`): sections 2 + 3 replace the old "create dir + git init + harness init + project add" steps with the new one-liner flow.
+- **Deferred to v0.31 (P63 part 2)**: colored sectioned output + spinner, per-call budget breakdown table, `harness loop` deterministic LLM ⇒ lint/test ⇒ canonical-error-retry loop.
+
+
+
 ## 2026-06-15 — v0.29.1 — Single canonical docs/tutorial.md (drop versioned manuals)
 
 - **`docs/tutorial.md`** is now the only manual. Per-version files (`tutorial-v0.4-manual.md`, `v0.11`, `v0.27`, `v0.28`, `v0.29`) are deleted. Historical commands live in `git log docs/tutorial.md` for anyone who needs them. Stops the accumulation of redirect notices and stale walkthroughs.

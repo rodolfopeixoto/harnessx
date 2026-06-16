@@ -1,0 +1,33 @@
+language: ruby
+description: Sinatra app with rspec, rubocop, and a Rakefile dev loop
+tested_against: "ruby 3.2+, sinatra 4.0+, rspec 3.13+, rubocop 1.64+"
+
+required_tools:
+  - ruby
+  - bundle
+
+files:
+  - path: app.rb
+    template: app.rb.tmpl
+  - path: Gemfile
+    template: Gemfile
+  - path: spec/app_spec.rb
+    template: spec/app_spec.rb.tmpl
+  - path: spec/spec_helper.rb
+    template: spec/spec_helper.rb
+  - path: .rubocop.yml
+    template: .rubocop.yml
+  - path: .gitignore
+    template: .gitignore
+  - path: Rakefile
+    template: Rakefile
+  - path: README.md
+    template: README.md.tmpl
+
+post_steps:
+  - name: bundle-install
+    cmd: ["bundle", "install"]
+
+lint_command: "bundle exec rubocop"
+test_command: "bundle exec rspec"
+run_command:  "bundle exec ruby app.rb"
