@@ -164,6 +164,20 @@ func printPlan(out io.Writer, steps []plannedStep) {
 	}
 }
 
+// handoff builds a "Past steps in this run" block that gets prepended
+// to every task after the first. Lets multi-adapter pipelines share
+// state via the prompt without a new shared-memory abstraction.
+func handoff(originalPrompt string, prev []plannedStep, results []string) string {
+	var b strings.Builder
+	b.WriteString("# Past steps in this run\n\n")
+	fmt.Fprintf(&b, "Original request: %s\n\n", originalPrompt)
+	for i, s := range prev {
+		fmt.Fprintf(&b, "- step %d (%s via %s): %s\n", i+1, s.task.Kind, s.chosen, results[i])
+	}
+	b.WriteString("\nUse these as context. Do not redo work that already succeeded.\n\n# This step\n")
+	return b.String()
+}
+
 func truncStr(s string, n int) string {
 	if len(s) <= n {
 		return s
@@ -189,6 +203,9 @@ func runDo(ctx context.Context, out io.Writer, prompt string, opts doOpts) error
 	results := make([]string, len(steps))
 	for i, s := range steps {
 		fmt.Fprintf(out, "\n[task %d/%d] %s — %s\n", i+1, len(steps), s.task.Kind, s.chosen)
+		if i > 0 {
+			s.task.Prompt = handoff(prompt, steps[:i], results[:i]) + "\n\n" + s.task.Prompt
+		}
 		results[i] = executeStep(ctx, out, dir, s, opts)
 	}
 	if rp, err := writeDoReport(dir, prompt, steps, results); err == nil {
