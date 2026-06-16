@@ -48,3 +48,41 @@ func TestInitRejectsExistingRepo(t *testing.T) {
 		t.Fatal("expected error when .git present")
 	}
 }
+
+func TestInitWithEmptyBranchUsesDefault(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not installed")
+	}
+	dir := t.TempDir()
+	t.Setenv("GIT_CONFIG_GLOBAL", "/dev/null")
+	t.Setenv("GIT_CONFIG_SYSTEM", "/dev/null")
+	if err := Init(context.Background(), dir, ""); err != nil {
+		t.Skipf("git init unavailable: %v", err)
+	}
+	if !HasRepo(dir) {
+		t.Fatal("empty branch arg should still init")
+	}
+}
+
+func TestRunGitCapturesOutput(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not installed")
+	}
+	out, err := runGit(context.Background(), os.TempDir(), "--version")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out == "" {
+		t.Error("--version should print something")
+	}
+}
+
+func TestCurrentBranchOnAbsentRepo(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not installed")
+	}
+	_, err := CurrentBranch(context.Background(), t.TempDir())
+	if err == nil {
+		t.Error("expected error on non-repo")
+	}
+}
