@@ -29,6 +29,7 @@ func newDoCmd() *cobra.Command {
 		budget        float64
 		maxTasks      int
 		autonomy      string
+		image         string
 	)
 	c := &cobra.Command{
 		Use:   "do \"<prompt>\"",
@@ -43,7 +44,7 @@ test, secrets-scan) skip the LLM by default.
 		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runDo(cmd.Context(), cmd.OutOrStdout(), strings.Join(args, " "), doOpts{
-				yes: yes, det: deterministic, budget: budget, maxTasks: maxTasks, autonomy: autonomy,
+				yes: yes, det: deterministic, budget: budget, maxTasks: maxTasks, autonomy: autonomy, image: image,
 			})
 		},
 	}
@@ -52,6 +53,7 @@ test, secrets-scan) skip the LLM by default.
 	c.Flags().Float64Var(&budget, "budget-usd", 1.0, "max USD across all routed tasks")
 	c.Flags().IntVar(&maxTasks, "max-tasks", 10, "hard cap on decomposed tasks")
 	c.Flags().StringVar(&autonomy, "autonomy", "safe_execute", "autonomy level for LLM tasks")
+	c.Flags().StringVar(&image, "image", "", "attach an image; auto-adds vision tag for routing")
 	return c
 }
 
@@ -81,6 +83,7 @@ type doOpts struct {
 	budget   float64
 	maxTasks int
 	autonomy string
+	image    string
 }
 
 type plannedStep struct {
@@ -91,6 +94,11 @@ type plannedStep struct {
 
 func planDo(ctx context.Context, dir, prompt string, opts doOpts) ([]plannedStep, error) {
 	tasks := taskgraph.Decompose(prompt, taskgraph.Options{})
+	if opts.image != "" {
+		for i := range tasks {
+			tasks[i].Tags = append(tasks[i].Tags, "vision")
+		}
+	}
 	if len(tasks) > opts.maxTasks {
 		tasks = tasks[:opts.maxTasks]
 	}

@@ -40,6 +40,8 @@ type Attempt struct {
 	TestOK      bool
 	TestOutput  string
 	Elapsed     time.Duration
+	Regressed   bool   // true when this attempt broke something the baseline had green
+	Regression  string // human-readable summary of what regressed
 }
 
 type Result struct {
@@ -61,6 +63,10 @@ func Run(ctx context.Context, opts Options, out io.Writer) (Result, error) {
 	if err := resolveCommands(opts.StartDir, &opts); err != nil {
 		return Result{}, err
 	}
+	baselineLintOK, _ := runShell(ctx, opts.StartDir, opts.LintCmd)
+	baselineTestOK, _ := runShell(ctx, opts.StartDir, opts.TestCmd)
+	fmt.Fprintf(out, "baseline: lint=%s test=%s (used to detect regressions)\n", okOrFail(baselineLintOK), okOrFail(baselineTestOK))
+
 	var res Result
 	prompt := opts.Prompt
 	for i := 1; i <= opts.MaxAttempts; i++ {
@@ -83,8 +89,12 @@ func Run(ctx context.Context, opts Options, out io.Writer) (Result, error) {
 		att.LintOK, att.LintOutput = runShell(ctx, opts.StartDir, opts.LintCmd)
 		att.TestOK, att.TestOutput = runShell(ctx, opts.StartDir, opts.TestCmd)
 		att.Elapsed = time.Since(start)
+		att.Regressed, att.Regression = checkRegression(baselineLintOK, att.LintOK, baselineTestOK, att.TestOK)
 		res.Attempts = append(res.Attempts, att)
 		fmt.Fprintf(out, "  lint: %s  test: %s  elapsed %s\n", okOrFail(att.LintOK), okOrFail(att.TestOK), att.Elapsed.Round(time.Millisecond))
+		if att.Regressed {
+			fmt.Fprintf(out, "  ⚠ regression detected: %s\n", att.Regression)
+		}
 		if att.LintOK && att.TestOK {
 			res.Passed = true
 			res.Reason = "lint + test green"
@@ -150,6 +160,20 @@ func runShell(ctx context.Context, root, cmdline string) (bool, string) {
 	return err == nil, string(out)
 }
 
+func checkRegression(baseLint, attLint, baseTest, attTest bool) (bool, string) {
+	var parts []string
+	if baseLint && !attLint {
+		parts = append(parts, "lint regressed (was green before this attempt)")
+	}
+	if baseTest && !attTest {
+		parts = append(parts, "tests regressed (was green before this attempt)")
+	}
+	if len(parts) == 0 {
+		return false, ""
+	}
+	return true, strings.Join(parts, "; ")
+}
+
 func okOrFail(b bool) string {
 	if b {
 		return "✓"
@@ -164,6 +188,9 @@ func Canonicalise(original string, a Attempt) string {
 	var b strings.Builder
 	b.WriteString("# Previous attempt failed verification.\n\n")
 	fmt.Fprintf(&b, "Attempt #%d ran for %s.\n\n", a.Number, a.Elapsed.Round(time.Millisecond))
+	if a.Regressed {
+		fmt.Fprintf(&b, "## Regression detected\n\n%s\n\nFix this before anything else.\n\n", a.Regression)
+	}
 	if !a.LintOK {
 		b.WriteString("## Lint failure\n\n```\n")
 		b.WriteString(trimToLines(a.LintOutput, 80))
