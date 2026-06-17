@@ -59,7 +59,7 @@ func TestRunHonorsLangsFilter(t *testing.T) {
 	if len(res.Stacks) != 2 {
 		t.Fatalf("stack count: want 2 got %d", len(res.Stacks))
 	}
-	if !(res.Stacks[0].Stack == "go" && res.Stacks[1].Stack == "python") {
+	if res.Stacks[0].Stack != "go" || res.Stacks[1].Stack != "python" {
 		t.Errorf("stacks not sorted: %v", []string{res.Stacks[0].Stack, res.Stacks[1].Stack})
 	}
 	if !res.OK {

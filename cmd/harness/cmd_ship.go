@@ -77,23 +77,39 @@ chain.`,
 }
 
 func runShip(ctx context.Context, out io.Writer, opts shipOptions) error {
-	root, err := cwd()
+	root, err := prepareShip(ctx, out, &opts)
 	if err != nil {
 		return err
 	}
-	if !scm.HasRepo(root) {
-		return errors.New("ship: not a git repo (run 'git init' or 'harness init --git' first)")
-	}
-	if dirty, err := gitDirty(ctx, root); err != nil {
+	slug := slugify(opts.prompt)
+	branch := fmt.Sprintf("%s/%s", opts.branchPrefix, slug)
+	bin, err := os.Executable()
+	if err != nil {
 		return err
-	} else if dirty && !opts.dryRun {
-		return errors.New("ship: working tree dirty; commit or stash first")
 	}
+	steps := buildShipSteps(ctx, out, bin, root, opts, branch)
+	return runShipSteps(ctx, out, root, opts, branch, steps)
+}
 
+func prepareShip(ctx context.Context, out io.Writer, opts *shipOptions) (string, error) {
+	root, err := cwd()
+	if err != nil {
+		return "", err
+	}
+	if !scm.HasRepo(root) {
+		return "", errors.New("ship: not a git repo (run 'git init' or 'harness init --git' first)")
+	}
+	dirty, err := gitDirty(ctx, root)
+	if err != nil {
+		return "", err
+	}
+	if dirty && !opts.dryRun {
+		return "", errors.New("ship: working tree dirty; commit or stash first")
+	}
 	if opts.planID != "" {
 		contract, err := plancontract.Load(root, opts.planID)
 		if err != nil {
-			return err
+			return "", err
 		}
 		fmt.Fprintf(out, "ship: plan %s loaded — files=%d invariants=%d risk=%s\n",
 			contract.ID, len(contract.Files), len(contract.Invariants), contract.Risk)
@@ -101,15 +117,10 @@ func runShip(ctx context.Context, out io.Writer, opts shipOptions) error {
 			opts.prompt = contract.Intent
 		}
 	}
+	return root, nil
+}
 
-	slug := slugify(opts.prompt)
-	branch := fmt.Sprintf("%s/%s", opts.branchPrefix, slug)
-
-	bin, err := os.Executable()
-	if err != nil {
-		return err
-	}
-
+func buildShipSteps(ctx context.Context, out io.Writer, bin, root string, opts shipOptions, branch string) []func() error {
 	steps := []func() error{
 		func() error { return shipCheckoutBranch(ctx, out, root, opts, branch) },
 		func() error {
@@ -144,7 +155,10 @@ func runShip(ctx context.Context, out io.Writer, opts shipOptions) error {
 			return shipCommit(ctx, out, root, opts, branch)
 		})
 	}
+	return steps
+}
 
+func runShipSteps(ctx context.Context, out io.Writer, root string, opts shipOptions, branch string, steps []func() error) error {
 	for _, step := range steps {
 		if err := step(); err != nil {
 			if errors.Is(err, errShipCISucceeded) {
@@ -199,7 +213,7 @@ func shipRunStep(ctx context.Context, out io.Writer, bin, root string, opts ship
 			return ctx.Err()
 		case <-time.After(wait):
 		}
-		wait = wait * 2
+		wait *= 2
 	}
 	return nil
 }

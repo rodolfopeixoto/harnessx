@@ -186,7 +186,7 @@ func RunWizard(opts WizardOptions) error {
 			return err
 		}
 		var budget float64
-		fmt.Sscanf(budgetStr, "%f", &budget)
+		_, _ = fmt.Sscanf(budgetStr, "%f", &budget)
 		fbList := splitCSV(fallback)
 		if err := SetTaskPrimary(opts.Root, task, primary, fbList, budget, current.Model); err != nil {
 			return err

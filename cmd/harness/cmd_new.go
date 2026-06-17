@@ -76,6 +76,24 @@ func runNewProject(ctx context.Context, out io.Writer, opts newOptions) error {
 	if err != nil {
 		return err
 	}
+	if err := resolveNewInputs(&opts, langs, out); err != nil {
+		return err
+	}
+	abs, err := prepareNewTarget(ctx, &opts, out)
+	if err != nil {
+		return err
+	}
+	if err := applyNewScaffold(abs, &opts, out); err != nil {
+		return err
+	}
+	installNewHooks(abs, opts, out)
+	fmt.Fprintf(out, "\n✓ project ready at %s\n", abs)
+	fmt.Fprintf(out, "  cd %s\n  harness lint && harness test && harness dev\n", opts.target)
+	fmt.Fprintf(out, "  harness ship \"<your first feature>\"\n")
+	return nil
+}
+
+func resolveNewInputs(opts *newOptions, langs []string, out io.Writer) error {
 	if !opts.yes {
 		if opts.stack == "" {
 			s, err := promptChoice(opts.stdin, out, "stack", langs)
@@ -98,26 +116,31 @@ func runNewProject(ctx context.Context, out io.Writer, opts newOptions) error {
 	if !contains(langs, opts.stack) {
 		return fmt.Errorf("new: unknown stack %q (have %v)", opts.stack, langs)
 	}
+	return nil
+}
+
+func prepareNewTarget(ctx context.Context, opts *newOptions, out io.Writer) (string, error) {
 	abs, err := filepath.Abs(opts.target)
 	if err != nil {
-		return err
+		return "", err
 	}
 	if err := os.MkdirAll(abs, 0o755); err != nil {
-		return err
+		return "", err
 	}
 	fmt.Fprintf(out, "new: target %s, stack %s\n", abs, opts.stack)
-
 	if !scm.HasRepo(abs) {
 		if err := scm.Init(ctx, abs, opts.gitBranch); err != nil {
-			return fmt.Errorf("git init: %w", err)
+			return "", fmt.Errorf("git init: %w", err)
 		}
 		fmt.Fprintf(out, "new: git initialised on %s\n", opts.gitBranch)
 	}
-
 	if _, err := initcmd.Run(ctx, initcmd.Options{StartDir: abs}, out); err != nil {
-		return err
+		return "", err
 	}
+	return abs, nil
+}
 
+func applyNewScaffold(abs string, opts *newOptions, out io.Writer) error {
 	m, err := scaffoldpkg.Load(opts.stack)
 	if err != nil {
 		return err
@@ -140,19 +163,18 @@ func runNewProject(ctx context.Context, out io.Writer, opts newOptions) error {
 	if err := projectcfg.Save(abs, cfg); err != nil {
 		fmt.Fprintf(out, "new: warning project.yaml: %v\n", err)
 	}
-
-	if opts.withHooks {
-		if _, err := InstallPrePushHook(abs, false); err != nil {
-			fmt.Fprintf(out, "new: hook skipped (%v)\n", err)
-		} else {
-			fmt.Fprintf(out, "new: pre-push hook installed\n")
-		}
-	}
-
-	fmt.Fprintf(out, "\n✓ project ready at %s\n", abs)
-	fmt.Fprintf(out, "  cd %s\n  harness lint && harness test && harness dev\n", opts.target)
-	fmt.Fprintf(out, "  harness ship \"<your first feature>\"\n")
 	return nil
+}
+
+func installNewHooks(abs string, opts newOptions, out io.Writer) {
+	if !opts.withHooks {
+		return
+	}
+	if _, err := InstallPrePushHook(abs, false); err != nil {
+		fmt.Fprintf(out, "new: hook skipped (%v)\n", err)
+		return
+	}
+	fmt.Fprintf(out, "new: pre-push hook installed\n")
 }
 
 func promptChoice(in io.Reader, out io.Writer, label string, options []string) (string, error) {

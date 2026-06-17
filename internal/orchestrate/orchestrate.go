@@ -190,41 +190,8 @@ func Run(ctx context.Context, opts RunOptions, out io.Writer) (RunResult, error)
 	}
 	stepIdx := 0
 	for c := 0; c < cycles; c++ {
-		for i, step := range opts.Flow.Steps {
-			entry := BlackboardEntry{Step: stepIdx, Role: step.Role, Started: time.Now().UTC()}
-			fmt.Fprintf(out, "orchestrate: step %d cycle %d/%d role=%s\n", stepIdx, c+1, cycles, step.Role)
-			if opts.DryRun {
-				entry.Status = "dry-run"
-			} else if len(step.Command) > 0 {
-				stdout, stderr, err := runStep(ctx, opts.Root, step.Command, timeout)
-				entry.Stdout = truncate(stdout, 8_000)
-				entry.Stderr = truncate(stderr, 4_000)
-				if err != nil {
-					entry.Status = "fail"
-					res.OK = false
-				} else {
-					entry.Status = "ok"
-				}
-			} else if step.Adapter != "" && opts.AdapterRunner != nil {
-				stdout, err := opts.AdapterRunner(ctx, step, res.Entries)
-				entry.Stdout = truncate(stdout, 8_000)
-				if err != nil {
-					entry.Status = "fail"
-					entry.Stderr = err.Error()
-					res.OK = false
-				} else {
-					entry.Status = "ok"
-				}
-			} else {
-				entry.Status = "adapter-step-not-executed-yet"
-			}
-			entry.Ended = time.Now().UTC()
-			res.Entries = append(res.Entries, entry)
-			stepIdx++
-			if !res.OK && opts.Flow.Topology == TopologyChain {
-				break
-			}
-			_ = i
+		if stop := runCycle(ctx, opts, &res, &stepIdx, c, cycles, timeout, out); stop {
+			break
 		}
 	}
 	if err := writeBlackboard(runDir, res); err != nil {
@@ -232,6 +199,50 @@ func Run(ctx context.Context, opts RunOptions, out io.Writer) (RunResult, error)
 	}
 	fmt.Fprintf(out, "orchestrate: blackboard %s\n", filepath.Join(runDir, "blackboard.json"))
 	return res, nil
+}
+
+func runCycle(ctx context.Context, opts RunOptions, res *RunResult, stepIdx *int, c, cycles int, timeout time.Duration, out io.Writer) bool {
+	for _, step := range opts.Flow.Steps {
+		entry := BlackboardEntry{Step: *stepIdx, Role: step.Role, Started: time.Now().UTC()}
+		fmt.Fprintf(out, "orchestrate: step %d cycle %d/%d role=%s\n", *stepIdx, c+1, cycles, step.Role)
+		runOneStep(ctx, opts, &entry, step, res, timeout)
+		entry.Ended = time.Now().UTC()
+		res.Entries = append(res.Entries, entry)
+		*stepIdx++
+		if !res.OK && opts.Flow.Topology == TopologyChain {
+			return true
+		}
+	}
+	return false
+}
+
+func runOneStep(ctx context.Context, opts RunOptions, entry *BlackboardEntry, step Step, res *RunResult, timeout time.Duration) {
+	switch {
+	case opts.DryRun:
+		entry.Status = "dry-run"
+	case len(step.Command) > 0:
+		stdout, stderr, err := runStep(ctx, opts.Root, step.Command, timeout)
+		entry.Stdout = truncate(stdout, 8_000)
+		entry.Stderr = truncate(stderr, 4_000)
+		if err != nil {
+			entry.Status = "fail"
+			res.OK = false
+		} else {
+			entry.Status = "ok"
+		}
+	case step.Adapter != "" && opts.AdapterRunner != nil:
+		stdout, err := opts.AdapterRunner(ctx, step, res.Entries)
+		entry.Stdout = truncate(stdout, 8_000)
+		if err != nil {
+			entry.Status = "fail"
+			entry.Stderr = err.Error()
+			res.OK = false
+		} else {
+			entry.Status = "ok"
+		}
+	default:
+		entry.Status = "adapter-step-not-executed-yet"
+	}
 }
 
 func runStep(ctx context.Context, root string, cmd []string, timeout time.Duration) (string, string, error) {

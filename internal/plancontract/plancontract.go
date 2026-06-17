@@ -51,36 +51,7 @@ func Load(root, id string) (Contract, error) {
 			section = strings.TrimSpace(strings.TrimPrefix(line, "## "))
 			continue
 		}
-		switch strings.ToLower(section) {
-		case "intent":
-			if t := strings.TrimSpace(line); t != "" {
-				if c.Intent == "" {
-					c.Intent = t
-				} else {
-					c.Intent += " " + t
-				}
-			}
-		case "files in scope":
-			if item := bullet(line); item != "" && item != "_unconstrained_" {
-				c.Files = append(c.Files, item)
-			}
-		case "invariants":
-			if item := bullet(line); item != "" && item != "_none declared_" {
-				c.Invariants = append(c.Invariants, item)
-			}
-		case "validation":
-			if cmd := codeLine(line); cmd != "" {
-				c.Validation = append(c.Validation, cmd)
-			}
-		case "rollback":
-			if cmd := codeLine(line); cmd != "" && c.Rollback == "" {
-				c.Rollback = cmd
-			}
-		case "risk tier":
-			if t := strings.TrimSpace(line); t != "" && c.Risk == "" {
-				c.Risk = t
-			}
-		}
+		applySection(&c, section, line)
 	}
 	if err := sc.Err(); err != nil {
 		return Contract{}, err
@@ -89,6 +60,52 @@ func Load(root, id string) (Contract, error) {
 		return Contract{}, errors.New("plancontract: missing intent")
 	}
 	return c, nil
+}
+
+func applySection(c *Contract, section, line string) {
+	switch strings.ToLower(section) {
+	case "intent":
+		appendIntent(c, line)
+	case "files in scope":
+		appendListItem(line, &c.Files, "_unconstrained_")
+	case "invariants":
+		appendListItem(line, &c.Invariants, "_none declared_")
+	case "validation":
+		if cmd := codeLine(line); cmd != "" {
+			c.Validation = append(c.Validation, cmd)
+		}
+	case "rollback":
+		setFirstNonEmpty(&c.Rollback, codeLine(line))
+	case "risk tier":
+		setFirstNonEmpty(&c.Risk, strings.TrimSpace(line))
+	}
+}
+
+func appendListItem(line string, dst *[]string, sentinel string) {
+	item := bullet(line)
+	if item == "" || item == sentinel {
+		return
+	}
+	*dst = append(*dst, item)
+}
+
+func setFirstNonEmpty(dst *string, v string) {
+	if *dst != "" || v == "" {
+		return
+	}
+	*dst = v
+}
+
+func appendIntent(c *Contract, line string) {
+	t := strings.TrimSpace(line)
+	if t == "" {
+		return
+	}
+	if c.Intent == "" {
+		c.Intent = t
+		return
+	}
+	c.Intent += " " + t
 }
 
 func planID(path string) string {
