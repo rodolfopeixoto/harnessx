@@ -95,7 +95,7 @@ check: vet test build
 smoke: build
 	$(BIN) smoke matrix --bin $(BIN) --step-timeout 180s
 
-# tutorial-replay: deterministic walk of the docs/tutorial-python-demo.md
+# tutorial-replay: deterministic walk of docs/TUTORIAL-ECOMMERCE.md
 # cheat-sheet (LLM-free; dry-run on `harness ship`). Catches drift
 # between documented cmds and actual binary surface.
 tutorial-replay: build

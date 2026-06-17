@@ -50,6 +50,7 @@ var updateFlags struct {
 	channel string
 	dryRun  bool
 	jsonOut bool
+	force   bool
 }
 
 func addUpdateFlags(c *cobra.Command) {
@@ -57,6 +58,14 @@ func addUpdateFlags(c *cobra.Command) {
 	c.Flags().StringVar(&updateFlags.tag, "tag", "", "pin a specific tag (overrides --channel)")
 	c.Flags().StringVar(&updateFlags.channel, "channel", "stable", "stable|beta|develop")
 	c.Flags().BoolVar(&updateFlags.dryRun, "dry-run", false, "print plan without replacing binary")
+	c.Flags().BoolVar(&updateFlags.force, "force", false, "allow downgrade to an older tag")
+}
+
+func normaliseTag(t string) string {
+	if t == "" || t[0] == 'v' {
+		return t
+	}
+	return "v" + t
 }
 
 func newUpdateStatusCmd() *cobra.Command {
@@ -164,11 +173,16 @@ func runDoUpdate(cmd *cobra.Command, _ []string) error {
 }
 
 func updateFromRelease(out io.Writer, repo, tag string, dryRun bool) error {
-	current := version.Version
+	current := normaliseTag(version.Version)
+	tag = normaliseTag(tag)
 	fmt.Fprintf(out, "current:  %s\ntarget:   %s\nrepo:     %s\n", current, tag, repo)
-	if update.CompareVersions(current, tag) == 0 {
+	cmp := update.CompareVersions(current, tag)
+	if cmp == 0 {
 		fmt.Fprintln(out, "already on target tag — nothing to do")
 		return nil
+	}
+	if cmp > 0 && !updateFlags.force {
+		return fmt.Errorf("refusing downgrade %s → %s (pass --force to override)", current, tag)
 	}
 	target := update.PlatformTarget()
 	url := update.TarballURL(repo, tag, target)

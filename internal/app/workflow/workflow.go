@@ -197,7 +197,9 @@ func planThenMaybeExecute(ctx stdctx.Context, opts Options, execute bool, out io
 
 	g := budget.New(opts.BudgetUSD)
 	_ = g.Charge(pl.EstimatedCostUSD)
-	fmt.Fprintf(out, "Budget: $%.2f / $%.2f remaining\n", g.Remaining(), opts.BudgetUSD)
+	if pl.EstimatedCostUSD > 0 {
+		fmt.Fprintf(out, "Budget: $%.2f / $%.2f remaining\n", g.Remaining(), opts.BudgetUSD)
+	}
 
 	res.Confirmed = opts.AutoYes
 	if !opts.AutoYes && execute {

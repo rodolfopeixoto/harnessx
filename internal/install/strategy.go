@@ -5,6 +5,7 @@ package install
 import (
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"runtime"
 )
@@ -114,8 +115,30 @@ func Execute(ctx context.Context, p Plan, dryRun bool, stdout, stderr Writer) er
 	cmd.Stderr = stderr
 	if len(p.Env) > 0 {
 		cmd.Env = p.Env
+	} else {
+		cmd.Env = sanitisedEnv(p.Command[0])
 	}
 	return cmd.Run()
+}
+
+func sanitisedEnv(bin string) []string {
+	env := os.Environ()
+	if bin != "go" {
+		return env
+	}
+	if goroot := os.Getenv("GOROOT"); goroot != "" {
+		if _, err := os.Stat(goroot); err != nil {
+			out := make([]string, 0, len(env))
+			for _, kv := range env {
+				if len(kv) >= 7 && kv[:7] == "GOROOT=" {
+					continue
+				}
+				out = append(out, kv)
+			}
+			return out
+		}
+	}
+	return env
 }
 
 type Writer interface {
