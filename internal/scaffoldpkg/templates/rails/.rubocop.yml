@@ -1,0 +1,14 @@
+require:
+  - rubocop-rails
+
+AllCops:
+  TargetRubyVersion: 3.2
+  NewCops: enable
+  Exclude:
+    - 'config/**/*'
+    - 'vendor/**/*'
+
+Style/Documentation:
+  Enabled: false
+Metrics/MethodLength:
+  Max: 25

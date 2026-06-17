@@ -9,6 +9,7 @@ package memory
 import (
 	"context"
 	"errors"
+	"fmt"
 	"regexp"
 	"strings"
 	"time"
@@ -22,7 +23,32 @@ var (
 	ErrMissingEvidence = errors.New("memory: missing run id / evidence")
 	ErrSensitive       = errors.New("memory: content contains forbidden tokens")
 	ErrLowConfidence   = errors.New("memory: confidence below floor")
+	ErrUnknownKind     = errors.New("memory: unknown kind (paper §3.2)")
 )
+
+// Kinds taxonomy mirrors paper "Code as Agent Harness" §3.2.1–§3.2.5.
+// Unknown kinds are rejected at Promote time to keep the taxonomy
+// observable for downstream context-engineering decisions.
+const (
+	KindWorking      = "working"
+	KindSemantic     = "semantic"
+	KindExperiential = "experiential"
+	KindLongTerm     = "long_term"
+	KindMultiAgent   = "multi_agent"
+)
+
+func KnownKinds() []string {
+	return []string{KindWorking, KindSemantic, KindExperiential, KindLongTerm, KindMultiAgent}
+}
+
+func validKind(k string) bool {
+	for _, v := range KnownKinds() {
+		if v == k {
+			return true
+		}
+	}
+	return false
+}
 
 const confidenceFloor = 0.4
 
@@ -51,6 +77,12 @@ func Promote(ctx context.Context, repo *sqlite.Repo, c Candidate, db SQLExec) (d
 	}
 	if strings.TrimSpace(c.Content) == "" {
 		return domain.Memory{}, errors.New("memory: empty content")
+	}
+	if c.Kind == "" {
+		c.Kind = KindSemantic
+	}
+	if !validKind(c.Kind) {
+		return domain.Memory{}, fmt.Errorf("%w: got %q, want one of %v", ErrUnknownKind, c.Kind, KnownKinds())
 	}
 
 	now := time.Now().UTC()

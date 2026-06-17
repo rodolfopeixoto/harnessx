@@ -72,12 +72,13 @@ Creates:
 - `.venv/` (deps installed when `--with-deps`)
 - `Makefile` with `test`, `lint`, `run` targets
 
-Verify:
+Verify (all via `harness`, no raw `.venv` invocation needed — the
+wrappers read `.harness/config/project.yaml`):
 
 ```bash
-.venv/bin/pytest -q       # expect 1 passed
-.venv/bin/uvicorn app.main:app --reload    # in another shell
-curl http://localhost:8000/health
+harness test                          # expect 1 passed
+harness dev &                         # uvicorn under the hood
+curl http://localhost:8000/healthz
 ```
 
 ---
@@ -309,10 +310,11 @@ Stakeholder, Settings, Onboarding, Command, Catalog, plus 11
 operational (Backup, Cleanup, Containers, Images, Install, Runtime,
 Secrets, Sessions, ActiveRun, RunDetail, SessionDetail).
 
-Run smoke E2E:
+Run smoke E2E (from the dashboard subtree — only place where `npm`
+remains, as it is a contributor-only target):
 
 ```bash
-cd web/dashboard && npm install && npm run test:e2e
+make dashboard-install && make dashboard-test
 ```
 
 ---
@@ -320,10 +322,9 @@ cd web/dashboard && npm install && npm run test:e2e
 ## 19. Performance + memory profiling
 
 ```bash
-make bench                                # go test -bench across ./internal/...
-make profile-mem                          # heap pprof → dist/profiles/mem.pprof
-make profile-cpu                          # cpu pprof → dist/profiles/cpu.pprof
-go tool pprof -http=:8081 dist/profiles/mem.pprof
+harness bench               # project benchmark suite (resolved per stack)
+harness profile mem         # heap profile
+harness profile cpu         # cpu profile
 ```
 
 Baseline budgets: [docs/benchmarks.md](benchmarks.md).
@@ -333,8 +334,7 @@ Baseline budgets: [docs/benchmarks.md](benchmarks.md).
 ## 20. SOLID + god-file audit
 
 ```bash
-make audit-solid                          # scan: file LOC > 400 or imports > 15
-harness audit-solid --root .              # same via CLI
+harness audit-solid --root .              # file LOC > 400 or imports > 15
 ```
 
 ---
@@ -351,22 +351,33 @@ harness uninstall                         # remove harness + state (asks confirm
 
 ## Demo cheat-sheet (one-pager)
 
+The fast path uses **one driver**, `harness ship`, which branches,
+writes a spec, runs `do`, gates with `ci`, retries on HTTP 429, and
+commits the result:
+
 ```bash
 mkdir demo && cd demo && git init
-harness init && harness install-git-hooks
-harness flow init python-fastapi --yes
-harness do "add /healthz with pytest" --autonomy ask
-harness sensor run secrets_scan
-harness sensor run tests
-harness loop &                            # watch + rerun
-harness metrics show
-harness audit tail --limit 20
-harness backup save
-harness dashboard                          # open http://localhost:5173
+harness init --git --all              # .harness/, hooks, project registry
+harness scaffold apply python --apply --with-deps
+harness ship "add /healthz endpoint with pytest"
+harness dashboard                     # open http://localhost:5173
+```
+
+Underneath `ship`, the deterministic blocks are:
+
+```bash
+harness test            # project test command (resolved per stack)
+harness lint            # project lint command
+harness dev             # project dev server
+harness bench           # benchmarks
+harness profile mem|cpu # profilers
+harness ci              # every applicable sensor; non-zero on red
+harness loop            # watch + rerun until green
 ```
 
 Done. You exercised every layer + every adapter pattern + every
-sensor + every persistence surface.
+sensor + every persistence surface — without leaving the `harness`
+namespace.
 
 ---
 
@@ -376,7 +387,7 @@ sensor + every persistence surface.
 |---|---|
 | `harness doctor` red | Install missing dep (Go, Python, Docker, git) |
 | `harness do` denied | Loosen `--autonomy ask` instead of `strict`, or `harness autonomy show` |
-| `pre-push` blocks push | Run `make lint && go test ./... && make coverage-gate` locally; or `HARNESS_SKIP_CI=1 git push` (escape hatch) |
+| `pre-push` blocks push | Run `harness ci` locally to reproduce the gate; `HARNESS_SKIP_CI=1 git push` only as an escape hatch |
 | Dashboard 404 | `cd web/dashboard && npm install && npm run build && harness dashboard` |
 | Brew formula stale | `brew update && brew upgrade harness` |
 

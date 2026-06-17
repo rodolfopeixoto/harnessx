@@ -15,7 +15,6 @@ import (
 // Skip-if-tool-missing behaviour lives in ShellSensor itself.
 func Catalog(p index.Profile) []Sensor {
 	out := []Sensor{
-		// Computational, universal — cheapest first.
 		ForbiddenFilesSensor{},
 		ForbiddenCommandsSensor{},
 		SecretsScanSensor{},
@@ -23,6 +22,15 @@ func Catalog(p index.Profile) []Sensor {
 		PerformanceBudgetSensor{},
 	}
 	out = append(out, stackSensors(p)...)
+	for _, s := range p.Stacks {
+		if s.Name == "go" {
+			out = append(out, goCoverageSensorDefault())
+			break
+		}
+	}
+	if plan, _ := LoadActivePlanID(p.Root); plan != "" {
+		out = append(out, PlanScopeSensor{IDValue: "plan_scope", PlanID: plan})
+	}
 	return out
 }
 
