@@ -312,6 +312,5 @@ These four properties define the three layers below.
 
 - Paper map: [`PAPER-MAPPING.md`](PAPER-MAPPING.md)
 - Command reference: [`COMMANDS.md`](COMMANDS.md)
-- Tutorial (Python FastAPI): [`tutorial-python-demo.md`](tutorial-python-demo.md)
-- Tutorial (end-to-end e-commerce): [`TUTORIAL-ECOMMERCE.md`](TUTORIAL-ECOMMERCE.md)
+- Tutorial: [`TUTORIAL-ECOMMERCE.md`](TUTORIAL-ECOMMERCE.md)
 - Contributing: [`../CONTRIBUTING.md`](../CONTRIBUTING.md)
