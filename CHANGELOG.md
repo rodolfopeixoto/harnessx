@@ -3,6 +3,37 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-17 — v0.106.0 — Tutorial blockers + update safety (F32–F36)
+
+Fixes blocking the e-commerce tutorial walkthrough.
+
+### Fixes
+
+- `harness update` refuses downgrade unless `--force` (F32). Tag display
+  normalised with `v` prefix on both `current:` and `target:` lines.
+- `harness install <tool>` now sanitises a stale `GOROOT` when invoking
+  `go install` (F33). Previously crashed with
+  `cannot find GOROOT directory: …gvm/gos/go1.19.2` when the host had
+  a removed gvm install lingering in env.
+- Workflow no longer prints `Budget: $0.90 / $1.00 remaining` when no
+  LLM was actually charged (F34). The line only appears after a paid
+  call.
+- Version constant moves to `v` prefix (`v0.106.0`) so internal
+  comparisons stop swapping prefixed and unprefixed tags.
+
+### Docs cleanup (F35)
+
+- Single tutorial: `docs/TUTORIAL-ECOMMERCE.md`. Removed legacy
+  `docs/tutorial-python-demo.md`, `docs/tutorial.md`,
+  `docs/paper-coverage-map.md`, `docs/ROADMAP-DONE.md`,
+  `docs/v1-readiness.md`, `docs/cli-reference.md`,
+  `docs/dashboard-parity-audit.md`, `docs/decomposer-decision.md`,
+  `docs/spec-p64-multi-agent.md`, `docs/coverage-plan.md`,
+  `docs/quickstart.md`, `docs/overview.md` (superseded by README +
+  COMMANDS.md + ARCHITECTURE.md + PAPER-MAPPING.md).
+- `README.md` and `docs/ARCHITECTURE.md` documentation tables updated
+  to point at the single remaining tutorial.
+
 ## 2026-06-17 — v0.105.0 — Paper end-to-end implementation (F0–F27)
 
 End-to-end implementation of "Code as Agent Harness" (arXiv 2605.18747).
