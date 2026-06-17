@@ -1,0 +1,12 @@
+# $NAME
+
+Rails 7 API skeleton scaffolded by `harness scaffold apply rails --apply`.
+
+```
+harness test    # rspec
+harness lint    # rubocop
+harness dev     # rails server
+harness ci      # every applicable sensor
+```
+
+Route: `GET /healthz` returns `{ status: ok, env, service }`.

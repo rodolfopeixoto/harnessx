@@ -8,12 +8,12 @@ import (
 	"testing"
 )
 
-func TestListAllFiveLanguages(t *testing.T) {
+func TestListAllBundledLanguages(t *testing.T) {
 	got, err := List()
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []string{"go", "python", "react", "ruby", "rust"}
+	want := []string{"go", "python", "rails", "react", "ruby", "rust"}
 	if len(got) != len(want) {
 		t.Fatalf("want %d langs, got %d: %v", len(want), len(got), got)
 	}

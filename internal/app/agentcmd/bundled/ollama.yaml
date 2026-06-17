@@ -1,0 +1,37 @@
+id: ollama
+name: Ollama (local)
+type: api
+capabilities:
+  text: true
+  vision: false
+  files: false
+  json_output: true
+  tool_use: false
+  mcp: false
+  max_context_tokens: 32768
+  strengths: [local, offline, cheap, search]
+models:
+  cheap: llama3.2:1b
+  default: llama3.1:8b
+  deep: qwen2.5-coder:14b
+api:
+  endpoint: http://localhost:11434/api/generate
+  method: POST
+  auth:
+    none: true
+  request_template: |
+    {"model":"{{model}}","prompt":"{{prompt}}","stream":false}
+  response:
+    final_message: "$.response"
+    usage: "$"
+  timeout_seconds: 600
+  retry:
+    max: 1
+    backoff_ms: 500
+failure_detection:
+  rate_limit: ["rate_limit", "429"]
+  auth: ["401", "403"]
+  context_limit: ["context length", "max_tokens"]
+cost:
+  input_token_price_per_1m: 0.0
+  output_token_price_per_1m: 0.0

@@ -13,6 +13,7 @@ import (
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 
+	"github.com/ropeixoto/harnessx/internal/projectcfg"
 	"github.com/ropeixoto/harnessx/internal/scaffoldpkg"
 	"github.com/ropeixoto/harnessx/internal/scm"
 )
@@ -152,7 +153,18 @@ func runScaffoldApply(ctx context.Context, out io.Writer, lang string, opts scaf
 	if opts.withDeps && opts.apply {
 		runPostSteps(ctx, out, root, m)
 	}
-	fmt.Fprintf(out, "\nnext:\n  lint:  %s\n  test:  %s\n  run:   %s\n", m.LintCommand, m.TestCommand, m.RunCommand)
+	if opts.apply {
+		cfg := projectcfg.FromMeta(m.Language, map[string]string{
+			"lint": m.LintCommand,
+			"test": m.TestCommand,
+			"run":  m.RunCommand,
+			"dev":  m.RunCommand,
+		})
+		if err := projectcfg.Save(root, cfg); err != nil {
+			fmt.Fprintf(out, "warning: could not write project.yaml: %v\n", err)
+		}
+	}
+	fmt.Fprintf(out, "\nnext:\n  harness lint\n  harness test\n  harness dev\n")
 	return nil
 }
 

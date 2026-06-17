@@ -49,6 +49,13 @@ workspace registry (equivalent to running 'harness project add . --slug
 			if _, err := initcmd.Run(cmd.Context(), initcmd.Options{StartDir: dir, Force: force}, out); err != nil {
 				return err
 			}
+			if scm.HasRepo(dir) {
+				if path, err := InstallPrePushHook(dir, false); err == nil {
+					fmt.Fprintf(out, "git: pre-push hook installed at %s\n", path)
+				} else {
+					fmt.Fprintf(out, "git: pre-push hook skipped (%v)\n", err)
+				}
+			}
 			if all {
 				if slug == "" {
 					slug = filepath.Base(dir)

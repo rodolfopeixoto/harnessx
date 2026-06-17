@@ -57,6 +57,7 @@ help:
 	@echo "  make security        govulncheck + harness security-audit"
 	@echo "  make licenses        regen THIRD_PARTY_LICENSES.md + NOTICE"
 	@echo "  make sbom            regen dist/sbom.cyclonedx.json"
+	@echo "  make smoke           run cross-stack CLI smoke matrix"
 	@echo "  make install-hooks   wire scripts/git-hooks/* into .git/hooks/"
 	@echo
 
@@ -87,6 +88,18 @@ tidy:
 	$(GO) mod tidy
 
 check: vet test build
+
+# smoke: exercise core CLI surface against a fresh project for every
+# bundled scaffold. Catches regressions where dev-repo commands break
+# for downstream users.
+smoke: build
+	$(BIN) smoke matrix --bin $(BIN) --step-timeout 180s
+
+# tutorial-replay: deterministic walk of the docs/tutorial-python-demo.md
+# cheat-sheet (LLM-free; dry-run on `harness ship`). Catches drift
+# between documented cmds and actual binary surface.
+tutorial-replay: build
+	HARNESS_BIN=$(BIN) bash scripts/tutorial-replay.sh
 
 # ci: full local CI gate. Wired to the pre-push hook by `make install-hooks`.
 ci: lint check coverage-gate coverage-shell test-sh e2e-all

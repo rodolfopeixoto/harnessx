@@ -3,6 +3,88 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-17 — v0.105.0 — Paper end-to-end implementation (F0–F27)
+
+End-to-end implementation of "Code as Agent Harness" (arXiv 2605.18747).
+Every paper section now has a concrete command, package, and test.
+Single PR `feature/F0-paper-end-to-end` against `develop`.
+
+### New commands
+
+- `harness new <stack>` — single-command project bootstrap.
+- `harness ship "<prompt>" [--plan <id>]` — SDLC driver: branch →
+  spec → do → ci-loop → conventional commit. 429-aware fallback and
+  optional plan-as-contract enforcement.
+- `harness chat --goal {dev|ads|research|ops} [--adapter <id>]` —
+  typed-plan REPL with deterministic dispatch (§3.1.4).
+- `harness plan write` / `harness plan check` — plan-as-contract
+  artefact + scope enforcement (§3.4.2).
+- `harness orchestrate list|show|run <flow>` — multi-role flow with
+  chain/cyclic topology and file-only blackboard (§4.1.1 + §4.1.3 +
+  §4.3.1). Adapter steps dispatch through `internal/agents`.
+- `harness evolve diagnose|propose|replay|sandbox|promote --hitl` —
+  Agentic Harness Engineering (§3.5). `sandbox` runs a real A/B replay
+  in an isolated workspace.
+- `harness config show|set|unset|wizard` — interactive routing wizard
+  with audited mutations (§3.5.3).
+- `harness coverage --threshold 0.9` — Go coverage gate (§3.4.4).
+- `harness smoke matrix [--langs csv|all]` — cross-stack CLI
+  regression harness.
+- `harness test|lint|dev|bench|profile` — project wrappers reading
+  `.harness/config/project.yaml`.
+- `harness install-git-hooks --hooks all` — embed pre-commit +
+  commit-msg + pre-push.
+
+### New scaffold
+
+- **Rails 7 API** — Gemfile, RSpec, Rubocop, healthz controller.
+
+### New sensors
+
+- `go_coverage_gate` (auto-registered for Go).
+- `plan_scope` (auto-registered when `.harness/config/plan.yaml` pins
+  an active plan).
+- `internal/sensors/commentscan` — Go AST scan flagging narrative
+  comments outside SPDX, package docs, godoc on exported symbols.
+
+### Architecture additions
+
+- `internal/intentplan` — typed JSON plan schema with per-goal palette.
+- `internal/repl` — REPL behind `harness chat`, injectable planner.
+- `internal/projectcfg` — `.harness/config/project.yaml` schema +
+  per-stack detection.
+- `internal/plancontract` — parses `PLAN-<id>.md` artefacts.
+- `internal/orchestrate` — flow loader + executor + adapter runner.
+- `internal/evolve` — telemetry clustering + sandbox replay.
+- `internal/configwiz` — interactive router config with audit log.
+- `internal/customrules` — `.harness/rules/*.yaml` loader.
+- `internal/sensors/coverage` — `go test -cover` parser.
+- `internal/sensors/planscope` — scope diff vs PLAN contract.
+
+### Documentation
+
+- `docs/COMMANDS.md` — every command reference.
+- `docs/ARCHITECTURE.md` — paper-anchored runtime architecture.
+- `docs/PAPER-MAPPING.md` — paper § → command → package → test.
+- `docs/TUTORIAL-ECOMMERCE.md` — end-to-end e-commerce build.
+- `README.md` — rewritten for OSS best practices (badges, TOC,
+  citation, contributing, code of conduct, security policy pointers).
+
+### Verification
+
+- 86 internal packages green, 0 failures.
+- 14 new internal packages, average coverage 93.7%.
+- `harness smoke matrix` green across 6 stacks (go, python, rails,
+  react, ruby, rust).
+- `make tutorial-replay` green.
+
+### Open follow-ups
+
+- Coverage sensor for non-Go stacks (pytest --cov, cargo tarpaulin,
+  c8, simplecov).
+- Full LLM-driven planner in `harness chat` with token-budget feedback
+  loop.
+
 ## 2026-06-16 — v0.41.0 — v1.0 readiness checklist (P73)
 
 - **`docs/v1-readiness.md`**: single-source checklist tracking what stands between v0.4x and a v1.0.0 cut. Maps every shipped surface to the paper principles + open challenges, lists quality / UX / docs gates, and pins the 7 items that block v1.0.0 today (stable JSON schema versioning, govulncheck re-run, coverage gate, tutorial refresh for v0.33–v0.40, architecture + JSON-schema docs, dashboard parity decision, LLM decomposer fallback decision).

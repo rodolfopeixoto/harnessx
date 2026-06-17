@@ -1,0 +1,41 @@
+language: rails
+description: Rails 7 API skeleton with RSpec + Rubocop + healthz route
+tested_against: "ruby 3.2+, rails 7.1+, rspec-rails 6+, rubocop-rails 2.24+"
+
+required_tools:
+  - ruby
+  - bundle
+
+files:
+  - path: Gemfile
+    template: Gemfile
+  - path: config.ru
+    template: config.ru
+  - path: config/application.rb
+    template: config/application.rb.tmpl
+  - path: config/environment.rb
+    template: config/environment.rb
+  - path: config/routes.rb
+    template: config/routes.rb
+  - path: app/controllers/application_controller.rb
+    template: app/controllers/application_controller.rb
+  - path: app/controllers/health_controller.rb
+    template: app/controllers/health_controller.rb.tmpl
+  - path: spec/spec_helper.rb
+    template: spec/spec_helper.rb
+  - path: spec/requests/health_spec.rb
+    template: spec/requests/health_spec.rb.tmpl
+  - path: .rubocop.yml
+    template: .rubocop.yml
+  - path: .gitignore
+    template: .gitignore
+  - path: README.md
+    template: README.md.tmpl
+
+post_steps:
+  - name: bundle-install
+    cmd: ["bundle", "install"]
+
+lint_command: "bundle exec rubocop"
+test_command: "bundle exec rspec"
+run_command:  "bundle exec rails server"
