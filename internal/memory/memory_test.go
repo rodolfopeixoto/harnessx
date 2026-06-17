@@ -24,7 +24,7 @@ func TestPromote_Success(t *testing.T) {
 
 	adapter := sqlAdapter{db: repo.DB()}
 	m, err := Promote(context.Background(), repo, Candidate{
-		Scope: "project", Kind: "convention",
+		Scope: "project", Kind: KindSemantic,
 		Content:       "tests use rspec, not minitest",
 		EvidenceRunID: "run-1", Confidence: 0.8,
 	}, adapter)
@@ -36,7 +36,7 @@ func TestPromote_MissingEvidence(t *testing.T) {
 	repo, _ := sqlite.Open(":memory:")
 	defer repo.Close()
 	_, err := Promote(context.Background(), repo, Candidate{
-		Scope: "p", Kind: "k", Content: "x", Confidence: 0.9,
+		Scope: "p", Kind: KindSemantic, Content: "x", Confidence: 0.9,
 	}, sqlAdapter{db: repo.DB()})
 	require.True(t, errors.Is(err, ErrMissingEvidence))
 }
@@ -45,7 +45,7 @@ func TestPromote_LowConfidence(t *testing.T) {
 	repo, _ := sqlite.Open(":memory:")
 	defer repo.Close()
 	_, err := Promote(context.Background(), repo, Candidate{
-		Scope: "p", Kind: "k", Content: "x", EvidenceRunID: "run-1", Confidence: 0.2,
+		Scope: "p", Kind: KindSemantic, Content: "x", EvidenceRunID: "run-1", Confidence: 0.2,
 	}, sqlAdapter{db: repo.DB()})
 	require.True(t, errors.Is(err, ErrLowConfidence))
 }
@@ -54,7 +54,7 @@ func TestPromote_RejectsSensitive(t *testing.T) {
 	repo, _ := sqlite.Open(":memory:")
 	defer repo.Close()
 	_, err := Promote(context.Background(), repo, Candidate{
-		Scope: "p", Kind: "k",
+		Scope: "p", Kind: KindSemantic,
 		Content:       "found AKIAIOSFODNN7EXAMPLE in the codebase",
 		EvidenceRunID: "run-1", Confidence: 0.9,
 	}, sqlAdapter{db: repo.DB()})

@@ -18,7 +18,7 @@ func newMemoryCmd() *cobra.Command {
 	c := &cobra.Command{Use: "memory", Short: "Project memory commands"}
 
 	var limit int
-	var scope string
+	var scope, kind string
 	listC := &cobra.Command{
 		Use:   "list",
 		Short: "List recent project memory entries",
@@ -28,12 +28,13 @@ func newMemoryCmd() *cobra.Command {
 				return err
 			}
 			return memorycmd.List(cmd.OutOrStdout(), memorycmd.ListOptions{
-				StartDir: dir, Limit: limit, Scope: scope,
+				StartDir: dir, Limit: limit, Scope: scope, Kind: kind,
 			})
 		},
 	}
 	listC.Flags().IntVar(&limit, "limit", constants.DefaultListLimit, "max entries to return")
 	listC.Flags().StringVar(&scope, "scope", "", "filter by scope")
+	listC.Flags().StringVar(&kind, "kind", "", "filter by kind (working|semantic|experiential|long_term|multi_agent)")
 
 	var (
 		mScope, mKind, mContent, mRunID string
@@ -54,7 +55,7 @@ func newMemoryCmd() *cobra.Command {
 		},
 	}
 	promoteC.Flags().StringVar(&mScope, "scope", "project", "scope (project|session|global)")
-	promoteC.Flags().StringVar(&mKind, "kind", "fact", "kind (fact|convention|failure|success)")
+	promoteC.Flags().StringVar(&mKind, "kind", "semantic", "kind (working|semantic|experiential|long_term|multi_agent — paper §3.2)")
 	promoteC.Flags().StringVar(&mContent, "content", "", "memory content (required)")
 	promoteC.Flags().StringVar(&mRunID, "run-id", "", "evidence run id (required)")
 	promoteC.Flags().Float64Var(&mConf, "confidence", 0.7, "confidence 0..1 (>= 0.4 required)")

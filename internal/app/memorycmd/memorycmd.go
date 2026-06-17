@@ -22,7 +22,8 @@ import (
 type ListOptions struct {
 	StartDir string
 	Limit    int
-	Scope    string // optional filter
+	Scope    string
+	Kind     string
 }
 
 func List(out io.Writer, opts ListOptions) error {
@@ -49,9 +50,21 @@ func List(out io.Writer, opts ListOptions) error {
 	q := `select id, scope, kind, content, evidence_run_id, confidence, updated_at
 	      from memories`
 	args := []any{}
+	conds := []string{}
 	if opts.Scope != "" {
-		q += ` where scope = ?`
+		conds = append(conds, "scope = ?")
 		args = append(args, opts.Scope)
+	}
+	if opts.Kind != "" {
+		conds = append(conds, "kind = ?")
+		args = append(args, opts.Kind)
+	}
+	for i, c := range conds {
+		if i == 0 {
+			q += " where " + c
+		} else {
+			q += " and " + c
+		}
 	}
 	q += ` order by updated_at desc limit ?`
 	args = append(args, limit)

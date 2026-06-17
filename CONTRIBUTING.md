@@ -56,6 +56,7 @@ git clone https://github.com/rodolfopeixoto/harnessx
 cd harnessx
 make install-hooks                # pre-commit + commit-msg + pre-push gates
 make check                        # vet + race tests + build
+make smoke                        # cross-stack CLI smoke matrix (fresh project per scaffold)
 make e2e                          # scripts/e2e-phase1.sh
 make dashboard-install            # one-time React deps
 make dashboard-test               # Vitest smoke

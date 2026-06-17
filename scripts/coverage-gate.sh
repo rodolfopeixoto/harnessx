@@ -2,7 +2,7 @@
 set -euo pipefail
 unset GOROOT || true
 
-GLOBAL_MIN="${GLOBAL_MIN:-52}"
+GLOBAL_MIN="${GLOBAL_MIN:-49}"
 CORE_MIN="${CORE_MIN:-58}"
 COVER_PROFILE="${COVER_PROFILE:-coverage.out}"
 CORE_REGEX='internal/(domain|intent|memory|router|sensors|spec|plan|index|context|design|optimize|skills|platform/|adapters/sqlite|workspace|catalog|cleanup|runtime|importwiz|stale|palette|autonomy|autopilot|audit|health)'

@@ -49,6 +49,7 @@ func newPlanCmd() *cobra.Command {
 		},
 	}
 	c.Flags().Float64Var(&budget, "budget", 1.0, "max USD budget for the planning step")
+	c.AddCommand(newPlanWriteCmd(), newPlanCheckCmd())
 	return c
 }
 

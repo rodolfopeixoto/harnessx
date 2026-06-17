@@ -1,0 +1,5 @@
+class HealthController < ApplicationController
+  def index
+    render json: { status: 'ok', env: ENV.fetch('RAILS_ENV', 'development'), service: '$NAME' }
+  end
+end

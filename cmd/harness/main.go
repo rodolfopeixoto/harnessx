@@ -97,6 +97,19 @@ func newRoot() *cobra.Command {
 		newRouteCmd(),
 		newUninstallCmd(),
 		newCompletionCmd(),
+		newSmokeCmd(),
+		newTestCmd(),
+		newLintCmd(),
+		newDevCmd(),
+		newBenchCmd(),
+		newProfileCmd(),
+		newShipCmd(),
+		newNewCmd(),
+		newOrchestrateCmd(),
+		newEvolveCmd(),
+		newConfigCmd(),
+		newChatCmd(),
+		newCoverageCmd(),
 	)
 	root.Args = cobra.ArbitraryArgs
 	root.RunE = func(cmd *cobra.Command, args []string) error {

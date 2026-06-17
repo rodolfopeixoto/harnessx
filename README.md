@@ -1,30 +1,116 @@
 # HarnessX
 
-Local-first adaptive runtime for **agentic software engineering**.
-Orchestrates multiple coding CLIs (Claude Code, Codex, Gemini, Kimi)
-through a pluggable adapter system, gates work with deterministic
-sensors, persists evidence in SQLite, and surfaces results via TUI +
-local React dashboard.
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Go Version](https://img.shields.io/badge/go-1.21%2B-00ADD8.svg)](https://go.dev)
+[![Paper](https://img.shields.io/badge/paper-arXiv%202605.18747-b31b1b.svg)](https://arxiv.org/abs/2605.18747)
+[![Coverage (new pkgs)](https://img.shields.io/badge/coverage%20(new%20pkgs)-%E2%89%A590%25-brightgreen.svg)](docs/PAPER-MAPPING.md#coverage-status)
+[![Smoke matrix](https://img.shields.io/badge/smoke%20matrix-6%20stacks-green.svg)](docs/COMMANDS.md#harness-smoke-matrix---langs-csvall---keep---json---step-timeout-duration---bin-path)
+[![Single binary](https://img.shields.io/badge/single%20binary-no%20CGO-brightgreen.svg)](#install)
 
-> **Status:** v0.100 (Phase D). v1.0.0 deferred until operator
-> manual testing + community feedback validates each surface.
-> See [docs/specs/](docs/specs/) for the per-release spec log and
-> [CHANGELOG.md](CHANGELOG.md) for milestones.
+> **HarnessX** is a local-first, single-binary runtime for **agentic
+> software engineering**. It turns one prompt into a deterministic
+> Plan-Execute-Verify loop across the coding CLIs you already use
+> (Claude Code, Codex, Gemini, Kimi, Ollama, …), gates every step with
+> deterministic sensors, persists the entire trajectory under
+> `.harness/`, and supports HITL-governed self-evolution.
+>
+> The implementation is end-to-end anchored on the survey paper
+> **"Code as Agent Harness"** (Ning et al., UIUC / Meta / Stanford,
+> [arXiv 2605.18747v1](https://arxiv.org/abs/2605.18747), May 2026).
+
+```bash
+brew tap rodolfopeixoto/harnessx https://github.com/rodolfopeixoto/harnessx
+brew install harness
+harness new python ./shop-api --yes
+cd shop-api && harness ship "add /healthz endpoint with pytest"
+```
+
+---
+
+## Table of contents
+
+- [Why HarnessX](#why-harnessx)
+- [Quick start](#quick-start)
+- [Install](#install)
+- [The 8 commands you actually need](#the-8-commands-you-actually-need)
+- [How it maps to the paper](#how-it-maps-to-the-paper)
+- [Documentation](#documentation)
+- [Verification surface](#verification-surface)
+- [Contributing](#contributing)
+- [Community standards](#community-standards)
+- [License](#license)
+- [Citation](#citation)
+
+---
 
 ## Why HarnessX
 
-Three-layer harness inspired by *"Code as Agent Harness"*
-([arXiv 2605.18747](https://arxiv.org/abs/2605.18747)). Each layer
-enforces one paper principle:
+The paper argues that production agent systems are bottlenecked by
+their **harness** — the software layer that surrounds an LLM with
+tools, sandboxes, memory, validators, permission boundaries, execution
+loops, and feedback channels — not by the base model. HarnessX is a
+concrete, open-source implementation of that view.
 
-| Layer | Principle | What it does |
-|---|---|---|
-| **L1 — Executability** | Make agents actually run | Adapters + router + scaffolds; one prompt → routed CLI execution |
-| **L2 — Verifiability** | Trust nothing without evidence | Sensors (secrets/lint/tests), audit log, change-contract optimizer |
-| **L3 — Composability** | Compose runs into workflows | `harness do`, `harness loop`, `harness flow` — task graphs + replan + critic |
+| Property the paper requires | How HarnessX delivers it |
+|---|---|
+| **Executable** — every action is code we can run | One binary, single-process, no CGO. Adapters wrap the existing coding CLIs. |
+| **Inspectable** — every action emits structured state | `.harness/logs/events.jsonl` append-only telemetry + `.harness/artifacts/` for diffs, blackboards, plans. |
+| **Stateful** — state outlives a single invocation | SQLite store + plan-as-contract artefacts + shared blackboard + 5-kind memory taxonomy. |
+| **Governed** — mutations are auditable + HITL-gated | `harness evolve promote --hitl` and `harness config wizard` both append to audit logs. |
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for dataflow diagrams,
-persistence layout, and the embed.FS template inventory.
+### What you get out of the box
+
+- **Single-command SDLC** — `harness ship "<prompt>"` branches, writes
+  a spec, loops `do`+`ci` with 429-aware fallback, gates against your
+  plan contract, and commits using Conventional Commits.
+- **Goal-aware REPL** — `harness chat --goal dev|ads|research|ops`
+  emits typed JSON plans and dispatches them against a deterministic,
+  per-goal palette.
+- **Plan-as-contract** — `harness plan write` materialises the paper's
+  §3.4.2 contract; `harness plan check` and the `plan_scope` sensor
+  enforce it before commits.
+- **Multi-agent orchestration** — declare role + topology in
+  `.harness/orchestrations/<name>.yaml`; `harness orchestrate run`
+  shares a file-only blackboard between roles.
+- **Self-evolving harness with guardrails** — `harness evolve
+  diagnose|sandbox|propose|promote --hitl` implements paper §3.5 with a
+  real A/B replay sandbox.
+- **6-stack scaffolds** — Go, Python, Rails, React, Ruby, Rust —
+  every one ready for `harness ship` out of the box.
+- **Deterministic regression matrix** — `harness smoke matrix`
+  exercises every CLI command across every scaffolded stack.
+
+---
+
+## Quick start
+
+```bash
+# 1. Bootstrap a Python e-commerce backend
+harness new python ./shop-api --yes
+cd shop-api
+
+# 2. Write a deterministic plan contract (no LLM call)
+harness plan write "build products + cart + checkout endpoints" \
+  --file app.py --file tests/test_app.py \
+  --invariant "/healthz still returns 200" \
+  --validate "harness ci" --risk medium
+PLAN_ID=01...
+
+# 3. Pin the contract so sensors enforce it
+printf "active_plan_id: %s\n" "$PLAN_ID" > .harness/config/plan.yaml
+
+# 4. Configure the router (audited)
+harness config set --task implementation --primary kimi \
+  --fallback gemini,claude --budget 0.5
+
+# 5. Ship the first feature end-to-end
+harness ship "implement GET /products with pytest" --plan ${PLAN_ID}
+
+# 6. Iterate via the goal-aware REPL
+harness chat --goal dev --adapter ollama
+```
+
+Full end-to-end walk-through: [docs/TUTORIAL-ECOMMERCE.md](docs/TUTORIAL-ECOMMERCE.md).
 
 ---
 
@@ -36,9 +122,6 @@ persistence layout, and the embed.FS template inventory.
 brew tap rodolfopeixoto/harnessx https://github.com/rodolfopeixoto/harnessx
 brew install harness
 ```
-
-Tap lives in this same repo under `Formula/harness.rb` — auto-refreshed
-every release with new SHAs across all 6 platforms.
 
 ### Linux / macOS (one-line installer)
 
@@ -57,253 +140,183 @@ make build
 
 ### Pre-built binaries
 
-Every release ships 6 platforms (`make release`):
-darwin-amd64, darwin-arm64, linux-amd64, linux-arm64,
-windows-amd64, windows-arm64. Each with `.sha256` companion.
-Download from the [Releases page](https://github.com/rodolfopeixoto/harnessx/releases).
+Every release ships 6 platforms (darwin-amd64, darwin-arm64,
+linux-amd64, linux-arm64, windows-amd64, windows-arm64) with `.sha256`
+companions. Download from the
+[Releases page](https://github.com/rodolfopeixoto/harnessx/releases).
 
----
-
-## Full step-by-step tutorial
-
-[docs/tutorial-python-demo.md](docs/tutorial-python-demo.md) — builds a
-working Python FastAPI service from zero, exercises every layer +
-every adapter + every sensor + every flow + dashboard + profiling +
-audit-solid + backup. 45–60 min.
-
-## Quickstart
+After install, run:
 
 ```bash
-# Init a project (writes .harness/ + hooks + first scaffold prompt)
-harness init
-
-# Install the pre-push gate (lint + tests + coverage + security)
-harness install-git-hooks
-
-# One-shot: route prompt to best adapter + critic + sensors
-harness do "add a /healthz endpoint with a test"
-
-# Continuous loop: rerun on save until sensors green
-harness loop
-
-# Bundle scaffolds + first feature in one go
-harness flow init rails-api          # software flow
-harness flow init meta-ads-campaign  # non-software flow
+harness doctor          # diagnose host environment
+harness --help          # full command tree
 ```
 
 ---
 
-## Features (organised by layer)
+## The 8 commands you actually need
 
-### Layer 1 — Executability
-
-| Command | What it does |
+| Command | Use it when |
 |---|---|
-| `harness init` | Bootstraps `.harness/`, hooks, default policy |
-| `harness do <prompt>` | Routes prompt → best adapter → critic → sensors |
-| `harness scaffold list / apply <name>` | Deterministic templates (python, go-cli, react-spa, …) |
-| `harness hookpkg list / install` | Bundled git hooks (pre-commit, gitleaks, etc.) |
-| `harness mcppkg list / install` | Bundled MCP servers (filesystem, git, sqlite) |
-| `harness skill list / apply` | Skill manifests |
-| `harness route show <prompt>` | Preview routing decision (strengths match) |
-| `harness execute <task>` | Run a task off the queue |
+| `harness new <stack> <path>` | Bootstrap a new project (git + .harness + scaffold + hooks) |
+| `harness ship "<prompt>"` | Branch → spec → do → ci-loop → conventional commit |
+| `harness chat --goal dev` | Iterative REPL with a typed plan + deterministic dispatch |
+| `harness plan write` / `plan check` | Materialise + enforce the §3.4.2 plan-as-contract |
+| `harness ci` | Run every applicable sensor; exits non-zero on red |
+| `harness coverage --threshold 0.9` | 90% coverage gate for Go projects |
+| `harness orchestrate run <flow>` | Multi-role flow with shared blackboard |
+| `harness evolve diagnose|sandbox` | Telemetry-driven harness evolution with HITL gates |
 
-### Layer 2 — Verifiability
-
-| Command | What it does |
-|---|---|
-| `harness sensor list / run <id>` | Deterministic checks (secrets, lint, tests, multimodal) |
-| `harness audit tail / replay` | Append-only event log under `.harness/audit/events.jsonl` |
-| `harness optimize propose / apply --canary` | Change-contract harness mutations (predicted improvement + falsifier test + rollback cmd) |
-| `harness metrics show` | Trajectory + verification + recovery + replayability |
-| `harness autonomy show / suggest` | Per-path policy + history-mined proposals |
-| `harness secret get/set/list` | Encrypted secret backend |
-| `harness backup save / restore` | Portable run-state snapshots |
-
-### Layer 3 — Composability
-
-| Command | What it does |
-|---|---|
-| `harness do <prompt>` | Plan → execute → critic → sensors → store |
-| `harness loop` | Watcher rerun until green; checkpoint + resume via `harness loop resume <id>` |
-| `harness flow list / show / apply / init` | Bundled flows: rails-api, python-fastapi, go-cli, meta-ads-campaign, content-pipeline, release-notes |
-| `harness workflow run` | Multi-step orchestration |
-| `harness stack show` | Active runs + sessions |
-
-### Cross-cutting
-
-| Command | What it does |
-|---|---|
-| `harness dashboard` | Boots local React UI on `http://localhost:5173` |
-| `harness palette` | Fuzzy command palette TUI |
-| `harness doctor` | Diagnose env + dependencies |
-| `harness install-git-hooks` | Wires `scripts/git/pre-push.sh` as `.git/hooks/pre-push` |
-| `harness update` | Self-update via release channel |
-| `harness uninstall` | Remove harness + state |
-| `harness version` | Build version + commit + date |
-
-Full reference: [docs/cli-reference.md](docs/cli-reference.md).
+Everything else (`harness scaffold`, `harness memory`, `harness audit`,
+`harness backup`, `harness dashboard`, `harness smoke matrix`, …) is
+listed in [docs/COMMANDS.md](docs/COMMANDS.md).
 
 ---
 
-## Make targets (contributor surface)
+## How it maps to the paper
 
-`harness` is the **user** CLI. `make` is the **contributor** surface.
+Every paper section is implemented in a specific package with a
+specific command and a specific test path. The full table lives in
+[docs/PAPER-MAPPING.md](docs/PAPER-MAPPING.md); the short version:
 
-| Target | What it does |
+| Paper layer | HarnessX surface |
 |---|---|
-| `make build` | Build `bin/harness` with ldflags-stamped version |
-| `make test` | Race tests + coverage report |
-| `make test-short` | Skip slow integration tests |
-| `make lint` | golangci-lint (file LOC ≤ 400, gocognit ≤ 25, gocyclo ≤ 15) |
-| `make fmt / tidy / vet` | Formatting + module hygiene |
-| `make check` | vet + race tests + build |
-| `make ci` | Full local gate: lint + coverage-gate + tests + e2e |
-| `make cd` | ci + dashboard build + security + licenses + sbom + release |
-| `make coverage` | Per-package coverage report |
-| `make coverage-gate` | Enforce floor (current: 58 core / 52 global) |
-| `make bench` | Run benchmarks across `./internal/...` |
-| `make profile-mem` | Dump heap pprof to `dist/profiles/mem.pprof` |
-| `make profile-cpu` | Dump cpu pprof to `dist/profiles/cpu.pprof` |
-| `make security` | govulncheck + gitleaks |
-| `make licenses / sbom` | License inventory + SPDX SBOM |
-| `make release` | Cross-compile 6 platforms into `dist/` + SHA-256 sums |
-| `make e2e / e2e-all` | Shell + Playwright E2E suites |
-| `make dashboard-install / dashboard-dev / dashboard-build / dashboard-test` | React dashboard lifecycle |
-| `make install-hooks / uninstall-hooks` | Git hook wiring |
+| **§2 Interface** — reasoning / acting / environment | adapters (`internal/agents`), scaffolds (`internal/scaffoldpkg`), context providers (`internal/context`) |
+| **§3.1 Planning** — orchestration, structure-grounded, linear | `harness chat`, `harness orchestrate`, `harness do`, `internal/intentplan`, `internal/customrules` |
+| **§3.2 Memory** — 5 kinds taxonomy | `harness memory list --kind {working\|semantic\|experiential\|long_term\|multi_agent}` |
+| **§3.3 Tool Use** | adapter contract + sandboxed runtime |
+| **§3.4 PEV** — Plan-Execute-Verify | `harness ship`, `harness loop`, sensors catalog, `harness plan write/check`, `harness coverage` |
+| **§3.4.2 Plan-as-contract** | `harness plan write`, `harness plan check`, `plan_scope` sensor, `harness ship --plan <id>` |
+| **§3.4.4 Deterministic sensors** | universal pack + stack pack + `go_coverage_gate` + `plan_scope` + `commentscan` |
+| **§3.5 AHE** — Agentic Harness Engineering | `harness evolve diagnose|propose|replay|sandbox|promote --hitl` |
+| **§3.5.3 Governed mutation** | `harness evolve promote --hitl` + `harness config wizard` (audit log) |
+| **§4.1.1 Roles** — Manager/Planner/Coder/Reviewer/Tester | `internal/orchestrate.Role*` |
+| **§4.1.3 Topology** — chain/cyclic | `internal/orchestrate.Topology*` |
+| **§4.3.1 Shared substrate** | `.harness/artifacts/runs/<id>/blackboard.json` |
+| **§5.1.1 Code assistants** | `harness new`, `harness ship`, `harness chat`, wrappers |
+| **§5.2 Open problems** | Coverage gate, scope gate, A/B replay sandbox, HITL governance |
 
 ---
 
-## Architecture (at a glance)
+## Documentation
 
-```
-                      ┌───────────────────────────────────┐
-                      │   cmd/harness (cobra commands)    │
-                      └─────────────┬─────────────────────┘
-                                    │
-   ┌────────────────────────────────┼────────────────────────────────┐
-   │                                │                                │
-┌──▼──────────┐              ┌──────▼──────┐                ┌────────▼────────┐
-│  L3: flow   │              │  L3: do     │                │  L3: loop       │
-│  flowpkg    │              │  cmd_do     │                │  devloop        │
-└──┬──────────┘              └──────┬──────┘                └────────┬────────┘
-   │                                │                                │
-   └──────────────┬─────────────────┼──────────────┬─────────────────┘
-                  │                 │              │
-              ┌───▼─────┐      ┌────▼────┐    ┌────▼─────┐
-              │ router  │      │ critic  │    │ sensors  │
-              │ adapters│      │ adapter │    │ multimd  │
-              └───┬─────┘      └────┬────┘    └────┬─────┘
-                  │                 │              │
-              ┌───▼─────────────────▼──────────────▼─────┐
-              │  execution + audit + recall + sharedstate │
-              └────────────────────┬──────────────────────┘
-                                   │
-                          ┌────────▼─────────┐
-                          │  .harness/ (FS)  │
-                          │  SQLite + JSONL  │
-                          └──────────────────┘
+| Doc | Purpose |
+|---|---|
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Runtime architecture, layered explanation, disk layout, data flow for every entry point |
+| [docs/COMMANDS.md](docs/COMMANDS.md) | Every `harness` command on one page (flags, env vars, exit codes, output paths) |
+| [docs/PAPER-MAPPING.md](docs/PAPER-MAPPING.md) | Paper § → command → package → test |
+| [docs/TUTORIAL-ECOMMERCE.md](docs/TUTORIAL-ECOMMERCE.md) | **Recommended** — build a small FastAPI e-commerce backend end-to-end |
+| [docs/tutorial-python-demo.md](docs/tutorial-python-demo.md) | Original Python FastAPI walkthrough |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | GitFlow, conventional commits, pre-push gate, coverage floor |
+| [SECURITY.md](SECURITY.md) | Coordinated disclosure policy |
+| [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) | Contributor Covenant |
+| [CHANGELOG.md](CHANGELOG.md) | Per-release history |
+| [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) | Bundled dependency licenses |
+
+---
+
+## Verification surface
+
+HarnessX dogfoods its own gates.
+
+| Gate | Command | Status |
+|---|---|---|
+| Build | `go build ./...` | green |
+| Vet | `go vet ./...` | green |
+| Unit tests | `make test` | 86 packages, 0 failures |
+| New-package coverage floor (90%) | every new internal package | ✓ 14 / 14 packages ≥ 90% |
+| Cross-stack regression | `make smoke` → `harness smoke matrix` | 6 stacks (go, python, rails, react, ruby, rust) × 10 commands = 60 invocations green |
+| Tutorial regression | `make tutorial-replay` | green |
+| Pre-push hook | `harness ci` | runs every applicable sensor, blocks the push on red |
+| Coverage floor | `harness coverage --threshold 0.9` | 90% default |
+| Scope contract | `harness plan check --plan <id>` | refuses commit on out-of-scope diffs |
+| Self-evolution | `harness evolve sandbox <trace>` | real A/B replay across baseline / candidate binaries |
+
+Run everything locally:
+
+```bash
+make ci                 # vet + race tests + build + every phase e2e
+make smoke              # cross-stack CLI smoke matrix
+make tutorial-replay    # deterministic walk of the tutorial
 ```
 
-Full diagrams + dataflow per command: [ARCHITECTURE.md](ARCHITECTURE.md).
+---
+
+## Contributing
+
+Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md)
+first — it covers GitFlow (`feature/p<NN>-slug` → `develop` → `main`),
+Conventional Commits, the pre-push gate, and the coverage floor.
+
+Quick path:
+
+```bash
+git clone https://github.com/rodolfopeixoto/harnessx
+cd harnessx
+make install-hooks      # pre-commit + commit-msg + pre-push gates
+make check              # vet + race tests + build
+make smoke              # cross-stack CLI matrix
+make tutorial-replay    # deterministic walk
+```
+
+Then branch from `develop`, open a PR with the
+[pull request template](.github/PULL_REQUEST_TEMPLATE.md). The
+`pre-push` hook (installed by `make install-hooks`) runs `make ci`
+before every push. Escape hatch: `HARNESS_SKIP_CI=1 git push` —
+documented hotfixes only.
+
+### Reporting issues
+
+Use the issue templates under
+[`.github/ISSUE_TEMPLATE/`](.github/ISSUE_TEMPLATE/). For security
+vulnerabilities, follow [SECURITY.md](SECURITY.md) (coordinated
+disclosure — do **not** open a public issue).
 
 ---
 
-## Insights (what this harness believes)
+## Community standards
 
-1. **Deterministic-first.** Templates, sensors, gates run before any
-   LLM call. The LLM only fills gaps deterministic code cannot.
-2. **Evidence over assertion.** No green signal without a sensor
-   bundle (`Confidence`, `Verified`, `Unverified`, `Risks`). Devloop
-   refuses green when `conf < 0.5 ∧ unverified ≠ ∅`.
-3. **Change contracts.** Every harness mutation declares
-   `{component, target_failure, predicted_improvement, invariants,
-   falsifier_test, rollback_cmd}` — and rolls back on canary failure.
-4. **Replayable runs.** Audit log under `.harness/audit/events.jsonl`
-   is append-only; `harness audit replay` reconstructs any past run.
-5. **Local-first.** No cloud, no telemetry, no SaaS. State lives
-   under `.harness/` per repo. Backups portable via `harness backup`.
-6. **Multi-adapter routing.** `router.Pick(strengths)` selects the
-   right CLI per task type. Critic loop re-routes diffs to a
-   different adapter (`tags:["review","critic"]`).
-7. **Domain-agnostic flows.** Same harness drives `rails-api` AND
-   `meta-ads-campaign`. Phases: `deterministic|llm|sensor`.
+This project follows the [Contributor Covenant](CODE_OF_CONDUCT.md).
+By participating, you agree to uphold its terms. Maintainers will
+enforce the code of conduct in good faith; escalate via the contact
+listed in the document.
 
----
-
-## Paper followed
-
-**"Code as Agent Harness"** — arXiv 2605.18747.
-
-Maps to repo:
-
-| Paper section | Repo surface |
-|---|---|
-| § Executability | `internal/execution`, `internal/adapters`, `internal/scaffoldpkg` |
-| § Verifiability | `internal/sensors`, `internal/audit`, `internal/optimize` |
-| § Statefulness | `internal/sharedstate`, `internal/recall`, `internal/devloop` (checkpoint/resume) |
-| § Composability | `internal/flowpkg`, `cmd/harness/cmd_do.go`, `internal/critic` |
-| § Trajectory metrics | `internal/execution/types.go::Trajectory` |
-| § Long-term memory | `internal/recall/bm25.go` (+ optional embeddings) |
-| § Multi-agent critic | `internal/critic/critic.go` |
-| § Human-in-the-loop | `internal/autonomy/{approvals,suggest}.go` |
-| § Multimodal grounding | `internal/multimodal/grounding.go` |
-
-Gap closure log: [docs/paper-coverage-map.md](docs/paper-coverage-map.md).
-
----
-
-## GitFlow + contribution rules
-
-- Branches: `feature/p<NN>-slug` → `develop` → `main`
-- Every release ships a spec in `docs/specs/p<NN>-*.md` **first**
-- Conventional Commits enforced by pre-commit
-- Pre-push gate (`scripts/git/pre-push.sh`) blocks: lint failures,
-  red tests, coverage below floor, direct push to main/develop
-- Escape hatch: `HARNESS_SKIP_CI=1 git push` (CI re-runs on PR)
-- No god files (file LOC ≤ 400), no useless comments, English in
-  code, brew formula refresh per release
-
-Full rules: [CONTRIBUTING.md](CONTRIBUTING.md).
-
----
-
-## Release status
-
-| Release | What landed |
-|---|---|
-| v0.72–v0.81 | Phase A: 10 paper-gap closures (trajectory, evidence, checkpoint, change contracts, sharedstate, replan, BM25, critic, autonomy, multimodal) |
-| v0.82–v0.91 | Phase B: coverage 50% → 58% core; gate hardened |
-| v0.92–v0.95 | Phase C: flowpkg + 6 bundled flows + `harness flow init` |
-| v0.96 | Phase D: dashboard parity audit (18/18 handoff screens covered) |
-| v0.97 | Phase D: ARCHITECTURE.md |
-| v0.98 | Phase E: pprof helpers + `make profile-mem/cpu` |
-| v0.99 | Phase D: version bump (README rewrite slipped) |
-| v0.100 | Phase D: full README rewrite (this doc) |
-
-**v1.0.0:** deferred indefinitely. Stays on `0.xx.xx` until operator
-explicitly green-lights cut.
-
-### Honest readiness snapshot (as of v0.104)
-
-| Gate | Target | Actual | Status |
-|---|---|---|---|
-| Tests | all pass | 759 / 759 pass | ✓ |
-| Lint | 0 issues | 0 issues | ✓ |
-| Coverage | ≥ 90% | 47.3% global | ✗ (gap remains) |
-| God files | 0 (LOC ≤ 400) | 6 over limit | ✗ |
-| Fan-out | ≤ 15 imports | 3 over limit | ✗ |
-| Pre-push gate | hard | installed | ✓ |
-| Brew tap | refreshed each release | up to date | ✓ |
-| 6-platform binaries | every release | shipping | ✓ |
-| Memory leak gate | ±10% drift | profiler exists, baseline not captured | ◐ |
-
-Coverage push + god-file refactor are the gates remaining before any
-v1.0.0 conversation. Use harness today — surfaces work — but do not
-treat it as a 1.0 release.
+Code-ownership for review is defined in
+[.github/CODEOWNERS](.github/CODEOWNERS).
 
 ---
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+Released under the [MIT License](LICENSE).
+
+Bundled third-party software keeps its own licenses, listed in
+[THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md). HarnessX itself
+contains no copyleft code and ships as a single statically-linked
+binary.
+
+---
+
+## Citation
+
+If you use HarnessX in academic work, please cite both the project
+and the paper it implements:
+
+```bibtex
+@software{harnessx,
+  author       = {Peixoto, Rodolfo and contributors},
+  title        = {HarnessX: a code-as-agent-harness runtime for software engineering},
+  year         = {2026},
+  url          = {https://github.com/rodolfopeixoto/harnessx}
+}
+
+@misc{ning2026codeagentharness,
+  title         = {Code as Agent Harness: Toward Executable, Verifiable, and Stateful Agent Systems},
+  author        = {Ning, Xuying and Tieu, Katherine and Fu, Dongqi and Wei, Tianxin and others},
+  year          = {2026},
+  eprint        = {2605.18747},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.CL},
+  url           = {https://arxiv.org/abs/2605.18747}
+}
+```

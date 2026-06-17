@@ -35,6 +35,14 @@ var bundledFS embed.FS
 // LoadAll resolves adapters from (1) project .harness/config/agents/*.yaml and
 // (2) bundled templates. Project entries override bundled entries by ID.
 // Returns a registry plus the per-id source path for `agent list`.
+func AvailableAdapterIDs() ([]string, error) {
+	reg, _, err := LoadAll(".")
+	if err != nil {
+		return nil, err
+	}
+	return reg.IDs(), nil
+}
+
 func LoadAll(root string) (*agents.Registry, map[string]string, error) {
 	reg := agents.NewRegistry()
 	sources := map[string]string{}

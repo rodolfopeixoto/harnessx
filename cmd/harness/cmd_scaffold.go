@@ -13,6 +13,7 @@ import (
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 
+	"github.com/ropeixoto/harnessx/internal/projectcfg"
 	"github.com/ropeixoto/harnessx/internal/scaffoldpkg"
 	"github.com/ropeixoto/harnessx/internal/scm"
 )
@@ -124,13 +125,8 @@ func runScaffoldApply(ctx context.Context, out io.Writer, lang string, opts scaf
 	if err != nil {
 		return err
 	}
-	if opts.withGit && opts.apply {
-		if !scm.HasRepo(root) {
-			if err := scm.Init(ctx, root, opts.gitBranch); err != nil {
-				return err
-			}
-			fmt.Fprintf(out, "git: initialised on %s\n", opts.gitBranch)
-		}
+	if err := ensureGitForScaffold(ctx, root, opts, out); err != nil {
+		return err
 	}
 	res, err := scaffoldpkg.Apply(m, scaffoldpkg.ApplyOptions{
 		Root: root, Name: opts.name, Force: opts.force, Dry: !opts.apply,
@@ -138,8 +134,34 @@ func runScaffoldApply(ctx context.Context, out io.Writer, lang string, opts scaf
 	if err != nil {
 		return err
 	}
-	mode := "dry-run"
+	printScaffoldSummary(out, lang, opts.apply, res)
+	if opts.withDeps && opts.apply {
+		runPostSteps(ctx, out, root, m)
+	}
 	if opts.apply {
+		writeProjectCfgFromMeta(root, m, out)
+	}
+	fmt.Fprintf(out, "\nnext:\n  harness lint\n  harness test\n  harness dev\n")
+	return nil
+}
+
+func ensureGitForScaffold(ctx context.Context, root string, opts scaffoldRunOpts, out io.Writer) error {
+	if !opts.withGit || !opts.apply {
+		return nil
+	}
+	if scm.HasRepo(root) {
+		return nil
+	}
+	if err := scm.Init(ctx, root, opts.gitBranch); err != nil {
+		return err
+	}
+	fmt.Fprintf(out, "git: initialised on %s\n", opts.gitBranch)
+	return nil
+}
+
+func printScaffoldSummary(out io.Writer, lang string, apply bool, res scaffoldpkg.ApplyResult) {
+	mode := "dry-run"
+	if apply {
 		mode = "applied"
 	}
 	fmt.Fprintf(out, "scaffold: %s (%s) — %d files\n", lang, mode, len(res.Created))
@@ -149,11 +171,18 @@ func runScaffoldApply(ctx context.Context, out io.Writer, lang string, opts scaf
 	for _, p := range res.Skipped {
 		fmt.Fprintf(out, "  · skip %s (exists; pass --force to overwrite)\n", p)
 	}
-	if opts.withDeps && opts.apply {
-		runPostSteps(ctx, out, root, m)
+}
+
+func writeProjectCfgFromMeta(root string, m scaffoldpkg.Meta, out io.Writer) {
+	cfg := projectcfg.FromMeta(m.Language, map[string]string{
+		"lint": m.LintCommand,
+		"test": m.TestCommand,
+		"run":  m.RunCommand,
+		"dev":  m.RunCommand,
+	})
+	if err := projectcfg.Save(root, cfg); err != nil {
+		fmt.Fprintf(out, "warning: could not write project.yaml: %v\n", err)
 	}
-	fmt.Fprintf(out, "\nnext:\n  lint:  %s\n  test:  %s\n  run:   %s\n", m.LintCommand, m.TestCommand, m.RunCommand)
-	return nil
 }
 
 func runPostSteps(ctx context.Context, out io.Writer, root string, m scaffoldpkg.Meta) {
