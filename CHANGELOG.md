@@ -3,6 +3,33 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-18 — v0.111.0 — Streaming + stack-aware coverage + loop UX (F56–F60)
+
+### New
+
+- **Live agent output (F56)**: `harness ship`, `harness do`, and the
+  workflow executor now tee the adapter subprocess stdout/stderr to
+  the caller's writer in real time. New `agents.AgentRequest.LiveOut`
+  field; YAML adapters use it via `runStreamed`. Operators see the
+  Claude / Codex / Gemini / Kimi CLI as it generates output instead
+  of waiting for the buffered final message.
+- **`harness coverage` stack-aware (F58)**: detects the project stack
+  from `.harness/config/project.yaml` or manifest probes and runs the
+  right tool:
+  - `go` → `go test -cover`
+  - `python` → `.venv/bin/pytest --cov`
+  - `rust` → `cargo tarpaulin`
+  - `ruby`/`rails` → `bundle exec rake coverage`
+  - `node` → `npx c8 --lines <threshold> npm test`
+  Default threshold is still 90%.
+- **`harness loop` zero-arg (F59)**: running `harness loop
+  --max-attempts 3` with no prompt is now valid. The default prompt
+  is *"iterate on the current diff until lint and tests pass"*.
+- **`harness chat` adapter fallback (F57)**: if the pinned adapter is
+  missing, falls through `claude → codex → gemini → kimi` and warns.
+  Healthcheck runs before the session starts; failures surface as a
+  warning so the operator knows why a turn might fail.
+
 ## 2026-06-18 — v0.110.0 — Real agent flow (F52–F55)
 
 ### New
