@@ -15,6 +15,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/ropeixoto/harnessx/internal/activeagent"
 	"github.com/ropeixoto/harnessx/internal/app/agentcmd"
 	"github.com/ropeixoto/harnessx/internal/app/workflow"
 	"github.com/ropeixoto/harnessx/internal/platform/paths"
@@ -32,6 +33,7 @@ func newDoCmd() *cobra.Command {
 		autonomy      string
 		image         string
 		asJSON        bool
+		agentOverride string
 	)
 	c := &cobra.Command{
 		Use:   "do \"<prompt>\"",
@@ -46,7 +48,8 @@ test, secrets-scan) skip the LLM by default.
 		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runDo(cmd.Context(), cmd.OutOrStdout(), strings.Join(args, " "), doOpts{
-				yes: yes, det: deterministic, budget: budget, maxTasks: maxTasks, autonomy: autonomy, image: image, asJSON: asJSON,
+				yes: yes, det: deterministic, budget: budget, maxTasks: maxTasks,
+				autonomy: autonomy, image: image, asJSON: asJSON, agentOverride: agentOverride,
 			})
 		},
 	}
@@ -57,6 +60,7 @@ test, secrets-scan) skip the LLM by default.
 	c.Flags().StringVar(&autonomy, "autonomy", "safe_execute", "autonomy level for LLM tasks")
 	c.Flags().StringVar(&image, "image", "", "attach an image; auto-adds vision tag for routing")
 	c.Flags().BoolVar(&asJSON, "json", false, "emit final result as JSON (implies --yes)")
+	c.Flags().StringVar(&agentOverride, "agent", "", "force a specific adapter id (overrides router + active pin)")
 	return c
 }
 
@@ -84,13 +88,14 @@ func routeShowCmd() *cobra.Command {
 }
 
 type doOpts struct {
-	yes      bool
-	det      bool
-	budget   float64
-	maxTasks int
-	autonomy string
-	image    string
-	asJSON   bool
+	yes           bool
+	det           bool
+	budget        float64
+	maxTasks      int
+	autonomy      string
+	image         string
+	asJSON        bool
+	agentOverride string
 }
 
 type plannedStep struct {
@@ -306,7 +311,11 @@ func executeStep(ctx context.Context, out io.Writer, dir string, s plannedStep, 
 	case strings.HasPrefix(s.chosen, "deterministic:sensor:"):
 		return runDeterministicSensor(ctx, out, dir, string(s.task.Kind))
 	case strings.HasPrefix(s.chosen, "adapter:"):
-		return runWorkflowFeature(ctx, out, dir, s.task.Prompt, s.choice.AdapterID, opts)
+		agentID := activeagent.ResolveAgentID(dir, opts.agentOverride)
+		if agentID == "" {
+			agentID = s.choice.AdapterID
+		}
+		return runWorkflowFeature(ctx, out, dir, s.task.Prompt, agentID, opts)
 	default:
 		fmt.Fprintln(out, "  ✗ no adapter matched (consider 'harness agent install <id>')")
 		return "skipped"
