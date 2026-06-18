@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ropeixoto/harnessx/internal/agenthealth"
 	"github.com/ropeixoto/harnessx/internal/intentplan"
 	"github.com/ropeixoto/harnessx/internal/platform/ids"
 )
@@ -42,6 +43,8 @@ type Options struct {
 	Out         io.Writer
 	Planner     Planner
 	StepTimeout time.Duration
+	HealthProbe *agenthealth.Probe
+	Plain       bool
 }
 
 type Planner func(ctx context.Context, goal intentplan.Goal, prompt string) (intentplan.Plan, error)
@@ -119,7 +122,11 @@ func Run(ctx context.Context, opts Options) error {
 	greet(opts.Out, sess)
 	rd := bufio.NewReader(opts.In)
 	for {
-		fmt.Fprintf(opts.Out, "\n[%s]> ", sess.Goal)
+		badge := ""
+		if opts.HealthProbe != nil {
+			badge = agenthealth.Badge(opts.HealthProbe.Snapshot(), opts.Plain)
+		}
+		fmt.Fprintf(opts.Out, "\n[%s%s]> ", sess.Goal, badge)
 		input, err := readMultilineInput(rd, opts.Out, sess.Goal)
 		if err != nil {
 			if errors.Is(err, io.EOF) {

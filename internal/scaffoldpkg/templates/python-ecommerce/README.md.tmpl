@@ -1,0 +1,20 @@
+# $NAME
+
+FastAPI e-commerce skeleton scaffolded by HarnessX.
+
+Endpoints:
+
+- `GET /healthz` — liveness
+- `GET /products`, `GET /products/{id}`
+- `GET /cart/{user_id}`, `POST /cart/{user_id}`
+- `POST /checkout`
+
+```sh
+harness lint
+harness test
+harness dev
+harness ci
+```
+
+Storage is in-memory and reset between tests via `conftest.py`. Swap
+out `app/storage.py` for a real database when you outgrow the demo.

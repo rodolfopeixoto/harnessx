@@ -10,9 +10,11 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/ropeixoto/harnessx/internal/activeagent"
+	"github.com/ropeixoto/harnessx/internal/agenthealth"
 	"github.com/ropeixoto/harnessx/internal/app/agentcmd"
 	"github.com/ropeixoto/harnessx/internal/intentplan"
 	"github.com/ropeixoto/harnessx/internal/repl"
+	"github.com/ropeixoto/harnessx/internal/ui"
 )
 
 func newChatCmd() *cobra.Command {
@@ -85,6 +87,11 @@ apply.`,
 				}
 				opts.Planner = planner
 				fmt.Fprintf(cmd.OutOrStdout(), "chat: LLM planner via %s\n", adapterID)
+				probe := agenthealth.New(adapter, 30*time.Second)
+				probe.Start(cmd.Context())
+				defer probe.Stop()
+				opts.HealthProbe = probe
+				opts.Plain = ui.IsPlain()
 			}
 			return repl.Run(cmd.Context(), opts)
 		},

@@ -44,13 +44,17 @@ One command does git init, `.harness/`, the Python scaffold, and the
 git hooks.
 
 ```bash
-harness new python ./shop-api --yes --with-deps
+harness new python-ecommerce ./shop-api --yes --with-deps
 cd shop-api
 ```
 
-You now have:
+You now have a real e-commerce skeleton:
 
-- `app.py`, `tests/test_app.py` — FastAPI hello world.
+- `app/main.py` — FastAPI app with `/healthz`.
+- `app/routers/{products,cart,checkout}.py` — REST endpoints.
+- `app/models.py` — Pydantic models.
+- `app/storage.py` — in-memory thread-safe storage (swap for a real DB later).
+- `tests/{test_healthz,test_products,test_cart,test_checkout}.py` — pytest suite.
 - `requirements.txt`, `pyproject.toml`, `ruff.toml` — toolchain.
 - `Makefile` — convenience targets.
 - `.harness/` — runtime: config, db, hooks, logs.

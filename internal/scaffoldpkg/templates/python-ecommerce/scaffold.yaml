@@ -1,0 +1,59 @@
+language: python-ecommerce
+description: FastAPI e-commerce skeleton (products + cart + checkout) with pytest, ruff
+tested_against: "python3.11+, fastapi 0.110+, ruff 0.4+, pytest 8+"
+
+required_tools:
+  - python3
+  - pip3
+
+files:
+  - path: app/__init__.py
+    template: app/__init__.py
+  - path: app/main.py
+    template: app/main.py.tmpl
+  - path: app/models.py
+    template: app/models.py
+  - path: app/storage.py
+    template: app/storage.py
+  - path: app/routers/__init__.py
+    template: app/__init__.py
+  - path: app/routers/products.py
+    template: app/routers/products.py
+  - path: app/routers/cart.py
+    template: app/routers/cart.py
+  - path: app/routers/checkout.py
+    template: app/routers/checkout.py
+  - path: tests/__init__.py
+    template: tests/__init__.py
+  - path: tests/conftest.py
+    template: tests/conftest.py
+  - path: tests/test_healthz.py
+    template: tests/test_healthz.py
+  - path: tests/test_products.py
+    template: tests/test_products.py
+  - path: tests/test_cart.py
+    template: tests/test_cart.py
+  - path: tests/test_checkout.py
+    template: tests/test_checkout.py
+  - path: requirements.txt
+    template: requirements.txt
+  - path: pyproject.toml
+    template: pyproject.toml.tmpl
+  - path: ruff.toml
+    template: ruff.toml
+  - path: Makefile
+    template: Makefile
+  - path: .gitignore
+    template: .gitignore
+  - path: README.md
+    template: README.md.tmpl
+
+post_steps:
+  - name: venv
+    cmd: ["python3", "-m", "venv", ".venv"]
+  - name: pip-install
+    cmd: [".venv/bin/pip", "install", "-r", "requirements.txt"]
+
+lint_command: ".venv/bin/ruff check ."
+test_command: ".venv/bin/pytest -q"
+run_command:  ".venv/bin/uvicorn app.main:app --reload"
