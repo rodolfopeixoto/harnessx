@@ -112,20 +112,27 @@ harness plan write "build product catalogue, cart, and checkout endpoints" \
   --risk medium
 ```
 
-This writes `.harness/artifacts/plans/PLAN-<ulid>.md`. Copy the ulid
-from the output; you will use it later. Pin it as the active contract
-so the `plan_scope` sensor enforces it:
+This writes `.harness/artifacts/plans/PLAN-<ulid>.md`. Capture the id
+into a variable (the simplest way is to derive it from the file name):
 
 ```bash
-PLAN_ID=01...  # the ulid from above
+PLAN_ID=$(ls -t .harness/artifacts/plans/PLAN-*.md | head -1 \
+  | xargs basename | sed 's/^PLAN-//; s/\.md$//')
+echo "${PLAN_ID}"
+```
+
+Pin it as the active contract so the `plan_scope` sensor enforces it:
+
+```bash
 mkdir -p .harness/config
-cat > .harness/config/plan.yaml <<EOF
-active_plan_id: ${PLAN_ID}
-EOF
+printf "active_plan_id: %s\n" "${PLAN_ID}" > .harness/config/plan.yaml
 
 harness sensor list | grep plan_scope     # confirm it now applies
-harness plan check --plan ${PLAN_ID}      # baseline: empty diff -> green
+harness plan check --plan "${PLAN_ID}"    # baseline: empty diff -> green
 ```
+
+> Both `PLAN-<id>`, `<id>`, or `PLAN-<id>.md` are accepted by the
+> `--plan` flag.
 
 ---
 
@@ -162,12 +169,20 @@ result).
 
 ## 5. Ship the first feature (§3.4 + §3.4.2)
 
-Combine plan contract, deterministic execution, and rate-limit-aware
-SDLC into one command:
+`harness ship` refuses to run on a dirty tree because the loop needs a
+known baseline. Commit the scaffold first:
+
+```bash
+git add -A
+git -c user.email=you@example.com -c user.name="You" \
+    commit -m "chore: initial scaffold"
+```
+
+Now ship the feature end-to-end:
 
 ```bash
 harness ship "implement GET /products returning a static catalogue with pytest" \
-  --plan ${PLAN_ID} \
+  --plan "${PLAN_ID}" \
   --autonomy ask \
   --max-attempts 3 \
   --rate-limit-retries 3
@@ -190,8 +205,8 @@ Inspect the run:
 
 ```bash
 git log --oneline -1            # see the conventional commit
-harness audit tail --limit 30   # event timeline
-ls .harness/runs/_do/           # do reports
+harness audit tail --limit 30   # event timeline (may be empty until you run a do/ship that touches sensors)
+ls .harness/runs/                # per-run scratch dirs
 ```
 
 ---
@@ -257,18 +272,24 @@ plans cannot ask for `runtime`, `containers`, or anything off-palette.
 ## 8. Promote learnings to memory (§3.2)
 
 Once the suite stays green, capture the convention as long-term
-memory:
+memory. Pick a real run id from `.harness/runs/`:
 
 ```bash
-RUN_ID=$(ls -t .harness/runs/_do | head -1)
+RUN_ID=$(ls -t .harness/runs/ | head -1)
+echo "${RUN_ID}"   # must be a ulid; if blank, run `harness ship` or `harness do` first
+
 harness memory promote \
   --scope project --kind semantic \
   --content "cart state lives in app.state.cart_db; do not import a new dict" \
-  --run-id ${RUN_ID} --confidence 0.85
+  --run-id "${RUN_ID}" --confidence 0.85
 
 harness memory list --kind semantic
 harness memory recall "cart state"
 ```
+
+> `harness memory promote` rejects an empty / flag-shaped `--run-id`,
+> so a typo here surfaces immediately instead of writing a memory
+> with the default confidence.
 
 The five paper kinds (`working | semantic | experiential | long_term |
 multi_agent`) all show up under `harness memory list --kind`.
