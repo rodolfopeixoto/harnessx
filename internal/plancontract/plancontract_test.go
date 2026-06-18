@@ -130,3 +130,17 @@ func TestResolvePrefixesPlan(t *testing.T) {
 		t.Errorf("want absolute, got %s", got)
 	}
 }
+
+func TestResolveAddsMissingMDSuffix(t *testing.T) {
+	got, _ := Resolve("/x", "PLAN-01KV")
+	if filepath.Base(got) != "PLAN-01KV.md" {
+		t.Errorf("got %s", got)
+	}
+}
+
+func TestResolveAddsMissingPLANPrefix(t *testing.T) {
+	got, _ := Resolve("/x", "01KV")
+	if filepath.Base(got) != "PLAN-01KV.md" {
+		t.Errorf("got %s", got)
+	}
+}

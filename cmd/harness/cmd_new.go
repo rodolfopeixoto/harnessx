@@ -14,6 +14,8 @@ import (
 
 	"github.com/spf13/cobra"
 
+	osexec "os/exec"
+
 	"github.com/ropeixoto/harnessx/internal/app/initcmd"
 	"github.com/ropeixoto/harnessx/internal/projectcfg"
 	"github.com/ropeixoto/harnessx/internal/scaffoldpkg"
@@ -163,7 +165,23 @@ func applyNewScaffold(abs string, opts *newOptions, out io.Writer) error {
 	if err := projectcfg.Save(abs, cfg); err != nil {
 		fmt.Fprintf(out, "new: warning project.yaml: %v\n", err)
 	}
+	if opts.withDeps {
+		runPostStepsInDir(out, abs, m)
+	}
 	return nil
+}
+
+func runPostStepsInDir(out io.Writer, root string, m scaffoldpkg.Meta) {
+	for _, step := range m.PostSteps {
+		fmt.Fprintf(out, "new: post-step %s — %v\n", step.Name, step.Cmd)
+		cmd := osexec.Command(step.Cmd[0], step.Cmd[1:]...)
+		cmd.Dir = root
+		cmd.Stdout = out
+		cmd.Stderr = out
+		if err := cmd.Run(); err != nil {
+			fmt.Fprintf(out, "  ✗ %s failed: %v\n", step.Name, err)
+		}
+	}
 }
 
 func installNewHooks(abs string, opts newOptions, out io.Writer) {
