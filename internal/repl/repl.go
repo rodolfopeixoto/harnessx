@@ -171,6 +171,18 @@ func handleInput(ctx context.Context, sess *Session, opts Options, input string)
 	case input == "/help":
 		turn.Action = "help"
 		printHelp(opts.Out)
+	case input == "/history":
+		turn.Action = "history"
+		printHistory(opts.Out, sess)
+	case input == "/last":
+		last := lastPromptInput(sess)
+		if last == "" {
+			fmt.Fprintln(opts.Out, "no previous prompt yet")
+			turn.Action = "no-history"
+			return turn
+		}
+		fmt.Fprintf(opts.Out, "↻ replaying: %s\n", last)
+		return handleInput(ctx, sess, opts, last)
 	default:
 		plan, err := opts.Planner(ctx, sess.Goal, input)
 		if err != nil {
@@ -244,9 +256,39 @@ func printHelp(out io.Writer) {
 	fmt.Fprintln(out, "commands:")
 	fmt.Fprintln(out, "  /goal <dev|ads|research|ops>   switch session goal")
 	fmt.Fprintln(out, "  /plan <prompt>                 emit plan JSON without executing")
+	fmt.Fprintln(out, "  /last                          replay the previous prompt")
+	fmt.Fprintln(out, "  /history                       list previous prompts in this session")
 	fmt.Fprintln(out, "  /help                          this message")
 	fmt.Fprintln(out, "  /exit | /quit                  leave the session")
-	fmt.Fprintln(out, "any other line is treated as a prompt; planner builds + executes a plan")
+	fmt.Fprintln(out, "  end a line with \\ to continue prompt on next line")
+}
+
+func printHistory(out io.Writer, sess *Session) {
+	if sess == nil || len(sess.Turns) == 0 {
+		fmt.Fprintln(out, "history empty")
+		return
+	}
+	start := 0
+	if len(sess.Turns) > 20 {
+		start = len(sess.Turns) - 20
+	}
+	for i := start; i < len(sess.Turns); i++ {
+		fmt.Fprintf(out, "%3d  %s\n", i+1, sess.Turns[i].Input)
+	}
+}
+
+func lastPromptInput(sess *Session) string {
+	if sess == nil {
+		return ""
+	}
+	for i := len(sess.Turns) - 1; i >= 0; i-- {
+		in := sess.Turns[i].Input
+		if in == "" || strings.HasPrefix(in, "/") {
+			continue
+		}
+		return in
+	}
+	return ""
 }
 
 func sessionPath(root, id string) string {

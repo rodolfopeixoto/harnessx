@@ -3,6 +3,27 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-18 — v0.113.0 — diff preview + chat history + audit tail + ship watch (F66–F70)
+
+### New
+
+- **Colored diff preview after every `harness do` (F66)**: the
+  workflow now reads `runDir/diff.patch` + `diff-stat.txt` and prints
+  a unified-diff preview (first 40 lines) with colour for `+`, `-`,
+  `@@` hunk headers, and the diff file header. Stat block sits
+  above it.
+- **Chat `/last` and `/history` (F67)**: `/last` replays the previous
+  prompt in the session; `/history` lists the last 20 inputs (slash
+  commands omitted from `/last` resolution).
+- **`harness audit tail [--limit N]` (F68)**: explicit subcommand
+  that tails the project event log. Falls back to
+  `.harness/logs/events.jsonl` when the legacy `audit/events.jsonl`
+  is empty, so events recorded by harness runs show up immediately.
+- **`harness ship --watch` (F69)**: re-runs the ship loop whenever a
+  tracked project file changes. Polls at `--watch-interval` (default
+  3s), skips `.git`/`.harness`/`node_modules`/`vendor`/`target`/
+  `dist`/`build`/`.venv`/`__pycache__` while hashing.
+
 ## 2026-06-18 — v0.112.0 — Smoke matrix + chat multiline + tutorial polish (F61–F65)
 
 ### New

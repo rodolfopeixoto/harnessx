@@ -195,8 +195,7 @@ func newAuditCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			sink := &audit.FileSink{Path: filepath.Join(root, ".harness", "audit", "events.jsonl")}
-			events, err := sink.List(context.Background())
+			events, err := loadAuditEvents(root)
 			if err != nil {
 				return err
 			}
@@ -226,5 +225,52 @@ func newAuditCmd() *cobra.Command {
 	c.Flags().IntVar(&limit, "limit", 50, "max rows")
 	c.Flags().StringVar(&kind, "kind", "", "filter by kind (sensor|hook|agent|cleanup|...)")
 	c.Flags().BoolVar(&jsonOut, "json", false, "emit JSON")
+	c.AddCommand(newAuditTailCmd())
 	return c
+}
+
+func newAuditTailCmd() *cobra.Command {
+	var limit int
+	c := &cobra.Command{
+		Use:   "tail",
+		Short: "Tail the last N events from the project event log",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			root, err := cwd()
+			if err != nil {
+				return err
+			}
+			events, err := loadAuditEvents(root)
+			if err != nil {
+				return err
+			}
+			if limit > 0 && len(events) > limit {
+				events = events[len(events)-limit:]
+			}
+			w := tabwriter.NewWriter(cmd.OutOrStdout(), 0, 0, 2, ' ', 0)
+			fmt.Fprintln(w, "WHEN\tKIND\tSOURCE\tSUBJECT")
+			for _, e := range events {
+				fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", e.OccurredAt.Format("01-02 15:04:05"), e.Kind, e.Source, e.Subject)
+			}
+			return w.Flush()
+		},
+	}
+	c.Flags().IntVar(&limit, "limit", 30, "max rows")
+	return c
+}
+
+func loadAuditEvents(root string) ([]audit.Event, error) {
+	candidates := []string{
+		filepath.Join(root, ".harness", "audit", "events.jsonl"),
+		filepath.Join(root, ".harness", "logs", "events.jsonl"),
+	}
+	merged := []audit.Event{}
+	for _, p := range candidates {
+		sink := &audit.FileSink{Path: p}
+		evs, err := sink.List(context.Background())
+		if err != nil {
+			continue
+		}
+		merged = append(merged, evs...)
+	}
+	return merged, nil
 }
