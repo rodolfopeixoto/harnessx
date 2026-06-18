@@ -212,7 +212,7 @@ func applyNewScaffold(abs string, opts *newOptions, out io.Writer) error {
 }
 
 func runPostStepsInDir(out io.Writer, root string, m scaffoldpkg.Meta) {
-	if m.Language == "python" {
+	if m.Language == "python" || m.Language == "python-ecommerce" {
 		res, err := venvinstall.Install(context.Background(), root, "requirements.txt", out)
 		if err != nil {
 			fmt.Fprintf(out, "  ✗ venv install failed across every strategy: %v\n", err)

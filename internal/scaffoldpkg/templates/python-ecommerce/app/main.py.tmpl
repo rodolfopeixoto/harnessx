@@ -1,0 +1,16 @@
+import os
+
+from fastapi import FastAPI
+
+from app.routers import cart, checkout, products
+
+app = FastAPI(title="$NAME")
+
+app.include_router(products.router)
+app.include_router(cart.router)
+app.include_router(checkout.router)
+
+
+@app.get("/healthz")
+def healthz() -> dict[str, str]:
+    return {"status": "ok", "env": os.getenv("ENV", "dev"), "service": "$NAME"}

@@ -3,6 +3,29 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-18 — v0.115.0 — Health probe + python-ecommerce scaffold (F76–F80)
+
+### New
+
+- **`internal/agenthealth` package (F76, F79)**: race-free periodic
+  adapter health probe with `sync.RWMutex` over the status struct,
+  `atomic.Bool` for the running flag, and a `context`-driven loop.
+  Eight unit tests, including a concurrent `Snapshot()` + adapter
+  flip stress test, all clean under `-race`.
+- **`harness chat` adapter health badge**: when chat is started with
+  `--adapter X`, a 30 s background probe runs and the REPL prompt
+  shows `[dev|claude ✓]>` (yellow `⚠` on degradation). `--plain`
+  drops the colour.
+- **`python-ecommerce` scaffold (F77)**: new bundled stack
+  (`harness new python-ecommerce`). FastAPI app with
+  `products`, `cart`, `checkout` routers, Pydantic models,
+  in-memory thread-safe storage, and a pytest suite that covers
+  `/healthz`, listing/getting products, cart totals, and the
+  checkout flow. Uses the same venv hardening from F42.
+- **Tutorial (F78)** updated to bootstrap from the e-commerce
+  scaffold so the read-along walkthrough has a real backend
+  by step 1.
+
 ## 2026-06-18 — v0.113.0 — diff preview + chat history + audit tail + ship watch (F66–F70)
 
 ### New

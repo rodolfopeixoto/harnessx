@@ -100,6 +100,14 @@ func defaults(stack string) map[string]string {
 			"profile-mem": "python -X tracemalloc=25 -m app",
 			"profile-cpu": "python -m cProfile -o profile.out -m app",
 		}
+	case "python-ecommerce":
+		return map[string]string{
+			"test":  ".venv/bin/pytest -q",
+			"lint":  ".venv/bin/ruff check .",
+			"run":   ".venv/bin/uvicorn app.main:app --reload",
+			"dev":   ".venv/bin/uvicorn app.main:app --reload",
+			"bench": ".venv/bin/pytest --benchmark-only",
+		}
 	case "go":
 		return map[string]string{
 			"test":        "go test -race ./...",
