@@ -55,6 +55,9 @@ func Check(ctx context.Context, opts Options) (Result, error) {
 	}
 	res := Result{PlanID: contract.ID}
 	for _, f := range files {
+		if isAlwaysAllowed(f) {
+			continue
+		}
 		if !contract.InScope(f) {
 			res.Violations = append(res.Violations, Violation{
 				Path:   f,
@@ -63,6 +66,16 @@ func Check(ctx context.Context, opts Options) (Result, error) {
 		}
 	}
 	return res, nil
+}
+
+func isAlwaysAllowed(path string) bool {
+	allowedPrefixes := []string{".harness/", ".harness\\"}
+	for _, p := range allowedPrefixes {
+		if strings.HasPrefix(path, p) || path == strings.TrimSuffix(p, "/") {
+			return true
+		}
+	}
+	return false
 }
 
 func GitChangedFiles(ctx context.Context, root string) ([]string, error) {
