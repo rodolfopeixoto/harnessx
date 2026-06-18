@@ -59,6 +59,7 @@ func DefaultPlan(goal intentplan.Goal, prompt string) intentplan.Plan {
 		return intentplan.Plan{
 			Goal: goal, Intent: prompt, Generated: now,
 			Steps: []intentplan.Step{
+				{Kind: intentplan.StepHarness, Title: "do (apply diff)", Cmd: []string{"do", prompt, "--yes", "--autonomy", "safe_execute"}},
 				{Kind: intentplan.StepHarness, Title: "lint", Cmd: []string{"lint"}},
 				{Kind: intentplan.StepHarness, Title: "test", Cmd: []string{"test"}},
 				{Kind: intentplan.StepHarness, Title: "ci gate", Cmd: []string{"ci"}},
