@@ -14,6 +14,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/ropeixoto/harnessx/internal/projectcfg"
+	"github.com/ropeixoto/harnessx/internal/ui"
 )
 
 func newTestCmd() *cobra.Command  { return wrapperCmd("test", "Run the project test command") }
@@ -63,11 +64,17 @@ func runShellLine(ctx context.Context, stdout, stderr io.Writer, dir, line strin
 	if len(extra) > 0 {
 		line = line + " " + strings.Join(extra, " ")
 	}
+	fmt.Fprintf(stdout, "%s %s\n", ui.Muted.Render("→"), ui.Accent.Render(line))
 	cmd := exec.CommandContext(ctx, "/bin/sh", "-c", line)
 	cmd.Dir = dir
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
 	cmd.Env = os.Environ()
-	return cmd.Run()
+	if err := cmd.Run(); err != nil {
+		fmt.Fprintf(stderr, "%s %s\n", ui.MarkFail(), ui.Error.Render(err.Error()))
+		return err
+	}
+	fmt.Fprintln(stdout, ui.MarkSuccess()+" done")
+	return nil
 }

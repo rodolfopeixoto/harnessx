@@ -3,6 +3,37 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-18 — v0.108.0 — Robust venv + two-agent diagnose/fix + color UI (F42–F45)
+
+### Fixes
+
+- **Robust Python venv install (F42)**: `harness new --with-deps`
+  now tries `uv` first, then the highest stable Python found on PATH
+  (`python3.13` → `python3.12` → `python3.11` → `python3`), with three
+  fallback strategies (`ensurepip`, `--without-pip + get-pip.py`,
+  `--without-pip + system pip --prefix`). Works on hosts where
+  Python 3.14's `ensurepip` is broken.
+
+### New
+
+- **`harness diagnose`** (F43): runs the bundled diagnosers (missing
+  tools, dirty tree, unpinned plan) and writes a JSON diagnosis to
+  `.harness/artifacts/diagnoses/`. Two-agent pattern from paper §3.5.2.
+- **`harness fix [problem-id] [--all]`** (F43): applies registered
+  fixers (`install-tool`, `commit-snapshot`) to the problems surfaced
+  by `harness diagnose`. Diagnosers and Fixers are pluggable; bundled
+  defaults live in `internal/twoagent`.
+- **Color UI (F44)**: `harness new`, project wrappers (test/lint/dev/
+  bench/profile), and `harness diagnose` output now use coloured
+  markers (`✓ ✗ ⚠ ℹ ·`) via `internal/ui`. `--plain` /
+  `HARNESS_PLAIN=1` still flips everything back to ANSI-free output.
+
+### Packages added
+
+- `internal/venvinstall` — Python venv install with strategy fallback.
+- `internal/twoagent` — Diagnoser/Fixer contracts, default
+  implementations, JSON persistence.
+
 ## 2026-06-18 — v0.107.0 — Tutorial walkthrough fixes (F37–F41)
 
 Fixes raised during real end-to-end walkthrough of TUTORIAL-ECOMMERCE.md.
