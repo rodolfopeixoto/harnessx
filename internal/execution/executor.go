@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"time"
@@ -37,6 +38,9 @@ type DefaultExecutor struct {
 	// this to a stderr-writing closure so the operator sees a heartbeat
 	// while the LLM is working.
 	Status func(string)
+	// LiveOut, when non-nil, is teed into the agent subprocess stdout/
+	// stderr so the operator sees the CLI output in real time.
+	LiveOut io.Writer
 }
 
 func NewDefaultExecutor(root string, adapter agents.AgentAdapter, ss []sensors.Sensor, p index.Profile) *DefaultExecutor {
@@ -250,6 +254,9 @@ func (e *DefaultExecutor) finalizeNoChanges(ctx context.Context, req Request, wt
 func (e *DefaultExecutor) invokeAdapter(ctx context.Context, req Request, wt Worktree, agentReq agents.AgentRequest) agents.AgentResult {
 	if e.Status != nil {
 		e.Status("calling " + e.Adapter.ID() + "...")
+	}
+	if e.LiveOut != nil {
+		agentReq.LiveOut = e.LiveOut
 	}
 	start := time.Now()
 	var res agents.AgentResult

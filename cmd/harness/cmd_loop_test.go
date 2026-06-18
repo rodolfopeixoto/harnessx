@@ -26,10 +26,10 @@ func TestLoopCmdShortIncludesLoopKeyword(t *testing.T) {
 	}
 }
 
-func TestLoopCmdAcceptsAtLeastOneArg(t *testing.T) {
+func TestLoopCmdAcceptsZeroOrMoreArgs(t *testing.T) {
 	c := newLoopCmd()
-	if err := c.Args(c, []string{}); err == nil {
-		t.Error("loop with zero args should error")
+	if err := c.Args(c, []string{}); err != nil {
+		t.Errorf("loop with zero args should now be allowed (F59): %v", err)
 	}
 	if err := c.Args(c, []string{"fix x"}); err != nil {
 		t.Errorf("loop with one arg should accept: %v", err)

@@ -33,15 +33,19 @@ pass, on --max-attempts exhaustion, or when --budget-usd is consumed.
 Lint/test commands auto-detect from a scaffolded project (Python →
 ruff/pytest, Go → golangci-lint/go test, etc.). Override with --lint
 and --test.`,
-		Args: cobra.MinimumNArgs(1),
+		Args: cobra.MinimumNArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			dir, err := cwd()
 			if err != nil {
 				return err
 			}
+			prompt := strings.Join(args, " ")
+			if prompt == "" {
+				prompt = "iterate on the current diff until lint and tests pass"
+			}
 			res, err := devloop.Run(cmd.Context(), devloop.Options{
 				StartDir:    dir,
-				Prompt:      strings.Join(args, " "),
+				Prompt:      prompt,
 				AgentID:     agentID,
 				Autonomy:    autonomy,
 				BudgetUSD:   budgetUSD,

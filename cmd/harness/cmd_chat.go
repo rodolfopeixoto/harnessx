@@ -61,7 +61,19 @@ apply.`,
 				}
 				adapter, ok := reg.Get(adapterID)
 				if !ok {
-					return fmt.Errorf("chat: adapter %q not registered", adapterID)
+					for _, fid := range []string{"claude", "codex", "gemini", "kimi"} {
+						if a, found := reg.Get(fid); found && fid != adapterID {
+							fmt.Fprintf(cmd.OutOrStdout(), "chat: adapter %q not registered, falling back to %q\n", adapterID, fid)
+							adapter, adapterID, ok = a, fid, true
+							break
+						}
+					}
+					if !ok {
+						return fmt.Errorf("chat: adapter %q not registered (no fallback found)", adapterID)
+					}
+				}
+				if h := adapter.Healthcheck(cmd.Context()); !h.OK {
+					fmt.Fprintf(cmd.OutOrStdout(), "chat: %s healthcheck warn: %s\n", adapterID, h.Err)
 				}
 				planner, err := repl.NewLLMPlanner(repl.LLMPlannerOptions{
 					Adapter:    adapter,
