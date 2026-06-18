@@ -20,6 +20,8 @@ import (
 	"github.com/ropeixoto/harnessx/internal/projectcfg"
 	"github.com/ropeixoto/harnessx/internal/scaffoldpkg"
 	"github.com/ropeixoto/harnessx/internal/scm"
+	"github.com/ropeixoto/harnessx/internal/ui"
+	"github.com/ropeixoto/harnessx/internal/venvinstall"
 )
 
 type newOptions struct {
@@ -89,9 +91,10 @@ func runNewProject(ctx context.Context, out io.Writer, opts newOptions) error {
 		return err
 	}
 	installNewHooks(abs, opts, out)
-	fmt.Fprintf(out, "\n✓ project ready at %s\n", abs)
-	fmt.Fprintf(out, "  cd %s\n  harness lint && harness test && harness dev\n", opts.target)
-	fmt.Fprintf(out, "  harness ship \"<your first feature>\"\n")
+	fmt.Fprintf(out, "\n%s %s\n", ui.MarkSuccess(), ui.Accent.Render("project ready at "+abs))
+	fmt.Fprintf(out, "  %s cd %s\n", ui.Muted.Render("→"), opts.target)
+	fmt.Fprintf(out, "  %s harness lint %s harness test %s harness dev\n", ui.Muted.Render("→"), ui.Muted.Render("&&"), ui.Muted.Render("&&"))
+	fmt.Fprintf(out, "  %s harness ship \"<your first feature>\"\n", ui.Muted.Render("→"))
 	return nil
 }
 
@@ -172,6 +175,16 @@ func applyNewScaffold(abs string, opts *newOptions, out io.Writer) error {
 }
 
 func runPostStepsInDir(out io.Writer, root string, m scaffoldpkg.Meta) {
+	if m.Language == "python" {
+		res, err := venvinstall.Install(context.Background(), root, "requirements.txt", out)
+		if err != nil {
+			fmt.Fprintf(out, "  ✗ venv install failed across every strategy: %v\n", err)
+			fmt.Fprintln(out, "    fix: install uv (https://docs.astral.sh/uv/) or python3.11/3.12/3.13 and rerun --with-deps")
+			return
+		}
+		fmt.Fprintf(out, "  ✓ deps installed via %s strategy\n", res.Strategy)
+		return
+	}
 	for _, step := range m.PostSteps {
 		fmt.Fprintf(out, "new: post-step %s — %v\n", step.Name, step.Cmd)
 		cmd := osexec.Command(step.Cmd[0], step.Cmd[1:]...)
