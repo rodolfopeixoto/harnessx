@@ -15,6 +15,7 @@ import (
 	"github.com/ropeixoto/harnessx/internal/promptenh"
 	"github.com/ropeixoto/harnessx/internal/router"
 	"github.com/ropeixoto/harnessx/internal/sensors"
+	"github.com/ropeixoto/harnessx/internal/ui"
 )
 
 // runWithExecutor migrates the agentic step onto execution.DefaultExecutor
@@ -65,7 +66,8 @@ func runWithExecutorAndComplexity(ctx stdctx.Context, rc runtimeCtx, mode domain
 		fmt.Fprintf(out, "Execute: run=%s status=%s files=%d cost=$%.4f\n",
 			res.RunID, res.Status, len(res.ChangedFiles), res.EstimatedCostUSD)
 		if res.DiffPath != "" {
-			fmt.Fprintf(out, "  diff: %s\n", res.DiffPath)
+			fmt.Fprintf(out, "  %s diff: %s\n", ui.MarkInfo(), res.DiffPath)
+			printDiffPreview(out, res.DiffPath, res.DiffStatPath)
 		}
 		if res.ReportPath != "" {
 			fmt.Fprintf(out, "  report: %s\n", res.ReportPath)

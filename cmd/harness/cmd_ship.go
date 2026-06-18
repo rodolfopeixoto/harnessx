@@ -34,6 +34,8 @@ type shipOptions struct {
 	skipCommit     bool
 	planID         string
 	agentID        string
+	watch          bool
+	watchInterval  time.Duration
 }
 
 func newShipCmd() *cobra.Command {
@@ -63,6 +65,9 @@ chain.`,
 		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.prompt = strings.Join(args, " ")
+			if opts.watch {
+				return runShipWatch(cmd.Context(), cmd.OutOrStdout(), opts)
+			}
 			return runShip(cmd.Context(), cmd.OutOrStdout(), opts)
 		},
 	}
@@ -76,6 +81,8 @@ chain.`,
 	c.Flags().BoolVar(&opts.skipCommit, "skip-commit", false, "do not create the final conventional commit")
 	c.Flags().StringVar(&opts.planID, "plan", "", "PLAN contract id (ulid or filename); paper §3.4.2")
 	c.Flags().StringVar(&opts.agentID, "agent", "", "force a specific adapter id (overrides router + active pin)")
+	c.Flags().BoolVar(&opts.watch, "watch", false, "re-run ship loop whenever a project file changes")
+	c.Flags().DurationVar(&opts.watchInterval, "watch-interval", 3*time.Second, "polling interval in --watch mode")
 	return c
 }
 
