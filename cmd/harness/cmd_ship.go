@@ -16,6 +16,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/ropeixoto/harnessx/internal/activeagent"
 	"github.com/ropeixoto/harnessx/internal/plancontract"
 	"github.com/ropeixoto/harnessx/internal/scm"
 	"github.com/ropeixoto/harnessx/internal/sensors/planscope"
@@ -32,6 +33,7 @@ type shipOptions struct {
 	dryRun         bool
 	skipCommit     bool
 	planID         string
+	agentID        string
 }
 
 func newShipCmd() *cobra.Command {
@@ -73,6 +75,7 @@ chain.`,
 	c.Flags().BoolVar(&opts.dryRun, "dry-run", false, "print steps without invoking them")
 	c.Flags().BoolVar(&opts.skipCommit, "skip-commit", false, "do not create the final conventional commit")
 	c.Flags().StringVar(&opts.planID, "plan", "", "PLAN contract id (ulid or filename); paper §3.4.2")
+	c.Flags().StringVar(&opts.agentID, "agent", "", "force a specific adapter id (overrides router + active pin)")
 	return c
 }
 
@@ -117,6 +120,10 @@ func prepareShip(ctx context.Context, out io.Writer, opts *shipOptions) (string,
 			opts.prompt = contract.Intent
 		}
 	}
+	opts.agentID = activeagent.ResolveAgentID(root, opts.agentID)
+	if opts.agentID != "" {
+		fmt.Fprintf(out, "ship: agent=%s\n", opts.agentID)
+	}
 	return root, nil
 }
 
@@ -132,9 +139,12 @@ func buildShipSteps(ctx context.Context, out io.Writer, bin, root string, opts s
 		attempt := i + 1
 		steps = append(steps,
 			func() error {
+				doArgs := []string{"do", opts.prompt, "--autonomy", opts.autonomy, "--yes"}
+				if opts.agentID != "" {
+					doArgs = append(doArgs, "--agent", opts.agentID)
+				}
 				return shipRunStep(ctx, out, bin, root, opts,
-					fmt.Sprintf("do attempt %d", attempt),
-					[]string{"do", opts.prompt, "--autonomy", opts.autonomy})
+					fmt.Sprintf("do attempt %d", attempt), doArgs)
 			},
 			func() error {
 				err := shipRunStep(ctx, out, bin, root, opts, fmt.Sprintf("ci attempt %d", attempt),

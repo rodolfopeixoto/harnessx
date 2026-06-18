@@ -3,6 +3,37 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-18 — v0.110.0 — Real agent flow (F52–F55)
+
+### New
+
+- **`harness use <adapter-id>`** pins the active LLM adapter for the
+  project. Writes `.harness/config/active.yaml`. `harness do`,
+  `harness ship`, and `harness chat` pick it up automatically; CLI
+  overrides win (`--agent`, `--adapter`). `harness use --clear`
+  removes the pin. `harness use` with no arg shows the current pin.
+- **`harness do --agent <id>`** flag forces a specific adapter for a
+  routed task.
+- **`harness ship --agent <id>`** forwards the choice into the
+  embedded `harness do` invocation.
+
+### Fixes
+
+- `harness chat` consults the active pin when `--adapter` is empty.
+- `harness ship` passes `--yes` to the embedded `harness do` so the
+  loop stays non-interactive.
+
+### Tutorial
+
+- `docs/TUTORIAL-ECOMMERCE.md` rewritten to pin a real adapter
+  (`harness use claude`) and drop the manual scaffold commit (now
+  automatic in F46).
+
+### Packages
+
+- New `internal/activeagent` — load/save/clear/resolve the project
+  adapter pin.
+
 ## 2026-06-18 — v0.109.0 — Tutorial end-to-end fixes (F46–F51)
 
 Real-walk fixes uncovered while running TUTORIAL-ECOMMERCE.md.
