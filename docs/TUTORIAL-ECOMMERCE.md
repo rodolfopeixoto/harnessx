@@ -136,49 +136,49 @@ harness plan check --plan "${PLAN_ID}"    # baseline: empty diff -> green
 
 ---
 
-## 4. Pick a model (§3.5.3)
+## 4. Pin an agent (§3.5.3)
 
-By default, HarnessX uses the bundled router map. Override per task
-with the audited config wizard:
+Make sure at least one coding-CLI is installed and authenticated. The
+quickest path is Anthropic's Claude Code (`brew install claude`) signed
+in with `claude login`. `harness doctor` confirms which adapters it
+sees and which still need credentials.
+
+Pin Claude Code as the default for this project. `harness do`,
+`harness ship`, and `harness chat` all pick this up unless overridden
+on the call:
+
+```bash
+harness use claude
+harness use            # confirm
+```
+
+Per-task overrides land in `.harness/config/routes.yaml`:
 
 ```bash
 harness config show
-harness config set --task implementation --primary kimi --fallback gemini,claude --budget 0.5
-harness config show
+harness config set --task implementation --primary claude --fallback codex,kimi --budget 0.5
 cat .harness/logs/config-mutations.jsonl   # before / after recorded
 ```
 
-Prefer the deterministic planner first; flip to the LLM planner when
-you want a richer plan:
+If you prefer to flip agents inline, every command takes
+`--agent <id>` and stays inside the audit trail:
 
 ```bash
-harness chat --goal dev
-> /plan add /products endpoint returning a static catalogue
-> /exit
-
-harness chat --goal dev --adapter ollama --model llama3.1:8b
-> add /products endpoint with pytest coverage
-> /exit
+harness do "add /readyz endpoint with pytest" --agent kimi
+harness ship "implement /products" --agent claude
+harness chat --goal dev --adapter claude
 ```
 
-Each `harness chat` session lands at
-`.harness/sessions/<ulid>.jsonl` with every turn (input, plan, exec
-result).
+Each `harness chat` session lands at `.harness/sessions/<ulid>.jsonl`
+with every turn (input, plan, exec result).
 
 ---
 
 ## 5. Ship the first feature (§3.4 + §3.4.2)
 
-`harness ship` refuses to run on a dirty tree because the loop needs a
-known baseline. Commit the scaffold first:
-
-```bash
-git add -A
-git -c user.email=you@example.com -c user.name="You" \
-    commit -m "chore: initial scaffold"
-```
-
-Now ship the feature end-to-end:
+`harness new --yes --with-deps` already committed the scaffold as
+`chore: scaffold baseline`. Ship the feature end-to-end against your
+pinned agent:
 
 ```bash
 harness ship "implement GET /products returning a static catalogue with pytest" \
@@ -405,27 +405,29 @@ git push -u origin feature/shop-api-cart-checkout
 ## Cheat-sheet (one-pager)
 
 ```bash
-harness new python ./shop-api --yes
+harness new python ./shop-api --yes --with-deps   # auto-commits scaffold baseline
 cd shop-api
+harness use claude                                # pin default agent
 
 harness plan write "build product catalogue and cart" \
   --file app.py --file tests/test_app.py \
   --invariant "ruff stays green" \
   --validate "harness ci" --risk medium
-PLAN_ID=01...
-
+PLAN_ID=$(ls -t .harness/artifacts/plans/PLAN-*.md | head -1 \
+  | xargs basename | sed 's/^PLAN-//; s/\.md$//')
 printf "active_plan_id: %s\n" "$PLAN_ID" > .harness/config/plan.yaml
 
-harness config set --task implementation --primary kimi \
-  --fallback gemini,claude --budget 0.5
+harness config set --task implementation --primary claude \
+  --fallback codex,kimi --budget 0.5
 
-harness ship "implement GET /products with pytest" --plan ${PLAN_ID}
+harness ship "implement GET /products with pytest" --plan "$PLAN_ID"
 harness orchestrate run cart-cycle
-harness chat --goal dev --adapter ollama
+harness chat --goal dev                           # uses pinned adapter
 
+RUN_ID=$(ls -t .harness/runs/ | head -1)
 harness memory promote --scope project --kind semantic \
   --content "cart lives in app.state.cart_db" \
-  --run-id <run> --confidence 0.85
+  --run-id "$RUN_ID" --confidence 0.85
 
 harness coverage --threshold 0.9
 harness evolve diagnose

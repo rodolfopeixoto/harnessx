@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/ropeixoto/harnessx/internal/activeagent"
 	"github.com/ropeixoto/harnessx/internal/app/agentcmd"
 	"github.com/ropeixoto/harnessx/internal/intentplan"
 	"github.com/ropeixoto/harnessx/internal/repl"
@@ -52,6 +53,7 @@ apply.`,
 				Out:         cmd.OutOrStdout(),
 				StepTimeout: stepTimeout,
 			}
+			adapterID = activeagent.ResolveAgentID(dir, adapterID)
 			if adapterID != "" {
 				reg, _, err := agentcmd.LoadAll(dir)
 				if err != nil {
