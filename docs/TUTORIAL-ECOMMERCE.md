@@ -230,7 +230,7 @@ steps:
   - role: coder
     command: ["harness", "do",
               "implement POST /cart and GET /cart/{user_id} backed by an in-memory dict",
-              "--autonomy", "safe_execute", "--apply"]
+              "--autonomy", "safe_execute", "--yes"]
   - role: tester
     command: ["harness", "test"]
   - role: reviewer

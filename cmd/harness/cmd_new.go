@@ -91,6 +91,7 @@ func runNewProject(ctx context.Context, out io.Writer, opts newOptions) error {
 		return err
 	}
 	installNewHooks(abs, opts, out)
+	commitScaffoldBaseline(ctx, abs, out)
 	fmt.Fprintf(out, "\n%s %s\n", ui.MarkSuccess(), ui.Accent.Render("project ready at "+abs))
 	fmt.Fprintf(out, "  %s cd %s\n", ui.Muted.Render("→"), opts.target)
 	fmt.Fprintf(out, "  %s harness lint %s harness test %s harness dev\n", ui.Muted.Render("→"), ui.Muted.Render("&&"), ui.Muted.Render("&&"))
@@ -129,6 +130,9 @@ func prepareNewTarget(ctx context.Context, opts *newOptions, out io.Writer) (str
 	if err != nil {
 		return "", err
 	}
+	if err := guardNewTarget(abs); err != nil {
+		return "", err
+	}
 	if err := os.MkdirAll(abs, 0o755); err != nil {
 		return "", err
 	}
@@ -143,6 +147,39 @@ func prepareNewTarget(ctx context.Context, opts *newOptions, out io.Writer) (str
 		return "", err
 	}
 	return abs, nil
+}
+
+func guardNewTarget(abs string) error {
+	entries, err := os.ReadDir(abs)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	for _, e := range entries {
+		name := e.Name()
+		if name == ".git" || name == ".harness" {
+			continue
+		}
+		return fmt.Errorf("new: target %s is not empty (found %q); pick a fresh path or rerun inside the existing project", abs, name)
+	}
+	return nil
+}
+
+func commitScaffoldBaseline(ctx context.Context, root string, out io.Writer) {
+	for _, args := range [][]string{
+		{"add", "-A"},
+		{"-c", "user.email=harness@local", "-c", "user.name=harness new", "commit", "-q", "-m", "chore: scaffold baseline"},
+	} {
+		cmd := osexec.CommandContext(ctx, "git", args...)
+		cmd.Dir = root
+		if err := cmd.Run(); err != nil {
+			fmt.Fprintf(out, "new: baseline commit step failed (%v) — commit manually before harness ship\n", err)
+			return
+		}
+	}
+	fmt.Fprintln(out, "new: scaffold committed as baseline (chore: scaffold baseline)")
 }
 
 func applyNewScaffold(abs string, opts *newOptions, out io.Writer) error {

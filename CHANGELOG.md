@@ -3,6 +3,32 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-18 — v0.109.0 — Tutorial end-to-end fixes (F46–F51)
+
+Real-walk fixes uncovered while running TUTORIAL-ECOMMERCE.md.
+
+### Fixes
+
+- **`harness new` refuses non-empty target** (F46). Previously rerunning
+  `harness new python ./shop-api` inside an existing project created
+  `./shop-api/shop-api/shop-api/...`.
+- **`harness new` auto-commits the scaffold baseline** (F46). The
+  scaffolded tree is staged + committed as `chore: scaffold baseline`
+  so `harness ship --plan <id>` no longer trips on
+  *working tree dirty*.
+- **`forbidden_files` sensor default-excludes virtualenvs, caches, and
+  IDE dirs** (F47): `.venv`, `venv`, `__pycache__`, `.pytest_cache`,
+  `.ruff_cache`, `.mypy_cache`, `.tox`, `.cache`, `.idea`, `.vscode`,
+  `.bundle`, `.gradle`, `.next`, `.nuxt`, `.turbo`, `.parcel-cache`,
+  `coverage`, `htmlcov`.
+- **`plan_scope` sensor allows `.harness/` by default** (F48). The
+  metadata tree never counts as out-of-scope.
+- **`harness chat --goal dev` planner runs `harness do` first**, then
+  lint + test + ci (F50). Previously the default plan only verified;
+  it never wrote any code.
+- Tutorial `cart-cycle.yaml` example drops the unknown `--apply` flag
+  on `harness do` (F49).
+
 ## 2026-06-18 — v0.108.0 — Robust venv + two-agent diagnose/fix + color UI (F42–F45)
 
 ### Fixes
