@@ -69,6 +69,9 @@ func Promote(ctx context.Context, repo *sqlite.Repo, c Candidate, db SQLExec) (d
 	if c.EvidenceRunID == "" {
 		return domain.Memory{}, ErrMissingEvidence
 	}
+	if strings.HasPrefix(c.EvidenceRunID, "--") {
+		return domain.Memory{}, fmt.Errorf("%w: run id looks like a flag (%q) — likely empty shell variable", ErrMissingEvidence, c.EvidenceRunID)
+	}
 	if c.Confidence < confidenceFloor {
 		return domain.Memory{}, ErrLowConfidence
 	}

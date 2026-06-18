@@ -26,10 +26,14 @@ func Resolve(root, id string) (string, error) {
 	if filepath.IsAbs(id) {
 		return id, nil
 	}
-	if strings.HasPrefix(id, "PLAN-") || strings.HasSuffix(id, ".md") {
-		return filepath.Join(root, ".harness", "artifacts", "plans", id), nil
+	name := id
+	if !strings.HasPrefix(name, "PLAN-") {
+		name = "PLAN-" + name
 	}
-	return filepath.Join(root, ".harness", "artifacts", "plans", "PLAN-"+id+".md"), nil
+	if !strings.HasSuffix(name, ".md") {
+		name += ".md"
+	}
+	return filepath.Join(root, ".harness", "artifacts", "plans", name), nil
 }
 
 func Load(root, id string) (Contract, error) {

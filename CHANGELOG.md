@@ -3,7 +3,31 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
-## 2026-06-17 — v0.106.0 — Tutorial blockers + update safety (F32–F36)
+## 2026-06-18 — v0.107.0 — Tutorial walkthrough fixes (F37–F41)
+
+Fixes raised during real end-to-end walkthrough of TUTORIAL-ECOMMERCE.md.
+
+### Fixes
+
+- `harness new --with-deps` now actually runs the scaffold's post_steps
+  (`venv` + `pip install`, `bundle install`, `cargo build`, `npm
+  install`). Previously the flag existed but did nothing, so
+  `harness lint` / `harness test` immediately failed with
+  `.venv/bin/ruff: No such file or directory` (F37).
+- `harness plan check --plan <id>` accepts bare ulids, `PLAN-<ulid>`,
+  and `PLAN-<ulid>.md` interchangeably. Previously a `PLAN-` prefix
+  produced an invalid path (no `.md` suffix) and erroed out (F38).
+- `harness memory promote` rejects a `--run-id` that looks like a
+  flag (starts with `--`). This catches the common shell pitfall where
+  an empty variable expansion shifts subsequent args (`--run-id $BLANK
+  --confidence 0.85` → `--run-id` got the literal string
+  `"--confidence"`, and `--confidence` silently fell back to its
+  default) (F39).
+- Tutorial rewritten (F40): captures `PLAN_ID` from the artifact
+  filename, commits the scaffold before `harness ship`, points at
+  `.harness/runs/` for run ids instead of the legacy `_do/` path.
+
+
 
 Fixes blocking the e-commerce tutorial walkthrough.
 
