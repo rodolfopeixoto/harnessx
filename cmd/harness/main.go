@@ -110,6 +110,8 @@ func newRoot() *cobra.Command {
 		newConfigCmd(),
 		newChatCmd(),
 		newCoverageCmd(),
+		newDiagnoseCmd(),
+		newFixCmd(),
 	)
 	root.Args = cobra.ArbitraryArgs
 	root.RunE = func(cmd *cobra.Command, args []string) error {
