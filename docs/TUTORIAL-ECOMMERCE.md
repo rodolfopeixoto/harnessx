@@ -188,6 +188,18 @@ harness ship "implement GET /products returning a static catalogue with pytest" 
   --rate-limit-retries 3
 ```
 
+While the agent is working, its CLI stdout streams **live** through
+HarnessX prefixed with `│ `:
+
+```
+ship: do attempt 1 — harness do "implement GET /products..." --yes --autonomy ask
+  [agent] calling claude...
+  │ ⏺ Reading app.py
+  │ ⏺ Writing tests/test_products.py
+  │ ⏺ Diff: 2 files changed, 18 insertions(+)
+  [agent] claude returned in 9.2s
+```
+
 Under the hood `ship`:
 
 1. Branches `feature/implement-get-products...` from `develop` (or
@@ -200,6 +212,10 @@ Under the hood `ship`:
 
 If `harness ci` stays red, the loop emits failure context back into
 the next `harness do` attempt — paper §3.4 PEV loop.
+
+> The `harness chat` REPL also accepts multi-line prompts: end any
+> input line with a trailing `\` and the prompt continues onto the
+> next line.
 
 Inspect the run:
 

@@ -3,6 +3,28 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-18 — v0.112.0 — Smoke matrix + chat multiline + tutorial polish (F61–F65)
+
+### New
+
+- **Smoke matrix expanded (F61)**: every fresh-project run now also
+  exercises `harness use claude`, `harness use`, `harness use --clear`,
+  `harness diagnose`, `harness orchestrate list`, `harness agent list`,
+  `harness config show`, `harness plan write --help`, `harness ship
+  --help`, `harness chat --help`, `harness coverage --help`,
+  `harness loop --help`, `harness evolve diagnose`,
+  `harness smoke --help`. Catches regressions in the new commands
+  before they reach end users.
+- **Chat multiline prompts (F63)**: end any `harness chat` input line
+  with a trailing `\` and the REPL keeps reading until you submit a
+  line without one. Continuation prompt is `[goal]…`.
+
+### Tutorial
+
+- `docs/TUTORIAL-ECOMMERCE.md` shows the live agent stream output
+  (the `│ ` prefix the workflow injects) and documents the multi-line
+  `harness chat` UX (F64).
+
 ## 2026-06-18 — v0.111.0 — Streaming + stack-aware coverage + loop UX (F56–F60)
 
 ### New

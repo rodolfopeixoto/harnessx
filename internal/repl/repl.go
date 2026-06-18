@@ -120,14 +120,13 @@ func Run(ctx context.Context, opts Options) error {
 	rd := bufio.NewReader(opts.In)
 	for {
 		fmt.Fprintf(opts.Out, "\n[%s]> ", sess.Goal)
-		line, err := rd.ReadString('\n')
+		input, err := readMultilineInput(rd, opts.Out, sess.Goal)
 		if err != nil {
 			if errors.Is(err, io.EOF) {
 				break
 			}
 			return err
 		}
-		input := strings.TrimSpace(line)
 		if input == "" {
 			continue
 		}
@@ -198,6 +197,25 @@ func handleInput(ctx context.Context, sess *Session, opts Options, input string)
 		}
 	}
 	return turn
+}
+
+func readMultilineInput(rd *bufio.Reader, out io.Writer, goal intentplan.Goal) (string, error) {
+	var parts []string
+	for {
+		line, err := rd.ReadString('\n')
+		if err != nil && line == "" {
+			return "", err
+		}
+		trimmed := strings.TrimRight(line, "\n")
+		if strings.HasSuffix(trimmed, "\\") {
+			parts = append(parts, strings.TrimSuffix(trimmed, "\\"))
+			fmt.Fprintf(out, "[%s]… ", goal)
+			continue
+		}
+		parts = append(parts, trimmed)
+		break
+	}
+	return strings.TrimSpace(strings.Join(parts, "\n")), nil
 }
 
 func shouldExit(line string) bool {

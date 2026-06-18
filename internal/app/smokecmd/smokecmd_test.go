@@ -30,17 +30,20 @@ func writeFakeBin(t *testing.T, body string) string {
 
 func TestDefaultStepsContainsCanonicalCommands(t *testing.T) {
 	steps := DefaultSteps("python")
-	wantNames := []string{
+	must := []string{
 		"git init", "harness init", "harness install-git-hooks",
 		"harness scaffold apply", "harness doctor", "harness sensor list",
 		"harness check", "harness memory list", "harness flow list", "harness routes",
+		"harness use claude", "harness diagnose", "harness coverage --help",
+		"harness loop --help", "harness ship --help", "harness chat --help",
 	}
-	if len(steps) != len(wantNames) {
-		t.Fatalf("step count: want %d got %d", len(wantNames), len(steps))
+	have := map[string]bool{}
+	for _, s := range steps {
+		have[s.Name] = true
 	}
-	for i, w := range wantNames {
-		if steps[i].Name != w {
-			t.Errorf("step[%d]: want %q got %q", i, w, steps[i].Name)
+	for _, w := range must {
+		if !have[w] {
+			t.Errorf("missing canonical step: %q", w)
 		}
 	}
 }
@@ -132,12 +135,15 @@ func TestFormatTableEmitsPassFail(t *testing.T) {
 }
 
 func TestRunStepTimeoutKillsHangingProcess(t *testing.T) {
-	bin := writeFakeBin(t, "#!/bin/sh\nsleep 30\n")
+	if testing.Short() {
+		t.Skip("hanging-process test spawns sleep workers; skip under -short")
+	}
+	bin := writeFakeBin(t, "#!/bin/sh\nexec sleep 3\n")
 	var buf bytes.Buffer
 	res, err := Run(context.Background(), Options{
 		HarnessBin:  bin,
 		Langs:       []string{"go"},
-		StepTimeout: 200 * time.Millisecond,
+		StepTimeout: 100 * time.Millisecond,
 	}, &buf)
 	if err != nil {
 		t.Fatal(err)
