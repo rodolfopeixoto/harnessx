@@ -13,7 +13,7 @@ func TestListAllBundledLanguages(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []string{"go", "python", "rails", "react", "ruby", "rust"}
+	want := []string{"go", "python", "python-ecommerce", "rails", "react", "ruby", "rust"}
 	if len(got) != len(want) {
 		t.Fatalf("want %d langs, got %d: %v", len(want), len(got), got)
 	}
