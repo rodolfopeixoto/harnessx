@@ -32,6 +32,30 @@ type Runner interface {
 
 type defaultRunner struct{}
 
+func runStreamed(ctx context.Context, name string, args []string, stdin, workingDir string, live io.Writer) ([]byte, []byte, int, error) {
+	cmd := exec.CommandContext(ctx, name, args...)
+	if workingDir != "" {
+		cmd.Dir = workingDir
+	}
+	if stdin != "" {
+		cmd.Stdin = strings.NewReader(stdin)
+	}
+	var out, errb bytes.Buffer
+	cmd.Stdout = io.MultiWriter(&out, live)
+	cmd.Stderr = io.MultiWriter(&errb, live)
+	err := cmd.Run()
+	exitCode := 0
+	if err != nil {
+		var ee *exec.ExitError
+		if errors.As(err, &ee) {
+			exitCode = ee.ExitCode()
+		} else {
+			exitCode = -1
+		}
+	}
+	return out.Bytes(), errb.Bytes(), exitCode, err
+}
+
 func (defaultRunner) Run(ctx context.Context, name string, args []string, stdin string, workingDir string) ([]byte, []byte, int, error) {
 	cmd := exec.CommandContext(ctx, name, args...)
 	if workingDir != "" {
@@ -105,7 +129,14 @@ func (a *Adapter) Run(ctx context.Context, req agents.AgentRequest) agents.Agent
 		wd = "" // caller passes project root via req.WorkingDir; leave empty to inherit cwd
 	}
 
-	stdout, stderr, code, err := a.Runner.Run(rctx, a.Spec.Command.Binary, args, stdin, wd)
+	var stdout, stderr []byte
+	var code int
+	var err error
+	if req.LiveOut != nil {
+		stdout, stderr, code, err = runStreamed(rctx, a.Spec.Command.Binary, args, stdin, wd, req.LiveOut)
+	} else {
+		stdout, stderr, code, err = a.Runner.Run(rctx, a.Spec.Command.Binary, args, stdin, wd)
+	}
 	out := agents.AgentOutput{Stdout: stdout, Stderr: stderr}
 	if a.Spec.Output.FinalMessageJSONPath != "" {
 		out.FinalMessage = extractJSONPath(stdout, a.Spec.Output.Format, a.Spec.Output.FinalMessageJSONPath)

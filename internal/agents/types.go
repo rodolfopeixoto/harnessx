@@ -7,6 +7,7 @@ package agents
 
 import (
 	"context"
+	"io"
 	"time"
 )
 
@@ -59,6 +60,9 @@ type AgentRequest struct {
 	// by the executor to inject capabilities the YAML spec opts in to
 	// (e.g. --mcp-config <path>) without templating the spec itself.
 	ExtraArgs []string
+	// LiveOut, when non-nil, receives the adapter's stdout/stderr as it
+	// streams. CLI-wrapping adapters tee their subprocess pipes into it.
+	LiveOut io.Writer
 }
 
 type AgentResult struct {
