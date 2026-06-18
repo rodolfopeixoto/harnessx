@@ -88,6 +88,20 @@ func DefaultSteps(lang string) []Step {
 		{Name: "harness memory list", Args: []string{"memory", "list"}, Kind: KindCLI},
 		{Name: "harness flow list", Args: []string{"flow", "list"}, Kind: KindCLI},
 		{Name: "harness routes", Args: []string{"routes"}, Kind: KindCLI},
+		{Name: "harness use claude", Args: []string{"use", "claude"}, Kind: KindCLI},
+		{Name: "harness use show", Args: []string{"use"}, Kind: KindCLI},
+		{Name: "harness use --clear", Args: []string{"use", "--clear"}, Kind: KindCLI},
+		{Name: "harness diagnose", Args: []string{"diagnose"}, Kind: KindCLI},
+		{Name: "harness orchestrate list", Args: []string{"orchestrate", "list"}, Kind: KindCLI},
+		{Name: "harness agent list", Args: []string{"agent", "list"}, Kind: KindCLI},
+		{Name: "harness config show", Args: []string{"config", "show"}, Kind: KindCLI},
+		{Name: "harness plan write --help", Args: []string{"plan", "write", "--help"}, Kind: KindCLI},
+		{Name: "harness ship --help", Args: []string{"ship", "--help"}, Kind: KindCLI},
+		{Name: "harness chat --help", Args: []string{"chat", "--help"}, Kind: KindCLI},
+		{Name: "harness coverage --help", Args: []string{"coverage", "--help"}, Kind: KindCLI},
+		{Name: "harness loop --help", Args: []string{"loop", "--help"}, Kind: KindCLI},
+		{Name: "harness evolve diagnose", Args: []string{"evolve", "diagnose"}, Kind: KindCLI},
+		{Name: "harness smoke --help", Args: []string{"smoke", "--help"}, Kind: KindCLI},
 	}
 }
 
