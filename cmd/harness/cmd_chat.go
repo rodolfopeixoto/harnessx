@@ -26,6 +26,7 @@ func newChatCmd() *cobra.Command {
 		stepTimeout time.Duration
 		noAdapter   bool
 		resumeID    string
+		autoGate    bool
 	)
 	c := &cobra.Command{
 		Use:   "chat",
@@ -58,6 +59,7 @@ the deterministic planner.`,
 				In:          cmd.InOrStdin(),
 				Out:         cmd.OutOrStdout(),
 				StepTimeout: stepTimeout,
+				AutoGate:    autoGate,
 			}
 			if resumeID != "" {
 				sess, err := repl.LoadSession(dir, resumeID)
@@ -103,6 +105,9 @@ the deterministic planner.`,
 				opts.Adapter = adapter
 				opts.AdapterID = adapterID
 				opts.Model = model
+				for _, id := range reg.IDs() {
+					opts.AdaptersList = append(opts.AdaptersList, id)
+				}
 				fmt.Fprintf(cmd.OutOrStdout(), "chat: %s wired — plain text streams to agent; /exec for harness plan\n", adapterID)
 				probe := agenthealth.New(adapter, 30*time.Second)
 				probe.Start(cmd.Context())
@@ -119,6 +124,7 @@ the deterministic planner.`,
 	c.Flags().DurationVar(&stepTimeout, "step-timeout", 5*time.Minute, "per-step timeout")
 	c.Flags().BoolVar(&noAdapter, "no-adapter", false, "force deterministic planner; skip adapter auto-pin")
 	c.Flags().StringVar(&resumeID, "resume", "", "resume a prior session id from .harness/sessions/")
+	c.Flags().BoolVar(&autoGate, "auto-gate", false, "run harness ci after every agent turn (toggle in-chat with /auto-gate)")
 	c.AddCommand(newChatListCmd())
 	return c
 }

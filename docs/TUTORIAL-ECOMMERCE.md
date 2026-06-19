@@ -70,8 +70,13 @@ harness ci      # full sensor gate — green
 
 ```bash
 harness use claude          # pins claude as the active adapter
-harness chat --goal dev --adapter claude
+harness chat --goal dev     # auto-picks up the pin; --adapter still works
 ```
+
+Pass `--auto-gate` if you want `harness ci` to run after every agent
+turn — handy for tight feedback during the cart/checkout iterations
+below. You can toggle it later from inside chat with `/auto-gate on`
+or `/auto-gate off`.
 
 You land in:
 
@@ -228,13 +233,28 @@ What you have on disk:
 |-----------------------------|--------------------------------------------------|
 | `add /products endpoint`    | streams a chat turn to the pinned agent          |
 | `/exec add /products`       | deterministic harness plan: do + lint + test + ci|
-| `/ship add /products`       | branch + spec + loop + commit                    |
+| `/ship add /products`       | branch + spec + loop + commit (auto `--allow-dirty`)|
 | `/ci`, `/test`, `/lint`     | run the gate                                     |
 | `/plan add /products`       | print the plan JSON without executing            |
+| `/agents`                   | list registered adapters; mark the active one    |
+| `/cost`                     | cumulative session token + USD spend             |
+| `/clear`                    | drop conversation history from the next prompt   |
+| `/auto-gate on` / `off`     | toggle `harness ci` after each agent turn        |
 | `!<shell cmd>`              | run any shell command in the project root        |
 | `/goal ops`                 | switch session goal (dev/ops/research/ads)       |
 | `/history`, `/last`         | inspect / replay previous prompts                |
 | `/help`, `/exit`            | usual                                            |
+
+## Resume an old session
+
+```bash
+harness chat list                  # newest first
+harness chat --resume <id>         # continues writing to the same .jsonl
+```
+
+The previous turns flow back into `/history` and the Working Memory
+preamble, so the agent reads the conversation as one thread instead of
+a cold start. `/clear` resets that preamble without ending the session.
 
 ---
 
