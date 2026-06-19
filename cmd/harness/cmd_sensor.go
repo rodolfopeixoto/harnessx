@@ -76,7 +76,8 @@ func newCheckCmd() *cobra.Command {
 }
 
 func newCICmd() *cobra.Command {
-	return &cobra.Command{
+	var fast bool
+	c := &cobra.Command{
 		Use:   "ci",
 		Short: "Run every applicable sensor; exit non-zero on any failure",
 		RunE: func(cmd *cobra.Command, _ []string) error {
@@ -85,11 +86,13 @@ func newCICmd() *cobra.Command {
 				return err
 			}
 			if _, err := sensorcmd.Run(cmd.Context(), sensorcmd.RunOptions{
-				StartDir: dir, FailOnError: true,
+				StartDir: dir, FailOnError: true, Fast: fast,
 			}, cmd.OutOrStdout()); err != nil {
 				os.Exit(1)
 			}
 			return nil
 		},
 	}
+	c.Flags().BoolVar(&fast, "fast", false, "skip slow sensors (today: secrets_scan)")
+	return c
 }
