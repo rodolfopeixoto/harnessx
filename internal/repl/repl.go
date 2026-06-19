@@ -66,6 +66,11 @@ type Options struct {
 	AutoGate     bool
 	AdaptersList []string
 	SwitchTo     func(id string) (agents.AgentAdapter, string, error)
+	// NoAdapter is true when the user passed --no-adapter; plain text
+	// is refused with a clear message instead of falling into the
+	// deterministic-planner harness do loop, which routinely takes
+	// minutes against a fresh scratch project.
+	NoAdapter bool
 }
 
 type SessionSummary struct {
@@ -143,6 +148,76 @@ func ResolveSessionID(root, arg string) string {
 		}
 	}
 	return arg
+}
+
+// SuggestSession returns the closest known label or id to arg via
+// Levenshtein distance, with a max distance of 3. Empty when nothing
+// is close enough — callers use the empty case to fall through to
+// the canonical "session not found" error so we never auto-resolve
+// to the wrong session silently.
+func SuggestSession(root, arg string) string {
+	if arg == "" {
+		return ""
+	}
+	rows, err := ListSessions(root)
+	if err != nil || len(rows) == 0 {
+		return ""
+	}
+	candidates := make([]string, 0, 2*len(rows))
+	for _, r := range rows {
+		if r.Label != "" {
+			candidates = append(candidates, r.Label)
+		}
+		candidates = append(candidates, r.ID)
+	}
+	best := ""
+	bestDist := 4
+	for _, c := range candidates {
+		d := levenshtein(arg, c)
+		if d < bestDist {
+			best = c
+			bestDist = d
+		}
+	}
+	return best
+}
+
+func levenshtein(a, b string) int {
+	ar, br := []rune(a), []rune(b)
+	if len(ar) == 0 {
+		return len(br)
+	}
+	if len(br) == 0 {
+		return len(ar)
+	}
+	prev := make([]int, len(br)+1)
+	curr := make([]int, len(br)+1)
+	for j := range prev {
+		prev[j] = j
+	}
+	for i := 1; i <= len(ar); i++ {
+		curr[0] = i
+		for j := 1; j <= len(br); j++ {
+			cost := 1
+			if ar[i-1] == br[j-1] {
+				cost = 0
+			}
+			curr[j] = min3(curr[j-1]+1, prev[j]+1, prev[j-1]+cost)
+		}
+		prev, curr = curr, prev
+	}
+	return prev[len(br)]
+}
+
+func min3(a, b, c int) int {
+	m := a
+	if b < m {
+		m = b
+	}
+	if c < m {
+		m = c
+	}
+	return m
 }
 
 // ListSessions returns one summary per .harness/sessions/*.jsonl file,
@@ -453,6 +528,11 @@ func handleInput(ctx context.Context, sess *Session, opts *Options, input string
 				fmt.Fprintln(opts.Out, "  [auto-gate] running harness ci…")
 				runHarnessCmd(ctx, *opts, []string{"ci"})
 			}
+			return turn
+		}
+		if opts.NoAdapter {
+			fmt.Fprintf(opts.Out, "  ✗ no adapter wired (chat --no-adapter). use /exec %s or pin one with 'harness use <id>'\n", truncateForContext(input, 60))
+			turn.Action = "no-adapter-block"
 			return turn
 		}
 		executePlan(ctx, sess, *opts, input, &turn)
