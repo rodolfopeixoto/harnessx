@@ -626,6 +626,77 @@ func TestSignalAwareCtxCancelsOnInterrupt(t *testing.T) {
 	<-ctx.Done()
 }
 
+func TestRunSavePromptCapturesLastPlainText(t *testing.T) {
+	dir := t.TempDir()
+	bin := writeFakeBin(t, "#!/bin/sh\nexit 0\n")
+	var buf bytes.Buffer
+	_ = Run(context.Background(), Options{
+		Root: dir, HarnessBin: bin, Goal: intentplan.GoalDev,
+		In:  strings.NewReader("add /products with pytest\n/save-prompt add-endpoint\n/prompts\n/exit\n"),
+		Out: &buf,
+	})
+	for _, want := range []string{
+		"prompt \"add-endpoint\" saved",
+		"add-endpoint",
+	} {
+		if !strings.Contains(buf.String(), want) {
+			t.Errorf("missing %q: %s", want, buf.String())
+		}
+	}
+}
+
+func TestRunSavePromptRejectsBadName(t *testing.T) {
+	bin := writeFakeBin(t, "#!/bin/sh\nexit 0\n")
+	var buf bytes.Buffer
+	_ = Run(context.Background(), Options{
+		Root: t.TempDir(), HarnessBin: bin, Goal: intentplan.GoalDev,
+		In:  strings.NewReader("plain text\n/save-prompt BAD NAME\n/exit\n"),
+		Out: &buf,
+	})
+	if !strings.Contains(buf.String(), "not a valid name") {
+		t.Errorf("missing validation: %s", buf.String())
+	}
+}
+
+func TestRunSavePromptNoPriorTurn(t *testing.T) {
+	bin := writeFakeBin(t, "#!/bin/sh\nexit 0\n")
+	var buf bytes.Buffer
+	_ = Run(context.Background(), Options{
+		Root: t.TempDir(), HarnessBin: bin, Goal: intentplan.GoalDev,
+		In:  strings.NewReader("/save-prompt only-slashes\n/exit\n"),
+		Out: &buf,
+	})
+	if !strings.Contains(buf.String(), "no plain-text turn") {
+		t.Errorf("missing 'no plain-text' guard: %s", buf.String())
+	}
+}
+
+func TestRunPromptMissingErrors(t *testing.T) {
+	bin := writeFakeBin(t, "#!/bin/sh\nexit 0\n")
+	var buf bytes.Buffer
+	_ = Run(context.Background(), Options{
+		Root: t.TempDir(), HarnessBin: bin, Goal: intentplan.GoalDev,
+		In:  strings.NewReader("/prompt ghost\n/exit\n"),
+		Out: &buf,
+	})
+	if !strings.Contains(buf.String(), "/prompt ghost") {
+		t.Errorf("missing /prompt error: %s", buf.String())
+	}
+}
+
+func TestRunPromptsEmpty(t *testing.T) {
+	bin := writeFakeBin(t, "#!/bin/sh\nexit 0\n")
+	var buf bytes.Buffer
+	_ = Run(context.Background(), Options{
+		Root: t.TempDir(), HarnessBin: bin, Goal: intentplan.GoalDev,
+		In:  strings.NewReader("/prompts\n/exit\n"),
+		Out: &buf,
+	})
+	if !strings.Contains(buf.String(), "no saved prompts") {
+		t.Errorf("missing empty-prompts message: %s", buf.String())
+	}
+}
+
 func TestRunIgnoresBlankLines(t *testing.T) {
 	bin := writeFakeBin(t, "#!/bin/sh\nexit 0\n")
 	var out bytes.Buffer

@@ -243,6 +243,9 @@ What you have on disk:
 | `/budget 0.50` / `off`      | refuse further chat turns once spend > cap       |
 | `/save my-feature`          | label this session for `harness chat list`       |
 | `/branch feature/cart`      | `git checkout -B …` + auto-label session         |
+| `/save-prompt add-endpoint` | capture the last plain text into a template      |
+| `/prompt add-endpoint`      | replay a saved template as a new chat input      |
+| `/prompts`                  | list saved prompt templates                      |
 | `/recap`                    | ask the agent for an ≤8-bullet summary           |
 | `/clear`                    | drop conversation history from the next prompt   |
 | `/auto-gate on` / `off`     | toggle `harness ci` after each agent turn        |
@@ -268,6 +271,26 @@ The previous turns flow back into `/history` and the Working Memory
 preamble, so the agent reads the conversation as one thread instead of
 a cold start. `/clear` resets that preamble without ending the session.
 
+## Reusable prompt templates
+
+If you find yourself typing the same instruction every time you add a
+new endpoint, capture it:
+
+```
+[dev|claude ✓]> add a /<name> endpoint with pytest tests and update README
+[dev|claude ✓]> /save-prompt add-endpoint
+  ✓ prompt "add-endpoint" saved (74 chars)
+
+# later, in a fresh session:
+[dev|claude ✓]> /prompt add-endpoint
+↻ replaying prompt "add-endpoint"
+  [agent] calling claude…
+```
+
+Templates live in `.harness/prompts/<name>.md` and ship with the
+repo when you commit them. `/prompts` lists every name currently
+saved.
+
 ## Share a session
 
 ```bash
@@ -285,8 +308,11 @@ the receiver can replay it locally with `jq` or load it back through
 ## When something goes sideways
 
 - **Agent CLI prompts for an OS dialog** (Docker, OrbStack, keychain):
-  that is the upstream CLI, not HarnessX. Approve it once or
-  `harness use codex` to switch adapter.
+  that is the upstream CLI, not HarnessX. Approve it once. From then
+  on the same install is fine; if the dialog keeps reappearing
+  switch with `harness use codex` (or any other adapter), or run
+  `harness chat --no-adapter` to fall back to the deterministic
+  planner.
 - **`harness ship` rejects a dirty tree**: pass `--allow-dirty`, or
   `!git stash` first.
 - **`harness new` refuses target**: you are inside a folder with the

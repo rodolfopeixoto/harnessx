@@ -22,6 +22,7 @@ import (
 	"github.com/ropeixoto/harnessx/internal/agents"
 	"github.com/ropeixoto/harnessx/internal/intentplan"
 	"github.com/ropeixoto/harnessx/internal/platform/ids"
+	"github.com/ropeixoto/harnessx/internal/prompttpl"
 )
 
 type Session struct {
@@ -372,6 +373,22 @@ func handleInput(ctx context.Context, sess *Session, opts *Options, input string
 		turn.Action = "branch"
 		name := strings.TrimSpace(strings.TrimPrefix(input, "/branch "))
 		runBranch(ctx, sess, *opts, name)
+	case strings.HasPrefix(input, "/save-prompt "):
+		turn.Action = "save-prompt"
+		name := strings.TrimSpace(strings.TrimPrefix(input, "/save-prompt "))
+		savePromptTemplate(sess, *opts, name)
+	case strings.HasPrefix(input, "/prompt "):
+		turn.Action = "prompt"
+		name := strings.TrimSpace(strings.TrimPrefix(input, "/prompt "))
+		expanded := loadPromptTemplate(*opts, name)
+		if expanded == "" {
+			return turn
+		}
+		fmt.Fprintf(opts.Out, "↻ replaying prompt %q\n", name)
+		return handleInput(ctx, sess, opts, expanded)
+	case input == "/prompts":
+		turn.Action = "prompts"
+		listPromptTemplates(*opts)
 	case input == "/recap":
 		turn.Action = "recap"
 		recapSession(ctx, sess, *opts, &turn)
@@ -522,7 +539,7 @@ func isMutatingInput(input string) bool {
 		"/exec ", "/do ", "/ship ", "/ci", "/test", "/lint",
 		"/use ", "/budget ", "/auto-gate", "/autogate",
 		"/clear", "/save ", "/recap", "/plan ", "/goal ",
-		"/last", "/branch ",
+		"/last", "/branch ", "/save-prompt ", "/prompt ",
 	}
 	for _, p := range mutating {
 		if input == strings.TrimSpace(p) || strings.HasPrefix(input, p) {
@@ -533,6 +550,68 @@ func isMutatingInput(input string) bool {
 		return false
 	}
 	return true // plain text → would call adapter
+}
+
+// savePromptTemplate writes the most recent plain-text user input
+// into .harness/prompts/<name>.md so the user can replay it later
+// with /prompt. The "most recent plain-text" rule means slash and
+// shell-escape turns are skipped; otherwise the slash command would
+// save itself.
+func savePromptTemplate(sess *Session, opts Options, name string) {
+	if name == "" {
+		fmt.Fprintln(opts.Out, "  ✗ /save-prompt needs a name (e.g. /save-prompt add-endpoint)")
+		return
+	}
+	if !prompttpl.ValidName(name) {
+		fmt.Fprintf(opts.Out, "  ✗ /save-prompt: %q is not a valid name (lowercase alnum, _ or -, ≤40 chars)\n", name)
+		return
+	}
+	body := ""
+	for i := len(sess.Turns) - 1; i >= 0; i-- {
+		in := sess.Turns[i].Input
+		if in == "" || strings.HasPrefix(in, "/") || strings.HasPrefix(in, "!") {
+			continue
+		}
+		body = in
+		break
+	}
+	if body == "" {
+		fmt.Fprintln(opts.Out, "  ✗ /save-prompt: no plain-text turn to capture yet")
+		return
+	}
+	if err := prompttpl.Save(opts.Root, name, body); err != nil {
+		fmt.Fprintf(opts.Out, "  ✗ /save-prompt: %v\n", err)
+		return
+	}
+	fmt.Fprintf(opts.Out, "  ✓ prompt %q saved (%d chars)\n", name, len(body))
+}
+
+func loadPromptTemplate(opts Options, name string) string {
+	if name == "" {
+		fmt.Fprintln(opts.Out, "  ✗ /prompt needs a name (try /prompts to list)")
+		return ""
+	}
+	body, err := prompttpl.Load(opts.Root, name)
+	if err != nil {
+		fmt.Fprintf(opts.Out, "  ✗ /prompt %s: %v\n", name, err)
+		return ""
+	}
+	return strings.TrimSpace(body)
+}
+
+func listPromptTemplates(opts Options) {
+	names, err := prompttpl.List(opts.Root)
+	if err != nil {
+		fmt.Fprintf(opts.Out, "  ✗ /prompts: %v\n", err)
+		return
+	}
+	if len(names) == 0 {
+		fmt.Fprintln(opts.Out, "  no saved prompts (capture one with /save-prompt <name>)")
+		return
+	}
+	for _, n := range names {
+		fmt.Fprintf(opts.Out, "  %s\n", n)
+	}
 }
 
 // runBranch creates or switches to a git branch in one step and
@@ -916,6 +995,9 @@ func printHelp(out io.Writer) {
 	fmt.Fprintln(out, "  /budget <usd|off>              cap session spend (refuses turns when exceeded)")
 	fmt.Fprintln(out, "  /save <name>                   label this session for harness chat list")
 	fmt.Fprintln(out, "  /branch <name>                 git checkout -B <name> + auto-label session")
+	fmt.Fprintln(out, "  /save-prompt <name>            capture last plain text into a reusable template")
+	fmt.Fprintln(out, "  /prompt <name>                 replay a saved prompt template")
+	fmt.Fprintln(out, "  /prompts                       list saved prompt templates")
 	fmt.Fprintln(out, "  /recap                         ask the agent to summarise the session so far")
 	fmt.Fprintln(out, "  /clear                         drop conversation history from next prompt")
 	fmt.Fprintln(out, "  /auto-gate on|off              toggle harness ci after each agent turn")
