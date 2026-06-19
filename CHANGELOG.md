@@ -3,6 +3,16 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-19 — v0.128.0 — Chat /timeline slash command (F93)
+
+### New
+
+- **`/timeline`** prints an at-a-glance ASCII view of every turn in
+  the session: index, clock (local time), action label, truncated
+  input, and per-turn USD cost when present, plus a cumulative cost
+  footer. Resumed sessions render their full prior history.
+- Tutorial cheat sheet lists the new slash.
+
 ## 2026-06-19 — v0.127.0 — Wave 10 bug pass: no-adapter refuse, update --force, typo suggest (F92)
 
 ### Fixed
