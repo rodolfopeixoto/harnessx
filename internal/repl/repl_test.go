@@ -178,6 +178,70 @@ func TestRunRejectsUnknownGoalInline(t *testing.T) {
 	}
 }
 
+func TestLoadSessionMissingReturnsError(t *testing.T) {
+	if _, err := LoadSession(t.TempDir(), "ghost"); err == nil {
+		t.Fatal("want error for missing session id")
+	}
+}
+
+func TestLoadSessionRoundTripsTurns(t *testing.T) {
+	dir := t.TempDir()
+	bin := writeFakeBin(t, "#!/bin/sh\nexit 0\n")
+	var buf bytes.Buffer
+	_ = Run(context.Background(), Options{
+		Root:       dir,
+		HarnessBin: bin,
+		Goal:       intentplan.GoalDev,
+		In:         strings.NewReader("foo\nbar\n/exit\n"),
+		Out:        &buf,
+	})
+	sessions, err := ListSessions(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(sessions) == 0 {
+		t.Fatal("expected at least one persisted session")
+	}
+	got, err := LoadSession(dir, sessions[0].ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Turns) < 2 {
+		t.Errorf("expected at least 2 turns, got %d", len(got.Turns))
+	}
+}
+
+func TestListSessionsEmptyProjectReturnsNil(t *testing.T) {
+	got, err := ListSessions(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 0 {
+		t.Errorf("want 0 sessions, got %d", len(got))
+	}
+}
+
+func TestRunResumeReplaysTurnsBeforeNewInput(t *testing.T) {
+	bin := writeFakeBin(t, "#!/bin/sh\nexit 0\n")
+	prior := &Session{ID: "RESUMED", Goal: intentplan.GoalDev, Turns: []Turn{
+		{Input: "added /products", Action: "chat"},
+	}}
+	var buf bytes.Buffer
+	if err := Run(context.Background(), Options{
+		Root:       t.TempDir(),
+		HarnessBin: bin,
+		Goal:       intentplan.GoalDev,
+		In:         strings.NewReader("/history\n/exit\n"),
+		Out:        &buf,
+		Resume:     prior,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(buf.String(), "added /products") {
+		t.Errorf("resumed turn not visible in /history: %s", buf.String())
+	}
+}
+
 func TestStartSpinnerPlainNoop(t *testing.T) {
 	var buf bytes.Buffer
 	stop := startSpinner(&buf, true)

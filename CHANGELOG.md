@@ -3,6 +3,34 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-19 — v0.120.0 — Chat auto-pin + resume + list + /ship --allow-dirty (F85)
+
+### Changed
+
+- **`harness chat` now auto-pins an adapter** instead of silently
+  degrading to the deterministic planner when `--adapter` is omitted.
+  Precedence: `--adapter` flag → `.harness/config/active.yaml` pin
+  (set via `harness use <id>`) → first registered adapter from
+  `claude / codex / gemini / kimi / ollama`. The picked adapter is
+  printed so users know which CLI will run. Pass `--no-adapter` to
+  force the deterministic-planner mode.
+- **`/ship <prompt>` from inside chat now passes `--allow-dirty`**
+  automatically. The chat REPL frequently edits files via a plain-text
+  agent turn just before the user types `/ship`, so the previous
+  behaviour rejected the very flow the tutorial documents
+  ("ship: working tree dirty; commit or stash first").
+
+### New
+
+- **`harness chat --resume <id>`** rehydrates a prior session from
+  `.harness/sessions/<id>.jsonl`, replays the turns into the new REPL
+  so `/history` and the chat Working Memory preamble both see the
+  prior conversation, and continues persisting under the same id.
+- **`harness chat list`** subcommand prints every persisted session in
+  the current project sorted newest-first, with goal, turn count, and
+  truncated last input — the discoverable pair for the new
+  `--resume` flag.
+
 ## 2026-06-19 — v0.119.0 — Chat spinner + multi-turn conversation context (F84)
 
 ### Changed

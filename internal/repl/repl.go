@@ -51,6 +51,101 @@ type Options struct {
 	Adapter     agents.AgentAdapter
 	AdapterID   string
 	Model       string
+	Resume      *Session
+}
+
+type SessionSummary struct {
+	ID        string
+	Goal      intentplan.Goal
+	Turns     int
+	LastInput string
+}
+
+// LoadSession rehydrates a prior chat from .harness/sessions/<id>.jsonl.
+// The file is JSONL of Turn records (see persist) without the Session
+// envelope, so we synthesise a Session shell and replay every turn into
+// it. Used by `harness chat --resume <id>`.
+func LoadSession(root, id string) (*Session, error) {
+	p := sessionPath(root, id)
+	f, err := os.Open(p)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	sess := Session{ID: id, Started: time.Now().UTC(), Root: root}
+	dec := json.NewDecoder(f)
+	for dec.More() {
+		var t Turn
+		if err := dec.Decode(&t); err != nil {
+			return nil, err
+		}
+		sess.Turns = append(sess.Turns, t)
+	}
+	for i := len(sess.Turns) - 1; i >= 0; i-- {
+		if sess.Turns[i].Plan != nil {
+			sess.Goal = sess.Turns[i].Plan.Goal
+			break
+		}
+	}
+	if sess.Goal == "" {
+		sess.Goal = intentplan.GoalDev
+	}
+	return &sess, nil
+}
+
+// ListSessions returns one summary per .harness/sessions/*.jsonl file,
+// sorted newest first by file mtime.
+func ListSessions(root string) ([]SessionSummary, error) {
+	dir := filepath.Join(root, ".harness", "sessions")
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	type entryWithStat struct {
+		name  string
+		mtime time.Time
+	}
+	var stats []entryWithStat
+	for _, e := range entries {
+		if !strings.HasSuffix(e.Name(), ".jsonl") {
+			continue
+		}
+		info, err := e.Info()
+		if err != nil {
+			continue
+		}
+		stats = append(stats, entryWithStat{name: e.Name(), mtime: info.ModTime()})
+	}
+	for i := range stats {
+		for j := i + 1; j < len(stats); j++ {
+			if stats[j].mtime.After(stats[i].mtime) {
+				stats[i], stats[j] = stats[j], stats[i]
+			}
+		}
+	}
+	out := make([]SessionSummary, 0, len(stats))
+	for _, s := range stats {
+		id := strings.TrimSuffix(s.name, ".jsonl")
+		sess, err := LoadSession(root, id)
+		if err != nil {
+			continue
+		}
+		last := ""
+		for i := len(sess.Turns) - 1; i >= 0; i-- {
+			if sess.Turns[i].Input != "" {
+				last = sess.Turns[i].Input
+				if len(last) > 60 {
+					last = last[:60] + "…"
+				}
+				break
+			}
+		}
+		out = append(out, SessionSummary{ID: sess.ID, Goal: sess.Goal, Turns: len(sess.Turns), LastInput: last})
+	}
+	return out, nil
 }
 
 type Planner func(ctx context.Context, goal intentplan.Goal, prompt string) (intentplan.Plan, error)
@@ -125,6 +220,13 @@ func Run(ctx context.Context, opts Options) error {
 		ID: ids.New(), Goal: opts.Goal,
 		Started: time.Now().UTC(), Root: opts.Root,
 	}
+	if opts.Resume != nil {
+		sess.ID = opts.Resume.ID
+		if opts.Resume.Goal != "" {
+			sess.Goal = opts.Resume.Goal
+		}
+		sess.Turns = append(sess.Turns, opts.Resume.Turns...)
+	}
 	greet(opts.Out, sess)
 	rd := bufio.NewReader(opts.In)
 	for {
@@ -166,7 +268,8 @@ func handleInput(ctx context.Context, sess *Session, opts Options, input string)
 		prompt := strings.TrimSpace(strings.TrimPrefix(strings.TrimPrefix(input, "/exec"), "/do"))
 		executePlan(ctx, sess, opts, prompt, &turn)
 	case strings.HasPrefix(input, "/ship "):
-		runHarnessCmd(ctx, opts, append([]string{"ship", strings.TrimSpace(strings.TrimPrefix(input, "/ship "))}, "--yes"))
+		args := []string{"ship", strings.TrimSpace(strings.TrimPrefix(input, "/ship ")), "--yes", "--allow-dirty"}
+		runHarnessCmd(ctx, opts, args)
 		turn.Action = "ship"
 	case strings.HasPrefix(input, "/ci"):
 		runHarnessCmd(ctx, opts, []string{"ci"})
