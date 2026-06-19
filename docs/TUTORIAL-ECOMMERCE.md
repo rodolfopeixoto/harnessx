@@ -237,7 +237,10 @@ What you have on disk:
 | `/ci`, `/test`, `/lint`     | run the gate                                     |
 | `/plan add /products`       | print the plan JSON without executing            |
 | `/agents`                   | list registered adapters; mark the active one    |
+| `/use <id>`                 | switch adapter mid-session (kimi/codex/gemini/…) |
+| `/diff`                     | `git diff --stat` + full diff in project root    |
 | `/cost`                     | cumulative session token + USD spend             |
+| `/budget 0.50` / `off`      | refuse further chat turns once spend > cap       |
 | `/clear`                    | drop conversation history from the next prompt   |
 | `/auto-gate on` / `off`     | toggle `harness ci` after each agent turn        |
 | `!<shell cmd>`              | run any shell command in the project root        |
@@ -255,6 +258,18 @@ harness chat --resume <id>         # continues writing to the same .jsonl
 The previous turns flow back into `/history` and the Working Memory
 preamble, so the agent reads the conversation as one thread instead of
 a cold start. `/clear` resets that preamble without ending the session.
+
+## Share a session
+
+```bash
+harness session export <id> > session.json
+```
+
+Emits one JSON envelope with the goal, started timestamp, every turn,
+cumulative tokens/USD, plus the toggles (`auto_gate`, `budget_usd`,
+`context_mark`). Drop the file into a code review or a bug report —
+the receiver can replay it locally with `jq` or load it back through
+`harness chat --resume`.
 
 ---
 
