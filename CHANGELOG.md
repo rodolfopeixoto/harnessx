@@ -3,6 +3,35 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-19 — v0.124.0 — Chat SIGINT cancel + positional id/label + /branch (F89)
+
+### New
+
+- **SIGINT mid-turn cancel**. Hitting Ctrl-C during an agent call or a
+  `/ci`/`/test`/`/lint`/`/ship` step now cancels just that turn — the
+  spinner clears, "✗ interrupted — back to prompt" is printed, and the
+  REPL lands on a fresh prompt instead of dying. Implemented via a
+  `signalAwareCtx` wrapper that re-arms `signal.Notify(os.Interrupt)`
+  for every turn and releases the handler on the way out.
+- **`harness chat <id|label>`** positional shortcut for
+  `--resume <id|label>`. Same string passed to `--replay` works too.
+  Resolution is label-first; an unknown input falls through to the
+  raw `LoadSession` error so you still get a clean "session not
+  found".
+- **`/branch <name>`** runs `git checkout -B <name>` from the project
+  root and labels the session with the slash-flattened branch name
+  (so `feature/cart` → `feature-cart`) when no label was set yet.
+  Mutating-input list updated so `--replay` keeps refusing it.
+
+### Changed
+
+- `repl.ResolveSessionID(root, arg)` is the helper everyone uses for
+  the positional argument and the `--resume`/`--replay` flags. Label
+  lookup walks `ListSessions`; ambiguity prefers the newest mtime.
+- Tutorial cheat sheet lists `/branch`; the resume/replay snippet now
+  shows the positional + `<label>` forms; the Ctrl-C behaviour is
+  documented inline.
+
 ## 2026-06-19 — v0.123.0 — Chat /save /recap + --replay (F88)
 
 ### New
