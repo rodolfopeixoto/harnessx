@@ -18,8 +18,8 @@ The harness chat REPL (v0.116.0+) treats:
 - **`/ci` `/test` `/lint`** → run the gate directly;
 - **`!<shell>`** → escape to a shell command in the project root.
 
-You never leave the chat window. CTRL-C aborts a single turn; `/exit`
-ends the session.
+You never leave the chat window. CTRL-C aborts the current turn (the spinner clears, you land back at
+the prompt); `/exit` or CTRL-D ends the session.
 
 ---
 
@@ -242,6 +242,7 @@ What you have on disk:
 | `/cost`                     | cumulative session token + USD spend             |
 | `/budget 0.50` / `off`      | refuse further chat turns once spend > cap       |
 | `/save my-feature`          | label this session for `harness chat list`       |
+| `/branch feature/cart`      | `git checkout -B …` + auto-label session         |
 | `/recap`                    | ask the agent for an ≤8-bullet summary           |
 | `/clear`                    | drop conversation history from the next prompt   |
 | `/auto-gate on` / `off`     | toggle `harness ci` after each agent turn        |
@@ -254,9 +255,14 @@ What you have on disk:
 
 ```bash
 harness chat list                  # newest first; labels shown as a column
-harness chat --resume <id>         # continues writing to the same .jsonl
-harness chat --replay <id>         # read-only: /history, /agents, /cost, /diff only
+harness chat <id|label>            # positional shortcut for --resume
+harness chat --resume <id|label>   # continues writing to the same .jsonl
+harness chat --replay <id|label>   # read-only: /history, /agents, /cost, /diff only
 ```
+
+`<label>` is anything you typed into `/save`. Passing a string that
+matches neither a saved label nor a known ulid falls through to
+`--resume` and produces a clean "session not found" error.
 
 The previous turns flow back into `/history` and the Working Memory
 preamble, so the agent reads the conversation as one thread instead of

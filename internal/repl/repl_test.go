@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -554,6 +555,75 @@ func TestIsMutatingInputClassification(t *testing.T) {
 			t.Errorf("isMutatingInput(%q) = %v; want %v", in, got, want)
 		}
 	}
+}
+
+func TestResolveSessionIDFallsBackToInput(t *testing.T) {
+	if got := ResolveSessionID(t.TempDir(), "01KX-not-real"); got != "01KX-not-real" {
+		t.Errorf("unknown id should be returned as-is; got %q", got)
+	}
+}
+
+func TestResolveSessionIDByLabel(t *testing.T) {
+	dir := t.TempDir()
+	bin := writeFakeBin(t, "#!/bin/sh\nexit 0\n")
+	var buf bytes.Buffer
+	_ = Run(context.Background(), Options{
+		Root: dir, HarnessBin: bin, Goal: intentplan.GoalDev,
+		In:  strings.NewReader("/save my-feature\n/exit\n"),
+		Out: &buf,
+	})
+	sessions, _ := ListSessions(dir)
+	if len(sessions) == 0 {
+		t.Fatal("expected session persisted")
+	}
+	if got := ResolveSessionID(dir, "my-feature"); got != sessions[0].ID {
+		t.Errorf("label lookup failed: got %q want %q", got, sessions[0].ID)
+	}
+	if got := ResolveSessionID(dir, sessions[0].ID); got != sessions[0].ID {
+		t.Errorf("ulid lookup should pass through: got %q", got)
+	}
+}
+
+func TestRunBranchEmptyRejected(t *testing.T) {
+	var buf bytes.Buffer
+	runBranch(context.Background(), &Session{}, Options{Out: &buf, Root: t.TempDir()}, "")
+	if !strings.Contains(buf.String(), "needs a name") {
+		t.Errorf("missing /branch validation: %s", buf.String())
+	}
+}
+
+func TestRunBranchLabelsSessionWhenEmpty(t *testing.T) {
+	dir := t.TempDir()
+	// init bare git repo so checkout -B can succeed
+	for _, args := range [][]string{
+		{"init", "-q"},
+		{"config", "user.email", "x@y.z"},
+		{"config", "user.name", "t"},
+		{"commit", "--allow-empty", "-q", "-m", "init"},
+	} {
+		c := exec.Command("git", args...)
+		c.Dir = dir
+		if err := c.Run(); err != nil {
+			t.Skipf("git not available: %v", err)
+		}
+	}
+	sess := &Session{}
+	var buf bytes.Buffer
+	runBranch(context.Background(), sess, Options{Out: &buf, Root: dir}, "feature/cart")
+	if sess.Label != "feature-cart" {
+		t.Errorf("expected label feature-cart, got %q", sess.Label)
+	}
+}
+
+func TestSignalAwareCtxCancelsOnInterrupt(t *testing.T) {
+	parent, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	var buf bytes.Buffer
+	ctx, stop := signalAwareCtx(parent, &buf)
+	defer stop()
+	// Closing the parent should drain the goroutine cleanly.
+	cancel()
+	<-ctx.Done()
 }
 
 func TestRunIgnoresBlankLines(t *testing.T) {

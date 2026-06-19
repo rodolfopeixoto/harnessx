@@ -11,6 +11,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -115,6 +116,32 @@ func LoadSession(root, id string) (*Session, error) {
 		sess.Goal = intentplan.GoalDev
 	}
 	return &sess, nil
+}
+
+// ResolveSessionID converts either a ulid or a /save label into the
+// canonical session id. Labels are matched against ListSessions; on
+// ambiguity (two sessions sharing a label) the newest wins. Returns
+// the input unchanged when no label matches so callers can still
+// load by raw ulid.
+func ResolveSessionID(root, arg string) string {
+	if arg == "" {
+		return arg
+	}
+	rows, err := ListSessions(root)
+	if err != nil {
+		return arg
+	}
+	for _, r := range rows {
+		if r.ID == arg {
+			return arg
+		}
+	}
+	for _, r := range rows {
+		if r.Label == arg {
+			return r.ID
+		}
+	}
+	return arg
 }
 
 // ListSessions returns one summary per .harness/sessions/*.jsonl file,
@@ -284,7 +311,9 @@ func Run(ctx context.Context, opts Options) error {
 			fmt.Fprintln(opts.Out, "bye")
 			break
 		}
-		turn := handleInput(ctx, &sess, &opts, input)
+		turnCtx, cancel := signalAwareCtx(ctx, opts.Out)
+		turn := handleInput(turnCtx, &sess, &opts, input)
+		cancel()
 		sess.Turns = append(sess.Turns, turn)
 		if err := persist(opts.Root, sess); err != nil {
 			fmt.Fprintf(opts.Out, "warn: persist: %v\n", err)
@@ -339,6 +368,10 @@ func handleInput(ctx context.Context, sess *Session, opts *Options, input string
 		turn.Action = "save"
 		name := strings.TrimSpace(strings.TrimPrefix(input, "/save "))
 		setSessionLabel(sess, opts.Out, name)
+	case strings.HasPrefix(input, "/branch "):
+		turn.Action = "branch"
+		name := strings.TrimSpace(strings.TrimPrefix(input, "/branch "))
+		runBranch(ctx, sess, *opts, name)
 	case input == "/recap":
 		turn.Action = "recap"
 		recapSession(ctx, sess, *opts, &turn)
@@ -451,6 +484,30 @@ func setBudget(sess *Session, out io.Writer, raw string) {
 	fmt.Fprintf(out, "  ✓ budget set to $%.4f for this session\n", v)
 }
 
+// signalAwareCtx returns a derived context that cancels on SIGINT so
+// Ctrl-C during a long agent call or `harness ci` aborts just that
+// turn instead of killing the whole REPL. Printing the carriage-
+// return + clear lets the next prompt land on a fresh line even when
+// the spinner was mid-frame. The caller MUST invoke the returned
+// cancel func to release the signal handler.
+func signalAwareCtx(parent context.Context, out io.Writer) (context.Context, context.CancelFunc) {
+	ctx, cancel := context.WithCancel(parent)
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, os.Interrupt)
+	go func() {
+		select {
+		case <-sig:
+			fmt.Fprint(out, "\r  \r✗ interrupted — back to prompt (Ctrl-D or /exit to leave)\n")
+			cancel()
+		case <-ctx.Done():
+		}
+	}()
+	return ctx, func() {
+		signal.Stop(sig)
+		cancel()
+	}
+}
+
 // isMutatingInput reports whether an input would change state or
 // call out to an agent. Used by --replay to refuse anything beyond
 // inspection commands.
@@ -465,7 +522,7 @@ func isMutatingInput(input string) bool {
 		"/exec ", "/do ", "/ship ", "/ci", "/test", "/lint",
 		"/use ", "/budget ", "/auto-gate", "/autogate",
 		"/clear", "/save ", "/recap", "/plan ", "/goal ",
-		"/last",
+		"/last", "/branch ",
 	}
 	for _, p := range mutating {
 		if input == strings.TrimSpace(p) || strings.HasPrefix(input, p) {
@@ -476,6 +533,32 @@ func isMutatingInput(input string) bool {
 		return false
 	}
 	return true // plain text → would call adapter
+}
+
+// runBranch creates or switches to a git branch in one step and
+// labels the session with the same name so /save + git stay in
+// sync. A nested-slash branch like "feature/cart" turns into the
+// label "feature-cart" so it remains a single token in chat list
+// output.
+func runBranch(ctx context.Context, sess *Session, opts Options, name string) {
+	if name == "" {
+		fmt.Fprintln(opts.Out, "  ✗ /branch needs a name (try /branch feature/cart)")
+		return
+	}
+	fmt.Fprintf(opts.Out, "  $ git checkout -B %s\n", name)
+	c := exec.CommandContext(ctx, "git", "checkout", "-B", name)
+	c.Dir = opts.Root
+	c.Stdout = opts.Out
+	c.Stderr = opts.Out
+	if err := c.Run(); err != nil {
+		fmt.Fprintf(opts.Out, "  ✗ /branch %s: %v\n", name, err)
+		return
+	}
+	label := strings.ReplaceAll(name, "/", "-")
+	if sess.Label == "" {
+		sess.Label = label
+		fmt.Fprintf(opts.Out, "  ✓ session labelled %q to match the branch\n", label)
+	}
 }
 
 // setSessionLabel tags the session with a human-readable alias so
@@ -832,6 +915,7 @@ func printHelp(out io.Writer) {
 	fmt.Fprintln(out, "  /cost                          cumulative session token + USD spend")
 	fmt.Fprintln(out, "  /budget <usd|off>              cap session spend (refuses turns when exceeded)")
 	fmt.Fprintln(out, "  /save <name>                   label this session for harness chat list")
+	fmt.Fprintln(out, "  /branch <name>                 git checkout -B <name> + auto-label session")
 	fmt.Fprintln(out, "  /recap                         ask the agent to summarise the session so far")
 	fmt.Fprintln(out, "  /clear                         drop conversation history from next prompt")
 	fmt.Fprintln(out, "  /auto-gate on|off              toggle harness ci after each agent turn")
