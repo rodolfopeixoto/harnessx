@@ -3,6 +3,33 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-19 — v0.125.0 — Chat prompt templates + tutorial finalisation (F90)
+
+### New
+
+- **`internal/prompttpl` package** stores reusable chat prompt
+  templates under `.harness/prompts/<name>.md`. Public API: `Save`,
+  `Load`, `List`, `ValidName`. Names are restricted to lowercase
+  alphanumeric plus `_`/`-`, ≤40 chars, leading alnum, so they map
+  safely onto file paths and CLI output. Six unit tests cover the
+  validation, the round-trip, and the sort order.
+- **`/save-prompt <name>`** captures the most recent plain-text
+  session turn (skips slash + `!` shell turns) and persists it.
+- **`/prompt <name>`** loads the template and feeds it back into
+  `handleInput` so the agent receives it like a fresh user prompt.
+- **`/prompts`** lists every saved template in the project.
+- Mutating-input list extended so `--replay` refuses both new
+  template commands.
+
+### Changed
+
+- Tutorial cheat sheet gained the three template commands and a
+  worked "reusable prompt templates" example.
+- Troubleshooting section clarifies that the OrbStack/Docker dialog
+  from the upstream `claude` CLI is a one-time approval; falling
+  back to `--no-adapter` is documented as the deterministic escape
+  hatch.
+
 ## 2026-06-19 — v0.124.0 — Chat SIGINT cancel + positional id/label + /branch (F89)
 
 ### New
