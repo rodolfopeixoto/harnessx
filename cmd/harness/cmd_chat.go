@@ -31,7 +31,8 @@ func newChatCmd() *cobra.Command {
 		autoGate    bool
 	)
 	c := &cobra.Command{
-		Use:   "chat",
+		Use:   "chat [<session-id|label>]",
+		Args:  cobra.MaximumNArgs(1),
 		Short: "Iterative REPL: prompt → plan JSON → deterministic execution (paper §3.1.4)",
 		Long: `Drops into an interactive loop scoped to a goal:
 
@@ -45,7 +46,7 @@ Without --adapter, harness chat auto-pins the agent recorded in
 exists it falls back to the first registered adapter in
 claude / codex / gemini / kimi / ollama. Pass --no-adapter to force
 the deterministic planner.`,
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			dir, err := cwd()
 			if err != nil {
 				return err
@@ -53,6 +54,15 @@ the deterministic planner.`,
 			bin, err := os.Executable()
 			if err != nil {
 				return err
+			}
+			if len(args) > 0 && resumeID == "" && replayID == "" {
+				resumeID = repl.ResolveSessionID(dir, args[0])
+			}
+			if resumeID != "" {
+				resumeID = repl.ResolveSessionID(dir, resumeID)
+			}
+			if replayID != "" {
+				replayID = repl.ResolveSessionID(dir, replayID)
 			}
 			opts := repl.Options{
 				Root:        dir,
