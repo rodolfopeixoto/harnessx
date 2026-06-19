@@ -464,6 +464,9 @@ func handleInput(ctx context.Context, sess *Session, opts *Options, input string
 	case input == "/prompts":
 		turn.Action = "prompts"
 		listPromptTemplates(*opts)
+	case input == "/timeline":
+		turn.Action = "timeline"
+		printTimeline(opts.Out, sess)
 	case input == "/recap":
 		turn.Action = "recap"
 		recapSession(ctx, sess, *opts, &turn)
@@ -1072,6 +1075,7 @@ func printHelp(out io.Writer) {
 	fmt.Fprintln(out, "  /use <id>                      switch adapter mid-session")
 	fmt.Fprintln(out, "  /diff                          git diff --stat + full diff (project root)")
 	fmt.Fprintln(out, "  /cost                          cumulative session token + USD spend")
+	fmt.Fprintln(out, "  /timeline                      ASCII timeline of every turn in this session")
 	fmt.Fprintln(out, "  /budget <usd|off>              cap session spend (refuses turns when exceeded)")
 	fmt.Fprintln(out, "  /save <name>                   label this session for harness chat list")
 	fmt.Fprintln(out, "  /branch <name>                 git checkout -B <name> + auto-label session")
@@ -1088,6 +1092,30 @@ func printHelp(out io.Writer) {
 	fmt.Fprintln(out, "  /help                          this message")
 	fmt.Fprintln(out, "  /exit | /quit                  leave the session")
 	fmt.Fprintln(out, "  end a line with \\ to continue prompt on next line")
+}
+
+// printTimeline renders an at-a-glance ASCII view of every turn in
+// the session: clock, action label, truncated input, and cost in
+// USD. Designed for the "what happened today?" lookback after a long
+// chat. Cumulative cost is printed at the foot for a one-line sanity
+// check.
+func printTimeline(out io.Writer, sess *Session) {
+	if sess == nil || len(sess.Turns) == 0 {
+		fmt.Fprintln(out, "  no turns yet")
+		return
+	}
+	var total float64
+	for i, t := range sess.Turns {
+		clock := t.Time.Local().Format("15:04:05")
+		input := truncateForContext(t.Input, 60)
+		cost := ""
+		if t.CostUSD > 0 {
+			cost = fmt.Sprintf("  $%.4f", t.CostUSD)
+			total += t.CostUSD
+		}
+		fmt.Fprintf(out, "  %3d  %s  [%-15s] %s%s\n", i+1, clock, t.Action, input, cost)
+	}
+	fmt.Fprintf(out, "\n  total: %d turns, ~$%.4f\n", len(sess.Turns), total)
 }
 
 func printAgents(opts Options) {

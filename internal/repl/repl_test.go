@@ -762,6 +762,38 @@ func TestSuggestSessionTooFarReturnsEmpty(t *testing.T) {
 	}
 }
 
+func TestRunTimelineRendersTurnsAndCost(t *testing.T) {
+	bin := writeFakeBin(t, "#!/bin/sh\nexit 0\n")
+	prior := &Session{ID: "X", Goal: intentplan.GoalDev, Turns: []Turn{
+		{Input: "add /products", Action: "chat", CostUSD: 0.02},
+		{Input: "fix cart", Action: "chat", CostUSD: 0.03},
+	}}
+	var buf bytes.Buffer
+	_ = Run(context.Background(), Options{
+		Root: t.TempDir(), HarnessBin: bin, Goal: intentplan.GoalDev,
+		In: strings.NewReader("/timeline\n/exit\n"), Out: &buf, Resume: prior,
+	})
+	for _, want := range []string{
+		"add /products", "fix cart", "$0.0200", "$0.0300", "total:", "~$0.0500",
+	} {
+		if !strings.Contains(buf.String(), want) {
+			t.Errorf("missing %q: %s", want, buf.String())
+		}
+	}
+}
+
+func TestRunTimelineEmpty(t *testing.T) {
+	bin := writeFakeBin(t, "#!/bin/sh\nexit 0\n")
+	var buf bytes.Buffer
+	_ = Run(context.Background(), Options{
+		Root: t.TempDir(), HarnessBin: bin, Goal: intentplan.GoalDev,
+		In: strings.NewReader("/timeline\n/exit\n"), Out: &buf,
+	})
+	if !strings.Contains(buf.String(), "no turns yet") {
+		t.Errorf("missing empty timeline message: %s", buf.String())
+	}
+}
+
 func TestRunIgnoresBlankLines(t *testing.T) {
 	bin := writeFakeBin(t, "#!/bin/sh\nexit 0\n")
 	var out bytes.Buffer
