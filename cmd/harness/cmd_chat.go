@@ -86,7 +86,10 @@ apply.`,
 					return err
 				}
 				opts.Planner = planner
-				fmt.Fprintf(cmd.OutOrStdout(), "chat: LLM planner via %s\n", adapterID)
+				opts.Adapter = adapter
+				opts.AdapterID = adapterID
+				opts.Model = model
+				fmt.Fprintf(cmd.OutOrStdout(), "chat: %s wired — plain text streams to agent; /exec for harness plan\n", adapterID)
 				probe := agenthealth.New(adapter, 30*time.Second)
 				probe.Start(cmd.Context())
 				defer probe.Stop()

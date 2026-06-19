@@ -1,482 +1,256 @@
-# Tutorial — Build a small e-commerce API end-to-end with HarnessX
+# Tutorial — Build an e-commerce API by chatting with HarnessX
 
-In this tutorial you will build a small **FastAPI e-commerce backend**
-from zero while exercising every layer of HarnessX. Each step cites the
-paper section it implements so you finish the walkthrough understanding
-both the tool and the *"Code as Agent Harness"* framework
-(arXiv 2605.18747).
+You build a small **FastAPI e-commerce backend** (products → cart →
+checkout) by **talking to a pinned agent inside `harness chat`**.
+Every paragraph below is one chunk you can paste and watch happen.
 
-The application supports:
+This is the narrative version of the workflow.
+For raw command reference jump to [`COMMANDS.md`](COMMANDS.md). For the
+paper mapping see [`PAPER-MAPPING.md`](PAPER-MAPPING.md).
 
-- `GET /healthz` — liveness
-- `GET /products` — product catalogue
-- `POST /cart` — add to cart
-- `GET /cart/{user_id}` — read cart
-- `POST /checkout` — checkout an existing cart
+The harness chat REPL (v0.116.0+) treats:
 
-Estimated time: 60 min. Requires: macOS or Linux, Python 3.11+, git,
-network for adapter calls (optional — most steps are deterministic).
+- **plain text** → chat directly with the pinned agent (streams reads,
+  writes, diffs);
+- **`/exec <prompt>`** (alias `/do`) → deterministic harness plan
+  (`do` → `lint` → `test` → `ci`);
+- **`/ship <prompt>`** → `harness ship` (branch + spec + loop + commit);
+- **`/ci` `/test` `/lint`** → run the gate directly;
+- **`!<shell>`** → escape to a shell command in the project root.
 
-> Reference material:
-> - [`PAPER-MAPPING.md`](PAPER-MAPPING.md) — paper § → command
-> - [`COMMANDS.md`](COMMANDS.md) — every command in one page
-> - [`ARCHITECTURE.md`](ARCHITECTURE.md) — runtime architecture
+You never leave the chat window. CTRL-C aborts a single turn; `/exit`
+ends the session.
 
 ---
 
-## 0. Install
+## 0. Install once
 
 ```bash
 brew tap rodolfopeixoto/harnessx https://github.com/rodolfopeixoto/harnessx
 brew install harness
-harness version
-harness doctor
+harness doctor          # flags missing python/uv/git/agent CLI
 ```
 
-`harness doctor` flags any missing dependency. Install before moving on
-or the per-stack sensors will be skipped.
+Pick at least one agent CLI: `claude`, `codex`, `gemini`, `kimi`, or
+`ollama`. The tutorial below pins **claude** — substitute freely.
 
 ---
 
-## 1. Bootstrap the project (§2.3 + §5.1.1)
-
-One command does git init, `.harness/`, the Python scaffold, and the
-git hooks.
+## 1. Bootstrap the project
 
 ```bash
+cd ~/dev
 harness new python-ecommerce ./shop-api --yes --with-deps
 cd shop-api
 ```
 
-You now have a real e-commerce skeleton:
+What just happened (one line each):
 
-- `app/main.py` — FastAPI app with `/healthz`.
-- `app/routers/{products,cart,checkout}.py` — REST endpoints.
-- `app/models.py` — Pydantic models.
-- `app/storage.py` — in-memory thread-safe storage (swap for a real DB later).
-- `tests/{test_healthz,test_products,test_cart,test_checkout}.py` — pytest suite.
-- `requirements.txt`, `pyproject.toml`, `ruff.toml` — toolchain.
-- `Makefile` — convenience targets.
-- `.harness/` — runtime: config, db, hooks, logs.
-- `.harness/config/project.yaml` — canonical
-  `test`/`lint`/`run`/`bench` commands, used by the wrappers.
-- `.git/hooks/pre-push` — runs `harness ci` before every push.
+- `git init` on `main`;
+- `.harness/` created (config + db + logs);
+- 20 scaffold files written: `app/main.py`, routers, models, storage,
+  tests for `/healthz`;
+- `requirements.txt` installed into `.venv` via `uv`;
+- pre-push hook installed; baseline commit `chore: scaffold baseline`.
 
-Verify the wrappers resolve the right commands without you remembering
-them:
+Sanity check the floor:
 
 ```bash
-harness test                # .venv/bin/pytest -q
-harness lint                # .venv/bin/ruff check .
-harness dev &               # uvicorn on :8000
-curl http://localhost:8000/healthz
-kill %1
+harness lint    # ruff
+harness test    # pytest — 9 tests pass
+harness ci      # full sensor gate — green
 ```
+
+> If `harness new` errors with "refusing nested target", you are
+> standing inside a folder of the same name. `cd ..` and rerun.
 
 ---
 
-## 2. Inspect the harness surface (§3.3 + §3.4.4)
+## 2. Pin an agent and open chat
 
 ```bash
-harness scaffold list       # bundled stacks
-harness sensor list         # every sensor that applies to this project
-harness routes              # task → adapter chain table
-harness agent list          # registered adapters
-harness flow list           # bundled flows
-harness orchestrate list    # user-defined orchestration flows
-```
-
-The sensors include the universal pack (`forbidden_files`,
-`secrets_scan`, …) plus the Python stack pack (`py_ruff`, `py_pytest`,
-`py_mypy`, `py_bandit`, `py_pip_audit`). Run them to baseline:
-
-```bash
-harness ci
-```
-
-The first run may report missing optional tools (mypy, bandit). Install
-them with `pip install mypy bandit` to take the catalogue to green.
-
----
-
-## 3. Write the plan contract (§3.4.2)
-
-Before any LLM call, pin the scope deterministically:
-
-```bash
-harness plan write "build product catalogue, cart, and checkout endpoints" \
-  --file "app.py" \
-  --file "tests/test_app.py" \
-  --invariant "GET /healthz still returns 200" \
-  --invariant "ruff stays green" \
-  --validate "harness test" \
-  --validate "harness lint" \
-  --validate "harness ci" \
-  --rollback "git revert HEAD" \
-  --risk medium
-```
-
-This writes `.harness/artifacts/plans/PLAN-<ulid>.md`. Capture the id
-into a variable (the simplest way is to derive it from the file name):
-
-```bash
-PLAN_ID=$(ls -t .harness/artifacts/plans/PLAN-*.md | head -1 \
-  | xargs basename | sed 's/^PLAN-//; s/\.md$//')
-echo "${PLAN_ID}"
-```
-
-Pin it as the active contract so the `plan_scope` sensor enforces it:
-
-```bash
-mkdir -p .harness/config
-printf "active_plan_id: %s\n" "${PLAN_ID}" > .harness/config/plan.yaml
-
-harness sensor list | grep plan_scope     # confirm it now applies
-harness plan check --plan "${PLAN_ID}"    # baseline: empty diff -> green
-```
-
-> Both `PLAN-<id>`, `<id>`, or `PLAN-<id>.md` are accepted by the
-> `--plan` flag.
-
----
-
-## 4. Pin an agent (§3.5.3)
-
-Make sure at least one coding-CLI is installed and authenticated. The
-quickest path is Anthropic's Claude Code (`brew install claude`) signed
-in with `claude login`. `harness doctor` confirms which adapters it
-sees and which still need credentials.
-
-Pin Claude Code as the default for this project. `harness do`,
-`harness ship`, and `harness chat` all pick this up unless overridden
-on the call:
-
-```bash
-harness use claude
-harness use            # confirm
-```
-
-Per-task overrides land in `.harness/config/routes.yaml`:
-
-```bash
-harness config show
-harness config set --task implementation --primary claude --fallback codex,kimi --budget 0.5
-cat .harness/logs/config-mutations.jsonl   # before / after recorded
-```
-
-If you prefer to flip agents inline, every command takes
-`--agent <id>` and stays inside the audit trail:
-
-```bash
-harness do "add /readyz endpoint with pytest" --agent kimi
-harness ship "implement /products" --agent claude
+harness use claude          # pins claude as the active adapter
 harness chat --goal dev --adapter claude
 ```
 
-Each `harness chat` session lands at `.harness/sessions/<ulid>.jsonl`
-with every turn (input, plan, exec result).
+You land in:
+
+```
+chat: claude wired — plain text streams to agent; /exec for harness plan
+harness chat — session 01..., goal=dev
+plain text → talk to agent · /exec → plan+run · !<cmd> → shell · /help · /exit
+
+[dev|claude ✓]>
+```
+
+The badge `|claude ✓` means the periodic health probe pinged the
+adapter successfully.
 
 ---
 
-## 5. Ship the first feature (§3.4 + §3.4.2)
+## 3. Add the product catalogue (talking to claude)
 
-`harness new --yes --with-deps` already committed the scaffold as
-`chore: scaffold baseline`. Ship the feature end-to-end against your
-pinned agent:
-
-```bash
-harness ship "implement GET /products returning a static catalogue with pytest" \
-  --plan "${PLAN_ID}" \
-  --autonomy ask \
-  --max-attempts 3 \
-  --rate-limit-retries 3
-```
-
-While the agent is working, its CLI stdout streams **live** through
-HarnessX prefixed with `│ `:
+At the prompt, type the feature in your own words:
 
 ```
-ship: do attempt 1 — harness do "implement GET /products..." --yes --autonomy ask
-  [agent] calling claude...
-  │ ⏺ Reading app.py
-  │ ⏺ Writing tests/test_products.py
-  │ ⏺ Diff: 2 files changed, 18 insertions(+)
-  [agent] claude returned in 9.2s
+[dev|claude ✓]> add a real product catalogue: hard-code 3 products in app/storage.py
+with name, price_cents, stock. Update GET /products to return them.
+Add pytest in tests/test_products.py covering 3-item response and 200
+status. Keep the existing /healthz green.
 ```
 
-Under the hood `ship`:
+You will watch a live stream like:
 
-1. Branches `feature/implement-get-products...` from `develop` (or
-   `main` if `develop` is absent).
-2. Calls `harness feature` to write a spec.
-3. Loops `harness do` + `harness ci` until green or attempts
-   exhausted, with exponential backoff on `429` markers.
-4. Runs `harness plan check --plan ${PLAN_ID}` before committing.
-5. On success, emits a Conventional Commit referencing the plan.
-
-If `harness ci` stays red, the loop emits failure context back into
-the next `harness do` attempt — paper §3.4 PEV loop.
-
-> The `harness chat` REPL also accepts multi-line prompts: end any
-> input line with a trailing `\` and the prompt continues onto the
-> next line.
-
-Inspect the run:
-
-```bash
-git log --oneline -1            # see the conventional commit
-harness audit tail --limit 30   # event timeline (may be empty until you run a do/ship that touches sensors)
-ls .harness/runs/                # per-run scratch dirs
 ```
+  [agent] calling claude…
+  │ ● Reading app/storage.py
+  │ ● Reading app/routers/products.py
+  │ ● Writing app/storage.py
+  │ ● Writing tests/test_products.py
+  │ ● Diff: 2 files changed, +18 -1
+  ✓ claude done in 22s (in=4310 out=812 ~$0.0254)
+```
+
+When it stops, verify in the same chat:
+
+```
+[dev|claude ✓]> /test
+[dev|claude ✓]> /ci
+```
+
+Both must come back green. If they fail, **stay in the chat** and
+describe the failure in plain text — claude will read the failing
+output and patch.
 
 ---
 
-## 6. Add the cart endpoints with an orchestration flow (§4.1)
+## 4. Cart (multi-turn iteration)
 
-For richer changes (multiple roles, critic + repair), use a flow:
+Same chat, next feature. Notice every line is conversational — no
+shell escaping, no flag soup:
 
-```bash
-mkdir -p .harness/orchestrations
-cat > .harness/orchestrations/cart-cycle.yaml <<'EOF'
-name: cart-cycle
-description: Build /cart endpoints with planner -> coder -> tester chain
-topology: chain
-steps:
-  - role: planner
-    command: ["harness", "plan", "write", "implement POST /cart and GET /cart/{user_id}",
-              "--file", "app.py", "--file", "tests/test_app.py",
-              "--invariant", "existing endpoints unchanged",
-              "--validate", "harness ci", "--risk", "medium"]
-  - role: coder
-    command: ["harness", "do",
-              "implement POST /cart and GET /cart/{user_id} backed by an in-memory dict",
-              "--autonomy", "safe_execute", "--yes"]
-  - role: tester
-    command: ["harness", "test"]
-  - role: reviewer
-    command: ["harness", "ci"]
-EOF
-
-harness orchestrate show cart-cycle
-harness orchestrate run cart-cycle
-cat .harness/artifacts/runs/*/blackboard.json | head -40
+```
+[dev|claude ✓]> implement POST /cart/{user_id} and GET /cart/{user_id}
+backed by an in-memory dict in app/storage.py. POST takes
+{product_id, quantity}; GET returns the running total. Cover both with
+pytest in tests/test_cart.py including missing-product 404.
 ```
 
-The blackboard JSON is the paper's "file-only shared substrate"
-(§4.3.1). Each role's stdout becomes context for the next role.
+Watch the diff stream. Then gate it:
 
-You can drop a role-played LLM step too by setting `adapter: ollama`
-instead of `command:` — see [`COMMANDS.md`](COMMANDS.md#harness-orchestrate-listshow-run-name---dry-run---adapter-timeout-duration).
+```
+[dev|claude ✓]> /ci
+```
+
+If the gate breaks, debug conversationally:
+
+```
+[dev|claude ✓]> the 404 path returns 500; trace it and fix
+```
+
+claude will read the traceback, propose the patch, and re-run.
 
 ---
 
-## 7. Add the checkout endpoint with the typed REPL (§3.1.4)
+## 5. Checkout + a one-shot ship
 
-Interactive iteration without re-typing flags:
+For the third feature use the **`/ship`** slash command. That switches
+to `harness ship` under the hood: a branch is cut, a spec is written,
+`harness do` runs in a bounded loop, and the green result is committed
+with a Conventional Commit subject.
 
-```bash
-harness chat --goal dev --adapter ollama
-[dev]> /goal dev
-[dev]> implement POST /checkout that empties the cart for the user
-[dev]> harness test
-[dev]> /exit
+```
+[dev|claude ✓]> /ship implement POST /checkout that clears the cart for
+                 a user and returns the total; tests in tests/test_checkout.py
 ```
 
-Each prompt is converted into a typed `Plan` JSON whose `steps[].cmd`
-references are restricted to the dev palette (`plan, ship, test, lint,
-ci, check, scaffold, smoke, memory, evolve, coverage`). LLM-emitted
-plans cannot ask for `runtime`, `containers`, or anything off-palette.
+Stream looks like:
+
+```
+  $ harness ship implement POST /checkout … --yes
+  ship: agent=claude
+  ship: branch feature/implement-post-checkout ← develop
+  ship: feature spec — harness feature implement POST /checkout … --yes
+  ship: do attempt 1 — harness do … --autonomy ask --yes
+    [agent] calling claude…
+    | ● Reading app/routers/checkout.py
+    | ● Writing tests/test_checkout.py
+  ship: ci attempt 1 — harness ci
+  ✓ ship: green
+```
+
+> If you start a `/ship` with uncommitted work in the tree (because
+> you were iterating in chat first), add **`--allow-dirty`** to the
+> ship command — the dirty diff becomes part of the same commit.
 
 ---
 
-## 8. Promote learnings to memory (§3.2)
+## 6. Run the API and curl it
 
-Once the suite stays green, capture the convention as long-term
-memory. Pick a real run id from `.harness/runs/`:
-
-```bash
-RUN_ID=$(ls -t .harness/runs/ | head -1)
-echo "${RUN_ID}"   # must be a ulid; if blank, run `harness ship` or `harness do` first
-
-harness memory promote \
-  --scope project --kind semantic \
-  --content "cart state lives in app.state.cart_db; do not import a new dict" \
-  --run-id "${RUN_ID}" --confidence 0.85
-
-harness memory list --kind semantic
-harness memory recall "cart state"
+```
+[dev|claude ✓]> !.venv/bin/uvicorn app.main:app --reload &
+[dev|claude ✓]> !curl -s localhost:8000/products | jq
+[dev|claude ✓]> !curl -s -X POST localhost:8000/cart/alice \
+                  -H 'content-type: application/json' \
+                  -d '{"product_id":"sku-001","quantity":2}' | jq
+[dev|claude ✓]> !curl -s -X POST localhost:8000/checkout \
+                  -H 'content-type: application/json' \
+                  -d '{"user_id":"alice"}' | jq
+[dev|claude ✓]> !pkill -f uvicorn
 ```
 
-> `harness memory promote` rejects an empty / flag-shaped `--run-id`,
-> so a typo here surfaces immediately instead of writing a memory
-> with the default confidence.
-
-The five paper kinds (`working | semantic | experiential | long_term |
-multi_agent`) all show up under `harness memory list --kind`.
+The `!` prefix runs the line through `sh -c` from the project root,
+so you stay inside the chat session.
 
 ---
 
-## 9. Enforce the 90% coverage floor (§3.4.4)
+## 7. Wrap up
 
-```bash
-harness coverage --threshold 0.9         # gate; non-zero on red
+```
+[dev|claude ✓]> /exit
+bye
 ```
 
-For a Python project the gate is bundled with `pytest-cov` once you add
-it; for the harnessx-go internal you saw earlier the gate is wired to
-`go test -cover`.
+What you have on disk:
 
-You can also drop `pytest --cov` into the Makefile and run it through
-`harness bench` if you want a single command.
+- 4 routers, 1 storage layer, ~12 pytest cases — all green;
+- one feature branch per `/ship` with a Conventional Commit;
+- `.harness/sessions/<id>.jsonl` with every turn, plan, and result
+  (replayable with `harness chat --replay <id>` — see roadmap);
+- `.harness/artifacts/specs/*.md` for every feature you shipped;
+- a pre-push hook that re-runs `harness ci` before any `git push`.
 
 ---
 
-## 10. Iterate with `harness loop` (§3.4)
+## Cheat sheet inside the chat
 
-Watch the working tree for changes and re-run the PEV loop:
-
-```bash
-harness loop --max-attempts 3 &
-LOOP_PID=$!
-# in another shell, change app.py
-kill -INT $LOOP_PID
-harness loop resume <run-id>             # restore state.json
-```
-
----
-
-## 11. Diagnose and evolve the harness (§3.5)
-
-After a few sessions the telemetry log is rich enough to cluster:
-
-```bash
-harness evolve diagnose
-harness evolve diagnose --json > /tmp/diag.json
-```
-
-Propose a mutation candidate (no automatic apply):
-
-```bash
-harness evolve propose \
-  --component router \
-  --description "drop claude from cheap_review fallback" \
-  --rationale "always 429 under load" \
-  --risk low
-```
-
-Replay the candidate against a held-out trace inside an isolated
-sandbox (paper §3.5.2):
-
-```bash
-# Snapshot the current trace as the held-out set.
-cp .harness/logs/events.jsonl /tmp/heldout.jsonl
-
-# A/B replay: baseline vs the same binary as the candidate.
-harness evolve sandbox /tmp/heldout.jsonl
-```
-
-You can pass `--candidate /path/to/another/harness` when you actually
-have a mutated binary to compare. Promotion is HITL-gated (§3.5.3):
-
-```bash
-MUT_ID=$(jq -r .mutation.id .harness/logs/mutations.jsonl | head -1)
-harness evolve promote ${MUT_ID} --hitl --reason "review traffic improved"
-cat .harness/logs/mutations.jsonl
-```
+| You type                    | What happens                                     |
+|-----------------------------|--------------------------------------------------|
+| `add /products endpoint`    | streams a chat turn to the pinned agent          |
+| `/exec add /products`       | deterministic harness plan: do + lint + test + ci|
+| `/ship add /products`       | branch + spec + loop + commit                    |
+| `/ci`, `/test`, `/lint`     | run the gate                                     |
+| `/plan add /products`       | print the plan JSON without executing            |
+| `!<shell cmd>`              | run any shell command in the project root        |
+| `/goal ops`                 | switch session goal (dev/ops/research/ads)       |
+| `/history`, `/last`         | inspect / replay previous prompts                |
+| `/help`, `/exit`            | usual                                            |
 
 ---
 
-## 12. Cross-stack regression and tutorial replay
+## When something goes sideways
 
-Before pushing anything to a shared branch, exercise the whole CLI
-surface and the cheat-sheet replay:
+- **Agent CLI prompts for an OS dialog** (Docker, OrbStack, keychain):
+  that is the upstream CLI, not HarnessX. Approve it once or
+  `harness use codex` to switch adapter.
+- **`harness ship` rejects a dirty tree**: pass `--allow-dirty`, or
+  `!git stash` first.
+- **`harness new` refuses target**: you are inside a folder with the
+  same basename. `cd ..` and rerun.
+- **`harness ci` skips `py_ruff`/`py_pytest` with "binary not on PATH"**:
+  activate the venv first — `source .venv/bin/activate`.
+- **Adapter health badge flips to `⚠`**: the periodic probe failed.
+  Run `harness doctor` or check the CLI is logged in.
 
-```bash
-harness smoke matrix --langs all --step-timeout 180s
-make tutorial-replay                     # deterministic walk
-harness ci                               # full sensor gate
-```
-
-`harness ci` will run `plan_scope` (your active plan is pinned),
-`secrets_scan`, lint, pytest, performance budget, and the optional
-coverage gate.
-
----
-
-## 13. Wrap up
-
-```bash
-git log --oneline -10
-ls .harness/artifacts/plans/
-ls .harness/artifacts/runs/
-harness backup save
-harness backup list
-```
-
-Push your work — the `pre-push` hook will re-run `harness ci` and
-reject any red state:
-
-```bash
-git push -u origin feature/shop-api-cart-checkout
-```
-
----
-
-## Cheat-sheet (one-pager)
-
-```bash
-harness new python ./shop-api --yes --with-deps   # auto-commits scaffold baseline
-cd shop-api
-harness use claude                                # pin default agent
-
-harness plan write "build product catalogue and cart" \
-  --file app.py --file tests/test_app.py \
-  --invariant "ruff stays green" \
-  --validate "harness ci" --risk medium
-PLAN_ID=$(ls -t .harness/artifacts/plans/PLAN-*.md | head -1 \
-  | xargs basename | sed 's/^PLAN-//; s/\.md$//')
-printf "active_plan_id: %s\n" "$PLAN_ID" > .harness/config/plan.yaml
-
-harness config set --task implementation --primary claude \
-  --fallback codex,kimi --budget 0.5
-
-harness ship "implement GET /products with pytest" --plan "$PLAN_ID"
-harness orchestrate run cart-cycle
-harness chat --goal dev                           # uses pinned adapter
-
-RUN_ID=$(ls -t .harness/runs/ | head -1)
-harness memory promote --scope project --kind semantic \
-  --content "cart lives in app.state.cart_db" \
-  --run-id "$RUN_ID" --confidence 0.85
-
-harness coverage --threshold 0.9
-harness evolve diagnose
-harness evolve sandbox /tmp/heldout.jsonl
-harness backup save
-harness dashboard
-```
-
-You exercised every layer:
-
-- §2 Interface — scaffold, projectcfg, adapters.
-- §3.1 Planning — `plan write`, `chat`, `orchestrate`.
-- §3.2 Memory — typed promotions.
-- §3.3 Tool Use — adapter routing.
-- §3.4 PEV — `ship`, `loop`, sensors, plan-as-contract, coverage gate.
-- §3.5 AHE — `evolve diagnose / propose / sandbox / promote --hitl`.
-- §4 Scaling — orchestrate roles + topology + blackboard.
-- §5.1.1 Code assistants — `new`, `ship`, `chat`, wrappers.
-
----
-
-## Troubleshooting
-
-| Symptom | Fix |
-|---|---|
-| `harness doctor` red | Install the listed dep; re-run `harness ci` |
-| `harness ship` keeps retrying | Inspect `harness audit tail`; adjust `--rate-limit-retries` |
-| `harness ci` blocks on `plan_scope` | Run `harness plan check --plan ${PLAN_ID}` to see violations, then either edit the plan (`harness plan write`) or revert out-of-scope files |
-| `pre-push` blocks the push | Reproduce locally with `harness ci`; bypass only with `HARNESS_SKIP_CI=1` |
-| Dashboard 404 | `make dashboard-install && make dashboard-build && harness dashboard` |
-
-File issues at <https://github.com/rodolfopeixoto/harnessx/issues>.
+That is the whole workflow. Plain text → agent. Slash → harness.
+Bang → shell. Everything else is documentation.
