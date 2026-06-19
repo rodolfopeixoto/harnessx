@@ -10,11 +10,13 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/ropeixoto/harnessx/internal/agenthealth"
+	"github.com/ropeixoto/harnessx/internal/agents"
 	"github.com/ropeixoto/harnessx/internal/intentplan"
 	"github.com/ropeixoto/harnessx/internal/platform/ids"
 )
@@ -45,6 +47,9 @@ type Options struct {
 	StepTimeout time.Duration
 	HealthProbe *agenthealth.Probe
 	Plain       bool
+	Adapter     agents.AgentAdapter
+	AdapterID   string
+	Model       string
 }
 
 type Planner func(ctx context.Context, goal intentplan.Goal, prompt string) (intentplan.Plan, error)
@@ -153,6 +158,24 @@ func Run(ctx context.Context, opts Options) error {
 func handleInput(ctx context.Context, sess *Session, opts Options, input string) Turn {
 	turn := Turn{Time: time.Now().UTC(), Input: input}
 	switch {
+	case strings.HasPrefix(input, "!"):
+		turn.Action = "shell"
+		runShell(ctx, opts, strings.TrimSpace(input[1:]))
+	case strings.HasPrefix(input, "/exec "), strings.HasPrefix(input, "/do "):
+		prompt := strings.TrimSpace(strings.TrimPrefix(strings.TrimPrefix(input, "/exec"), "/do"))
+		executePlan(ctx, sess, opts, prompt, &turn)
+	case strings.HasPrefix(input, "/ship "):
+		runHarnessCmd(ctx, opts, append([]string{"ship", strings.TrimSpace(strings.TrimPrefix(input, "/ship "))}, "--yes"))
+		turn.Action = "ship"
+	case strings.HasPrefix(input, "/ci"):
+		runHarnessCmd(ctx, opts, []string{"ci"})
+		turn.Action = "ci"
+	case strings.HasPrefix(input, "/test"):
+		runHarnessCmd(ctx, opts, []string{"test"})
+		turn.Action = "test"
+	case strings.HasPrefix(input, "/lint"):
+		runHarnessCmd(ctx, opts, []string{"lint"})
+		turn.Action = "lint"
 	case strings.HasPrefix(input, "/goal "):
 		newGoal := intentplan.Goal(strings.TrimSpace(strings.TrimPrefix(input, "/goal ")))
 		if inKnownGoals(newGoal) {
@@ -191,31 +214,135 @@ func handleInput(ctx context.Context, sess *Session, opts Options, input string)
 		fmt.Fprintf(opts.Out, "↻ replaying: %s\n", last)
 		return handleInput(ctx, sess, opts, last)
 	default:
-		plan, err := opts.Planner(ctx, sess.Goal, input)
-		if err != nil {
-			turn.Action = "plan-error"
-			fmt.Fprintf(opts.Out, "planner: %v\n", err)
+		if opts.Adapter != nil {
+			turn.Action = "chat"
+			chatTurn(ctx, opts, input)
 			return turn
 		}
-		turn.Plan = &plan
-		res, err := intentplan.Execute(ctx, plan, intentplan.ExecOptions{
-			HarnessBin: opts.HarnessBin, WorkingDir: opts.Root,
-			Out: opts.Out, StepTimeout: opts.StepTimeout,
-		})
-		if err != nil {
-			turn.Action = "execute-error"
-			fmt.Fprintf(opts.Out, "executor: %v\n", err)
-			return turn
-		}
-		turn.Result = &res
-		turn.Action = "executed"
-		if res.OK {
-			fmt.Fprintln(opts.Out, "✓ plan green")
-		} else {
-			fmt.Fprintln(opts.Out, "✗ plan red — inspect step outputs above")
-		}
+		executePlan(ctx, sess, opts, input, &turn)
 	}
 	return turn
+}
+
+func executePlan(ctx context.Context, sess *Session, opts Options, prompt string, turn *Turn) {
+	plan, err := opts.Planner(ctx, sess.Goal, prompt)
+	if err != nil {
+		turn.Action = "plan-error"
+		fmt.Fprintf(opts.Out, "planner: %v\n", err)
+		return
+	}
+	turn.Plan = &plan
+	res, err := intentplan.Execute(ctx, plan, intentplan.ExecOptions{
+		HarnessBin: opts.HarnessBin, WorkingDir: opts.Root,
+		Out: opts.Out, StepTimeout: opts.StepTimeout,
+	})
+	if err != nil {
+		turn.Action = "execute-error"
+		fmt.Fprintf(opts.Out, "executor: %v\n", err)
+		return
+	}
+	turn.Result = &res
+	turn.Action = "executed"
+	if res.OK {
+		fmt.Fprintln(opts.Out, "✓ plan green")
+	} else {
+		fmt.Fprintln(opts.Out, "✗ plan red — inspect step outputs above")
+	}
+}
+
+func chatTurn(ctx context.Context, opts Options, prompt string) {
+	fmt.Fprintf(opts.Out, "  [agent] calling %s…\n", opts.AdapterID)
+	live := &prefixWriter{w: opts.Out, prefix: "  │ "}
+	timeout := opts.StepTimeout
+	if timeout <= 0 {
+		timeout = 5 * time.Minute
+	}
+	rctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	res := opts.Adapter.Run(rctx, agents.AgentRequest{
+		Prompt:     prompt,
+		Model:      opts.Model,
+		WorkingDir: opts.Root,
+		Timeout:    timeout,
+		LiveOut:    live,
+		Extra:      map[string]string{"task": "chat"},
+	})
+	live.flush()
+	if res.Err != nil {
+		fmt.Fprintf(opts.Out, "✗ %s: %v\n", opts.AdapterID, res.Err)
+		return
+	}
+	if msg := strings.TrimSpace(res.Output.FinalMessage); msg != "" {
+		fmt.Fprintln(opts.Out, msg)
+	}
+	fmt.Fprintf(opts.Out, "  ✓ %s done in %s (in=%d out=%d ~$%.4f)\n",
+		opts.AdapterID, res.Duration.Round(time.Millisecond),
+		res.Usage.InputTokens, res.Usage.OutputTokens, res.Usage.EstimatedCostUSD)
+}
+
+func runShell(ctx context.Context, opts Options, line string) {
+	if line == "" {
+		fmt.Fprintln(opts.Out, "shell: empty")
+		return
+	}
+	fmt.Fprintf(opts.Out, "  $ %s\n", line)
+	c := exec.CommandContext(ctx, "sh", "-c", line)
+	c.Dir = opts.Root
+	c.Stdout = opts.Out
+	c.Stderr = opts.Out
+	if err := c.Run(); err != nil {
+		fmt.Fprintf(opts.Out, "  ✗ exit %v\n", err)
+	}
+}
+
+func runHarnessCmd(ctx context.Context, opts Options, args []string) {
+	fmt.Fprintf(opts.Out, "  $ harness %s\n", strings.Join(args, " "))
+	c := exec.CommandContext(ctx, opts.HarnessBin, args...)
+	c.Dir = opts.Root
+	c.Stdout = opts.Out
+	c.Stderr = opts.Out
+	if err := c.Run(); err != nil {
+		fmt.Fprintf(opts.Out, "  ✗ exit %v\n", err)
+	}
+}
+
+type prefixWriter struct {
+	w      io.Writer
+	prefix string
+	buf    []byte
+	atBOL  bool
+}
+
+func (p *prefixWriter) Write(b []byte) (int, error) {
+	if p.buf == nil {
+		p.atBOL = true
+	}
+	for _, c := range b {
+		if p.atBOL {
+			p.buf = append(p.buf, []byte(p.prefix)...)
+			p.atBOL = false
+		}
+		p.buf = append(p.buf, c)
+		if c == '\n' {
+			p.atBOL = true
+		}
+	}
+	if p.atBOL {
+		_, err := p.w.Write(p.buf)
+		p.buf = p.buf[:0]
+		if err != nil {
+			return len(b), err
+		}
+	}
+	return len(b), nil
+}
+
+func (p *prefixWriter) flush() {
+	if len(p.buf) > 0 {
+		_, _ = p.w.Write(p.buf)
+		_, _ = p.w.Write([]byte{'\n'})
+		p.buf = p.buf[:0]
+	}
 }
 
 func readMultilineInput(rd *bufio.Reader, out io.Writer, goal intentplan.Goal) (string, error) {
@@ -256,15 +383,21 @@ func inKnownGoals(g intentplan.Goal) bool {
 
 func greet(out io.Writer, s Session) {
 	fmt.Fprintf(out, "harness chat — session %s, goal=%s\n", s.ID, s.Goal)
-	fmt.Fprintln(out, "type '/help' for commands, '/exit' to leave")
+	fmt.Fprintln(out, "plain text → talk to agent · /exec → plan+run · !<cmd> → shell · /help · /exit")
 }
 
 func printHelp(out io.Writer) {
 	fmt.Fprintln(out, "commands:")
+	fmt.Fprintln(out, "  plain text                     chat with pinned agent (streams)")
+	fmt.Fprintln(out, "  !<shell cmd>                   run shell command")
+	fmt.Fprintln(out, "  /exec <prompt>                 deterministic plan: do + lint + test + ci")
+	fmt.Fprintln(out, "  /do <prompt>                   alias for /exec")
+	fmt.Fprintln(out, "  /ship <prompt>                 harness ship (branch + spec + loop + commit)")
+	fmt.Fprintln(out, "  /ci | /test | /lint            run harness gate")
 	fmt.Fprintln(out, "  /goal <dev|ads|research|ops>   switch session goal")
 	fmt.Fprintln(out, "  /plan <prompt>                 emit plan JSON without executing")
 	fmt.Fprintln(out, "  /last                          replay the previous prompt")
-	fmt.Fprintln(out, "  /history                       list previous prompts in this session")
+	fmt.Fprintln(out, "  /history                       list previous prompts")
 	fmt.Fprintln(out, "  /help                          this message")
 	fmt.Fprintln(out, "  /exit | /quit                  leave the session")
 	fmt.Fprintln(out, "  end a line with \\ to continue prompt on next line")
