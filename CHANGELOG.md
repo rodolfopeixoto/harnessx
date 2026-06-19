@@ -3,6 +3,29 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-19 — v0.119.0 — Chat spinner + multi-turn conversation context (F84)
+
+### Changed
+
+- **`harness chat` now shows a braille spinner** (`⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏`) plus
+  the word *thinking…* every 120 ms while the pinned adapter is
+  working. `claude` and `codex` buffer their JSON output until the
+  call finishes, so v0.116–v0.118 made the terminal look frozen for
+  tens of seconds during real walk-throughs. The spinner is suppressed
+  under `--plain`/`HARNESS_PLAIN=1` and cleaned up with a carriage
+  return + blank pass so subsequent output is not clobbered. Stop is
+  idempotent (`sync.Once` + waited `done` channel) so the goroutine
+  never outlives the turn.
+- **`harness chat` plain-text turns now thread a Working Memory
+  preamble** (paper §3.2.1) built from the last 5 non-slash session
+  turns plus their outcomes. Without this, every chat turn was a
+  blank-slate single-shot call — "fix the 500 in cart" had no idea
+  that you had just asked claude to add `/products`. The preamble is
+  capped at 5 turns × 1200 bytes of agent reply each so it stays well
+  inside any adapter's context budget. Four new tests cover the
+  empty-session pass-through, the threading, the cap, and slash-
+  command filtering.
+
 ## 2026-06-19 — v0.118.0 — Python venv sensors + plan_scope metadata defaults (F83)
 
 ### Fixed

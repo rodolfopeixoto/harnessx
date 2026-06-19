@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ropeixoto/harnessx/internal/agenthealth"
@@ -216,7 +217,7 @@ func handleInput(ctx context.Context, sess *Session, opts Options, input string)
 	default:
 		if opts.Adapter != nil {
 			turn.Action = "chat"
-			chatTurn(ctx, opts, input)
+			chatTurn(ctx, sess, opts, input)
 			return turn
 		}
 		executePlan(ctx, sess, opts, input, &turn)
@@ -250,7 +251,7 @@ func executePlan(ctx context.Context, sess *Session, opts Options, prompt string
 	}
 }
 
-func chatTurn(ctx context.Context, opts Options, prompt string) {
+func chatTurn(ctx context.Context, sess *Session, opts Options, prompt string) {
 	fmt.Fprintf(opts.Out, "  [agent] calling %s…\n", opts.AdapterID)
 	live := &prefixWriter{w: opts.Out, prefix: "  │ "}
 	timeout := opts.StepTimeout
@@ -259,14 +260,17 @@ func chatTurn(ctx context.Context, opts Options, prompt string) {
 	}
 	rctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
+	spinStop := startSpinner(opts.Out, opts.Plain)
+	defer spinStop()
 	res := opts.Adapter.Run(rctx, agents.AgentRequest{
-		Prompt:     prompt,
+		Prompt:     withConversationContext(sess, prompt),
 		Model:      opts.Model,
 		WorkingDir: opts.Root,
 		Timeout:    timeout,
 		LiveOut:    live,
 		Extra:      map[string]string{"task": "chat"},
 	})
+	spinStop()
 	live.flush()
 	if res.Err != nil {
 		fmt.Fprintf(opts.Out, "✗ %s: %v\n", opts.AdapterID, res.Err)
@@ -278,6 +282,96 @@ func chatTurn(ctx context.Context, opts Options, prompt string) {
 	fmt.Fprintf(opts.Out, "  ✓ %s done in %s (in=%d out=%d ~$%.4f)\n",
 		opts.AdapterID, res.Duration.Round(time.Millisecond),
 		res.Usage.InputTokens, res.Usage.OutputTokens, res.Usage.EstimatedCostUSD)
+}
+
+// startSpinner returns a stop function that is idempotent and safe to
+// call multiple times. The spinner prints a frame every ~120ms while
+// the agent runs so the user can tell the terminal is alive — claude
+// and codex CLIs hold their JSON output until the call completes,
+// which used to make `harness chat` look frozen for tens of seconds.
+func startSpinner(out io.Writer, plain bool) func() {
+	if plain {
+		return func() {}
+	}
+	frames := []rune{'⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'}
+	stop := make(chan struct{})
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		t := time.NewTicker(120 * time.Millisecond)
+		defer t.Stop()
+		i := 0
+		for {
+			select {
+			case <-stop:
+				fmt.Fprint(out, "\r  \r")
+				return
+			case <-t.C:
+				fmt.Fprintf(out, "\r  %c thinking…", frames[i%len(frames)])
+				i++
+			}
+		}
+	}()
+	var once sync.Once
+	return func() {
+		once.Do(func() {
+			close(stop)
+			<-done
+		})
+	}
+}
+
+// withConversationContext threads the last few session turns into the
+// prompt so multi-turn chat reads as one conversation instead of a
+// series of isolated single-shot calls (paper §3.2.1 Working Memory).
+// Truncates aggressively because adapter context budgets are bounded
+// and the most recent few turns dominate the signal.
+func withConversationContext(sess *Session, prompt string) string {
+	if sess == nil || len(sess.Turns) == 0 {
+		return prompt
+	}
+	const maxTurns = 5
+	const maxOutputBytes = 1200
+	start := 0
+	if len(sess.Turns) > maxTurns {
+		start = len(sess.Turns) - maxTurns
+	}
+	var b strings.Builder
+	b.WriteString("# Conversation so far\n\n")
+	wrote := false
+	for i := start; i < len(sess.Turns); i++ {
+		t := sess.Turns[i]
+		in := strings.TrimSpace(t.Input)
+		if in == "" || strings.HasPrefix(in, "/") {
+			continue
+		}
+		wrote = true
+		fmt.Fprintf(&b, "[turn %d] user: %s\n", i+1, in)
+		if t.Result != nil && len(t.Result.Steps) > 0 {
+			fmt.Fprintf(&b, "[turn %d] harness ran %d steps (ok=%t)\n", i+1, len(t.Result.Steps), t.Result.OK)
+		}
+		if t.Action == "chat" {
+			out := truncateForContext(t.Input, maxOutputBytes)
+			if out != "" {
+				fmt.Fprintf(&b, "[turn %d] agent replied (truncated): %s\n", i+1, out)
+			}
+		}
+		b.WriteByte('\n')
+	}
+	if !wrote {
+		return prompt
+	}
+	b.WriteString("# New user message\n\n")
+	b.WriteString(prompt)
+	return b.String()
+}
+
+func truncateForContext(s string, max int) string {
+	s = strings.TrimSpace(s)
+	if len(s) <= max {
+		return s
+	}
+	return s[:max] + "…"
 }
 
 func runShell(ctx context.Context, opts Options, line string) {
