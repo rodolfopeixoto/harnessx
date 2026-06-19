@@ -58,7 +58,7 @@ func addUpdateFlags(c *cobra.Command) {
 	c.Flags().StringVar(&updateFlags.tag, "tag", "", "pin a specific tag (overrides --channel)")
 	c.Flags().StringVar(&updateFlags.channel, "channel", "stable", "stable|beta|develop")
 	c.Flags().BoolVar(&updateFlags.dryRun, "dry-run", false, "print plan without replacing binary")
-	c.Flags().BoolVar(&updateFlags.force, "force", false, "allow downgrade to an older tag")
+	c.Flags().BoolVar(&updateFlags.force, "force", false, "allow downgrade OR reinstall the same tag")
 }
 
 func normaliseTag(t string) string {
@@ -178,8 +178,11 @@ func updateFromRelease(out io.Writer, repo, tag string, dryRun bool) error {
 	fmt.Fprintf(out, "current:  %s\ntarget:   %s\nrepo:     %s\n", current, tag, repo)
 	cmp := update.CompareVersions(current, tag)
 	if cmp == 0 {
-		fmt.Fprintln(out, "already on target tag — nothing to do")
-		return nil
+		if !updateFlags.force {
+			fmt.Fprintln(out, "already on target tag — nothing to do (pass --force to reinstall)")
+			return nil
+		}
+		fmt.Fprintln(out, "→ same tag, --force set: reinstalling")
 	}
 	if cmp > 0 && !updateFlags.force {
 		return fmt.Errorf("refusing downgrade %s → %s (pass --force to override)", current, tag)

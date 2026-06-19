@@ -697,6 +697,71 @@ func TestRunPromptsEmpty(t *testing.T) {
 	}
 }
 
+func TestRunNoAdapterRefusesPlainText(t *testing.T) {
+	bin := writeFakeBin(t, "#!/bin/sh\nexit 0\n")
+	var buf bytes.Buffer
+	_ = Run(context.Background(), Options{
+		Root: t.TempDir(), HarnessBin: bin, Goal: intentplan.GoalDev,
+		In:        strings.NewReader("just hello there\n/exit\n"),
+		Out:       &buf,
+		NoAdapter: true,
+	})
+	if !strings.Contains(buf.String(), "no adapter wired") {
+		t.Errorf("missing refusal: %s", buf.String())
+	}
+	if strings.Contains(buf.String(), "✓ plan green") {
+		t.Errorf("plan should not have executed: %s", buf.String())
+	}
+}
+
+func TestLevenshteinBasic(t *testing.T) {
+	cases := map[string]struct {
+		a, b string
+		want int
+	}{
+		"identical":  {"abc", "abc", 0},
+		"single sub": {"abc", "abx", 1},
+		"insert":     {"abc", "abcd", 1},
+		"delete":     {"abcd", "abc", 1},
+		"swap":       {"abc", "acb", 2},
+		"empty":      {"", "abc", 3},
+	}
+	for name, c := range cases {
+		if got := levenshtein(c.a, c.b); got != c.want {
+			t.Errorf("%s: levenshtein(%q,%q)=%d want %d", name, c.a, c.b, got, c.want)
+		}
+	}
+}
+
+func TestSuggestSessionByCloseLabel(t *testing.T) {
+	dir := t.TempDir()
+	bin := writeFakeBin(t, "#!/bin/sh\nexit 0\n")
+	var buf bytes.Buffer
+	_ = Run(context.Background(), Options{
+		Root: dir, HarnessBin: bin, Goal: intentplan.GoalDev,
+		In:  strings.NewReader("/save ecommerce-products\n/exit\n"),
+		Out: &buf,
+	})
+	got := SuggestSession(dir, "ecommerce-prodcts")
+	if got != "ecommerce-products" {
+		t.Errorf("expected suggestion 'ecommerce-products', got %q", got)
+	}
+}
+
+func TestSuggestSessionTooFarReturnsEmpty(t *testing.T) {
+	dir := t.TempDir()
+	bin := writeFakeBin(t, "#!/bin/sh\nexit 0\n")
+	var buf bytes.Buffer
+	_ = Run(context.Background(), Options{
+		Root: dir, HarnessBin: bin, Goal: intentplan.GoalDev,
+		In:  strings.NewReader("/save foo\n/exit\n"),
+		Out: &buf,
+	})
+	if got := SuggestSession(dir, "totally-unrelated-name"); got != "" {
+		t.Errorf("expected empty for distant arg, got %q", got)
+	}
+}
+
 func TestRunIgnoresBlankLines(t *testing.T) {
 	bin := writeFakeBin(t, "#!/bin/sh\nexit 0\n")
 	var out bytes.Buffer
