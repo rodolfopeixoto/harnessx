@@ -240,6 +240,7 @@ What you have on disk:
 | `/use <id>`                 | switch adapter mid-session (kimi/codex/gemini/…) |
 | `/diff`                     | `git diff --stat` + full diff in project root    |
 | `/cost`                     | cumulative session token + USD spend             |
+| `/timeline`                 | ASCII timeline of every turn (clock, action, $)  |
 | `/budget 0.50` / `off`      | refuse further chat turns once spend > cap       |
 | `/save my-feature`          | label this session for `harness chat list`       |
 | `/branch feature/cart`      | `git checkout -B …` + auto-label session         |
