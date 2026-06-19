@@ -294,6 +294,70 @@ func TestWithConversationContextCapsAtFiveTurns(t *testing.T) {
 	}
 }
 
+func TestRunAgentsListsAdapters(t *testing.T) {
+	bin := writeFakeBin(t, "#!/bin/sh\nexit 0\n")
+	var buf bytes.Buffer
+	_ = Run(context.Background(), Options{
+		Root:         t.TempDir(),
+		HarnessBin:   bin,
+		Goal:         intentplan.GoalDev,
+		In:           strings.NewReader("/agents\n/exit\n"),
+		Out:          &buf,
+		AdapterID:    "claude",
+		AdaptersList: []string{"claude", "codex", "gemini"},
+	})
+	for _, want := range []string{"active: claude", "→ claude", "codex", "gemini"} {
+		if !strings.Contains(buf.String(), want) {
+			t.Errorf("missing %q in /agents output: %s", want, buf.String())
+		}
+	}
+}
+
+func TestRunCostEmptyReports(t *testing.T) {
+	bin := writeFakeBin(t, "#!/bin/sh\nexit 0\n")
+	var buf bytes.Buffer
+	_ = Run(context.Background(), Options{
+		Root: t.TempDir(), HarnessBin: bin, Goal: intentplan.GoalDev,
+		In:  strings.NewReader("/cost\n/exit\n"),
+		Out: &buf,
+	})
+	if !strings.Contains(buf.String(), "no agent turns yet") {
+		t.Errorf("missing empty-cost message: %s", buf.String())
+	}
+}
+
+func TestRunClearSetsContextMark(t *testing.T) {
+	bin := writeFakeBin(t, "#!/bin/sh\nexit 0\n")
+	prior := &Session{ID: "X", Goal: intentplan.GoalDev, Turns: []Turn{
+		{Input: "old chatter", Action: "chat"},
+	}}
+	var buf bytes.Buffer
+	_ = Run(context.Background(), Options{
+		Root: t.TempDir(), HarnessBin: bin, Goal: intentplan.GoalDev,
+		In:     strings.NewReader("/clear\n/exit\n"),
+		Out:    &buf,
+		Resume: prior,
+	})
+	if !strings.Contains(buf.String(), "working memory cleared") {
+		t.Errorf("missing /clear confirmation: %s", buf.String())
+	}
+}
+
+func TestRunAutoGateToggle(t *testing.T) {
+	bin := writeFakeBin(t, "#!/bin/sh\nexit 0\n")
+	var buf bytes.Buffer
+	_ = Run(context.Background(), Options{
+		Root: t.TempDir(), HarnessBin: bin, Goal: intentplan.GoalDev,
+		In:  strings.NewReader("/auto-gate on\n/auto-gate off\n/exit\n"),
+		Out: &buf,
+	})
+	for _, want := range []string{"auto-gate ON", "auto-gate OFF"} {
+		if !strings.Contains(buf.String(), want) {
+			t.Errorf("missing %q: %s", want, buf.String())
+		}
+	}
+}
+
 func TestRunIgnoresBlankLines(t *testing.T) {
 	bin := writeFakeBin(t, "#!/bin/sh\nexit 0\n")
 	var out bytes.Buffer

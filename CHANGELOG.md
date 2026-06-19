@@ -3,6 +3,36 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-19 — v0.121.0 — Chat /agents /cost /clear + --auto-gate (F86)
+
+### New
+
+- **`/agents` slash command** lists every adapter the registry knows
+  and marks the one wired to this session, so you can switch
+  contextually instead of leaving the REPL to run `harness agent list`.
+- **`/cost` slash command** sums `InTokens`, `OutTokens`, and
+  `EstimatedCostUSD` across every chat turn in the current session
+  (resumed sessions included). Turn-level usage is now persisted in
+  `.harness/sessions/<id>.jsonl` so the count survives a restart.
+- **`/clear` slash command** rewinds the Working Memory preamble by
+  setting `Session.ContextMark = len(Turns)`. The agent's next plain
+  text turn starts fresh while `/history` still shows everything that
+  came before.
+- **`/auto-gate on|off`** toggles a per-session flag that re-runs
+  `harness ci` after every plain-text chat turn. The starting value
+  comes from the new `harness chat --auto-gate` flag and persists into
+  resumed sessions via `Session.AutoGate`.
+
+### Changed
+
+- `Session` and `Turn` JSON shapes gained `auto_gate`, `context_mark`,
+  `in_tokens`, `out_tokens`, `cost_usd`. All fields are
+  `omitempty`/backwards compatible — older session files keep loading.
+- `harness chat` forwards `--auto-gate` and a snapshot of the
+  registered adapter ids into `repl.Options` so the slash commands
+  have something to render.
+- Tutorial cheat sheet covers the new slash + `--resume`/`chat list`.
+
 ## 2026-06-19 — v0.120.0 — Chat auto-pin + resume + list + /ship --allow-dirty (F85)
 
 ### Changed

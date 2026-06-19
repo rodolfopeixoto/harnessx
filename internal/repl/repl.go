@@ -23,35 +23,42 @@ import (
 )
 
 type Session struct {
-	ID      string          `json:"id"`
-	Goal    intentplan.Goal `json:"goal"`
-	Started time.Time       `json:"started"`
-	Turns   []Turn          `json:"turns"`
-	Root    string          `json:"root"`
+	ID          string          `json:"id"`
+	Goal        intentplan.Goal `json:"goal"`
+	Started     time.Time       `json:"started"`
+	Turns       []Turn          `json:"turns"`
+	Root        string          `json:"root"`
+	ContextMark int             `json:"context_mark,omitempty"`
+	AutoGate    bool            `json:"auto_gate,omitempty"`
 }
 
 type Turn struct {
-	Time   time.Time              `json:"time"`
-	Input  string                 `json:"input"`
-	Action string                 `json:"action"`
-	Plan   *intentplan.Plan       `json:"plan,omitempty"`
-	Result *intentplan.ExecResult `json:"result,omitempty"`
+	Time      time.Time              `json:"time"`
+	Input     string                 `json:"input"`
+	Action    string                 `json:"action"`
+	Plan      *intentplan.Plan       `json:"plan,omitempty"`
+	Result    *intentplan.ExecResult `json:"result,omitempty"`
+	InTokens  int                    `json:"in_tokens,omitempty"`
+	OutTokens int                    `json:"out_tokens,omitempty"`
+	CostUSD   float64                `json:"cost_usd,omitempty"`
 }
 
 type Options struct {
-	Root        string
-	HarnessBin  string
-	Goal        intentplan.Goal
-	In          io.Reader
-	Out         io.Writer
-	Planner     Planner
-	StepTimeout time.Duration
-	HealthProbe *agenthealth.Probe
-	Plain       bool
-	Adapter     agents.AgentAdapter
-	AdapterID   string
-	Model       string
-	Resume      *Session
+	Root         string
+	HarnessBin   string
+	Goal         intentplan.Goal
+	In           io.Reader
+	Out          io.Writer
+	Planner      Planner
+	StepTimeout  time.Duration
+	HealthProbe  *agenthealth.Probe
+	Plain        bool
+	Adapter      agents.AgentAdapter
+	AdapterID    string
+	Model        string
+	Resume       *Session
+	AutoGate     bool
+	AdaptersList []string
 }
 
 type SessionSummary struct {
@@ -226,6 +233,11 @@ func Run(ctx context.Context, opts Options) error {
 			sess.Goal = opts.Resume.Goal
 		}
 		sess.Turns = append(sess.Turns, opts.Resume.Turns...)
+		sess.AutoGate = opts.Resume.AutoGate
+		sess.ContextMark = opts.Resume.ContextMark
+	}
+	if opts.AutoGate {
+		sess.AutoGate = true
 	}
 	greet(opts.Out, sess)
 	rd := bufio.NewReader(opts.In)
@@ -280,6 +292,24 @@ func handleInput(ctx context.Context, sess *Session, opts Options, input string)
 	case strings.HasPrefix(input, "/lint"):
 		runHarnessCmd(ctx, opts, []string{"lint"})
 		turn.Action = "lint"
+	case input == "/agents":
+		turn.Action = "agents"
+		printAgents(opts)
+	case input == "/cost":
+		turn.Action = "cost"
+		printCost(opts.Out, sess)
+	case input == "/clear":
+		turn.Action = "clear-context"
+		sess.ContextMark = len(sess.Turns)
+		fmt.Fprintln(opts.Out, "  ✓ working memory cleared — next agent turn starts fresh")
+	case input == "/auto-gate on", input == "/autogate on":
+		turn.Action = "auto-gate-on"
+		sess.AutoGate = true
+		fmt.Fprintln(opts.Out, "  ✓ auto-gate ON — harness ci will run after every agent turn")
+	case input == "/auto-gate off", input == "/autogate off":
+		turn.Action = "auto-gate-off"
+		sess.AutoGate = false
+		fmt.Fprintln(opts.Out, "  ✓ auto-gate OFF")
 	case strings.HasPrefix(input, "/goal "):
 		newGoal := intentplan.Goal(strings.TrimSpace(strings.TrimPrefix(input, "/goal ")))
 		if inKnownGoals(newGoal) {
@@ -320,7 +350,11 @@ func handleInput(ctx context.Context, sess *Session, opts Options, input string)
 	default:
 		if opts.Adapter != nil {
 			turn.Action = "chat"
-			chatTurn(ctx, sess, opts, input)
+			chatTurn(ctx, sess, opts, input, &turn)
+			if sess.AutoGate || opts.AutoGate {
+				fmt.Fprintln(opts.Out, "  [auto-gate] running harness ci…")
+				runHarnessCmd(ctx, opts, []string{"ci"})
+			}
 			return turn
 		}
 		executePlan(ctx, sess, opts, input, &turn)
@@ -354,7 +388,7 @@ func executePlan(ctx context.Context, sess *Session, opts Options, prompt string
 	}
 }
 
-func chatTurn(ctx context.Context, sess *Session, opts Options, prompt string) {
+func chatTurn(ctx context.Context, sess *Session, opts Options, prompt string, turn *Turn) {
 	fmt.Fprintf(opts.Out, "  [agent] calling %s…\n", opts.AdapterID)
 	live := &prefixWriter{w: opts.Out, prefix: "  │ "}
 	timeout := opts.StepTimeout
@@ -385,6 +419,11 @@ func chatTurn(ctx context.Context, sess *Session, opts Options, prompt string) {
 	fmt.Fprintf(opts.Out, "  ✓ %s done in %s (in=%d out=%d ~$%.4f)\n",
 		opts.AdapterID, res.Duration.Round(time.Millisecond),
 		res.Usage.InputTokens, res.Usage.OutputTokens, res.Usage.EstimatedCostUSD)
+	if turn != nil {
+		turn.InTokens = res.Usage.InputTokens
+		turn.OutTokens = res.Usage.OutputTokens
+		turn.CostUSD = res.Usage.EstimatedCostUSD
+	}
 }
 
 // startSpinner returns a stop function that is idempotent and safe to
@@ -435,9 +474,12 @@ func withConversationContext(sess *Session, prompt string) string {
 	}
 	const maxTurns = 5
 	const maxOutputBytes = 1200
-	start := 0
-	if len(sess.Turns) > maxTurns {
+	start := sess.ContextMark
+	if len(sess.Turns)-start > maxTurns {
 		start = len(sess.Turns) - maxTurns
+	}
+	if start < 0 {
+		start = 0
 	}
 	var b strings.Builder
 	b.WriteString("# Conversation so far\n\n")
@@ -591,6 +633,10 @@ func printHelp(out io.Writer) {
 	fmt.Fprintln(out, "  /do <prompt>                   alias for /exec")
 	fmt.Fprintln(out, "  /ship <prompt>                 harness ship (branch + spec + loop + commit)")
 	fmt.Fprintln(out, "  /ci | /test | /lint            run harness gate")
+	fmt.Fprintln(out, "  /agents                        list registered adapters; mark active")
+	fmt.Fprintln(out, "  /cost                          cumulative session token + USD spend")
+	fmt.Fprintln(out, "  /clear                         drop conversation history from next prompt")
+	fmt.Fprintln(out, "  /auto-gate on|off              toggle harness ci after each agent turn")
 	fmt.Fprintln(out, "  /goal <dev|ads|research|ops>   switch session goal")
 	fmt.Fprintln(out, "  /plan <prompt>                 emit plan JSON without executing")
 	fmt.Fprintln(out, "  /last                          replay the previous prompt")
@@ -598,6 +644,41 @@ func printHelp(out io.Writer) {
 	fmt.Fprintln(out, "  /help                          this message")
 	fmt.Fprintln(out, "  /exit | /quit                  leave the session")
 	fmt.Fprintln(out, "  end a line with \\ to continue prompt on next line")
+}
+
+func printAgents(opts Options) {
+	if len(opts.AdaptersList) == 0 {
+		fmt.Fprintln(opts.Out, "no adapters registered (run 'harness agent list' for details)")
+		return
+	}
+	fmt.Fprintf(opts.Out, "active: %s\n", opts.AdapterID)
+	for _, id := range opts.AdaptersList {
+		marker := "  "
+		if id == opts.AdapterID {
+			marker = "→ "
+		}
+		fmt.Fprintf(opts.Out, "%s%s\n", marker, id)
+	}
+}
+
+func printCost(out io.Writer, sess *Session) {
+	if sess == nil || len(sess.Turns) == 0 {
+		fmt.Fprintln(out, "no agent turns yet")
+		return
+	}
+	var inTok, outTok int
+	var usd float64
+	chatTurns := 0
+	for _, t := range sess.Turns {
+		if t.Action == "chat" {
+			chatTurns++
+		}
+		inTok += t.InTokens
+		outTok += t.OutTokens
+		usd += t.CostUSD
+	}
+	fmt.Fprintf(out, "session %s: %d chat turns, in=%d out=%d ~$%.4f\n",
+		sess.ID, chatTurns, inTok, outTok, usd)
 }
 
 func printHistory(out io.Writer, sess *Session) {
