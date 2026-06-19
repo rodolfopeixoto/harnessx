@@ -101,6 +101,12 @@ smoke: build
 tutorial-replay: build
 	HARNESS_BIN=$(BIN) bash scripts/tutorial-replay.sh
 
+# tutorial-smoke: chat-driven flow walk (no LLM). Exercises the
+# /save /save-prompt /prompts + chat list + session show + ship
+# precondition contract documented in TUTORIAL-ECOMMERCE.md.
+tutorial-smoke: build
+	HARNESS_BIN=$(BIN) bash scripts/tutorial-smoke.sh
+
 # ci: full local CI gate. Wired to the pre-push hook by `make install-hooks`.
 ci: lint check coverage-gate coverage-shell test-sh e2e-all
 

@@ -3,6 +3,33 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-19 — v0.126.0 — session show chat fallback + ci --fast + tutorial smoke (F91)
+
+### Changed
+
+- **`harness session show <id|label>` now dispatches to the chat
+  store first**. When the argument resolves to a
+  `.harness/sessions/<id>.jsonl` (including via `/save` label) the
+  command renders a chat-shaped view: label, goal, started, root,
+  auto-gate, budget, turn counts, cumulative tokens + USD, and every
+  turn input truncated to 80 chars. The sqlite-backed run view is
+  used as the fallback so `harness ship`-style ids keep working.
+
+### New
+
+- **`harness ci --fast`** skips the slowest sensors (today:
+  `secrets_scan`, which walks the repo with ripgrep). Implemented
+  via a denylist on `sensorcmd.RunOptions.Fast` so the auto-gate
+  flow inside `harness chat --auto-gate` stays snappy without
+  losing the per-step `--fast` opt-out.
+- **`scripts/tutorial-smoke.sh`** is a deterministic no-LLM walk of
+  the documented chat flow. It boots a throwaway python-ecommerce
+  project, asserts `/save` labels appear in `harness chat list`,
+  exercises `/save-prompt` + `/prompt` + `/prompts`, verifies
+  `harness session show <label>` returns the new chat view, and
+  proves `harness ship` rejects a dirty tree without `--allow-dirty`.
+  Wired as the new `make tutorial-smoke` Makefile target.
+
 ## 2026-06-19 — v0.125.0 — Chat prompt templates + tutorial finalisation (F90)
 
 ### New
