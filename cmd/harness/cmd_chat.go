@@ -12,6 +12,7 @@ import (
 
 	"github.com/ropeixoto/harnessx/internal/activeagent"
 	"github.com/ropeixoto/harnessx/internal/agenthealth"
+	"github.com/ropeixoto/harnessx/internal/agents"
 	"github.com/ropeixoto/harnessx/internal/app/agentcmd"
 	"github.com/ropeixoto/harnessx/internal/intentplan"
 	"github.com/ropeixoto/harnessx/internal/repl"
@@ -107,6 +108,13 @@ the deterministic planner.`,
 				opts.Model = model
 				for _, id := range reg.IDs() {
 					opts.AdaptersList = append(opts.AdaptersList, id)
+				}
+				registry := reg
+				opts.SwitchTo = func(req string) (agents.AgentAdapter, string, error) {
+					if a, ok := registry.Get(req); ok {
+						return a, req, nil
+					}
+					return nil, "", fmt.Errorf("adapter %q not registered", req)
 				}
 				fmt.Fprintf(cmd.OutOrStdout(), "chat: %s wired — plain text streams to agent; /exec for harness plan\n", adapterID)
 				probe := agenthealth.New(adapter, 30*time.Second)
