@@ -118,6 +118,7 @@ func planDo(ctx context.Context, dir, prompt string, opts doOpts) ([]plannedStep
 	if err != nil {
 		return nil, err
 	}
+	override := activeagent.ResolveAgentID(dir, opts.agentOverride)
 	steps := make([]plannedStep, 0, len(tasks))
 	for _, t := range tasks {
 		step := plannedStep{task: t}
@@ -126,6 +127,19 @@ func planDo(ctx context.Context, dir, prompt string, opts doOpts) ([]plannedStep
 		} else if c, ok := router.Pick(t.Tags, reg); ok {
 			step.choice = c
 			step.chosen = "adapter:" + c.AdapterID
+			if override != "" && override != c.AdapterID {
+				if _, registered := reg.Get(override); registered {
+					step.choice = router.Choice{AdapterID: override}
+					step.chosen = "adapter:" + override + " (--agent override)"
+				}
+			}
+		} else if override != "" {
+			if _, registered := reg.Get(override); registered {
+				step.choice = router.Choice{AdapterID: override}
+				step.chosen = "adapter:" + override + " (--agent override)"
+			} else {
+				step.chosen = "none (no adapter matches tags)"
+			}
 		} else {
 			step.chosen = "none (no adapter matches tags)"
 		}

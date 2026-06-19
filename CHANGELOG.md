@@ -3,6 +3,37 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-19 — v0.117.0 — audit tail timestamps + do --agent display + orchestrate streaming (F82)
+
+### Fixed
+
+- **`harness audit tail` showed every row as `01-01 00:00:00`**.
+  `internal/eventlog` writes JSONL lines with `ts` (RFC3339Nano) while
+  `internal/audit.Event` only knew the `occurred_at` field, so every
+  decoded row landed with a zero-value timestamp. Added a tolerant
+  `Event.UnmarshalJSON` that maps `ts`/`timestamp`/`time` →
+  `OccurredAt`, `stage`/`level` → `Kind`, `sensor`/`agent` → `Source`,
+  and synthesises `Subject` from `sensor`+`status` when no native
+  subject is present. Two new tests cover the run-log shape end to
+  end.
+- **`harness do --agent <id>` plan rendered router pick, not the
+  override**. `planDo` now resolves the active-agent override (via
+  `activeagent.ResolveAgentID`) before composing each step's
+  `chosen` string, so the printed plan, the `--json` output, and the
+  executor all agree on the chosen adapter. When the override is set
+  but the router has no match for the task tags, the override still
+  wins as long as the adapter is registered.
+
+### Changed
+
+- **`harness orchestrate run` now streams each step's stdout/stderr**
+  with a `  [<role>] ` prefix while still recording the full output
+  in the blackboard. Before, the user only saw
+  `orchestrate: step N role=X` and the entire child output was
+  buried in `blackboard.json`. Implemented via `io.MultiWriter` over
+  an in-memory `bytes.Buffer` (for the blackboard) and a
+  `linePrefixWriter` (for the live console).
+
 ## 2026-06-18 — v0.116.0 — Chat REPL talks to agent + ship --allow-dirty + new nested guard (F81)
 
 ### Changed

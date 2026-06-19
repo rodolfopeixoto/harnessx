@@ -73,6 +73,24 @@ func TestRunChainProducesBlackboard(t *testing.T) {
 	}
 }
 
+func TestRunStreamsChildStdoutWithRolePrefix(t *testing.T) {
+	dir := t.TempDir()
+	flow := Flow{Name: "stream", Topology: TopologyChain, Steps: []Step{
+		{Role: RoleCoder, Command: []string{"echo", "hello world"}},
+		{Role: RoleTester, Command: []string{"echo", "two\nlines"}},
+	}}
+	var buf bytes.Buffer
+	if _, err := Run(context.Background(), RunOptions{Root: dir, Flow: flow}, &buf); err != nil {
+		t.Fatal(err)
+	}
+	got := buf.String()
+	for _, want := range []string{"  [coder] hello world", "  [tester] two", "  [tester] lines"} {
+		if !bytes.Contains([]byte(got), []byte(want)) {
+			t.Errorf("missing %q in stream\n--- output ---\n%s", want, got)
+		}
+	}
+}
+
 func TestRunDryDoesNotExecute(t *testing.T) {
 	dir := t.TempDir()
 	flow := Flow{Name: "x", Topology: TopologyChain, Steps: []Step{
