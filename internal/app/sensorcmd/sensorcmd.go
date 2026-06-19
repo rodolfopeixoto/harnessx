@@ -76,6 +76,14 @@ type RunOptions struct {
 	Quiet    bool
 	// FailOnError controls whether at least one StatusFailed returns a non-zero error.
 	FailOnError bool
+	// Fast drops the slowest sensors so the auto-gate flow inside
+	// `harness chat` stays snappy. Today: secrets_scan (ripgrep walk).
+	Fast bool
+}
+
+// slowSensorIDs is the denylist consulted when Fast is true.
+var slowSensorIDs = map[string]bool{
+	"secrets_scan": true,
 }
 
 func Run(ctx context.Context, opts RunOptions, out io.Writer) ([]sensors.Result, error) {
@@ -88,6 +96,21 @@ func Run(ctx context.Context, opts RunOptions, out io.Writer) ([]sensors.Result,
 	selected := filterByIDs(catalog, opts.IDs)
 	if len(opts.IDs) > 0 && len(selected) == 0 {
 		return nil, fmt.Errorf("no matching sensors for %v", opts.IDs)
+	}
+	if opts.Fast {
+		filtered := selected[:0]
+		skipped := 0
+		for _, s := range selected {
+			if slowSensorIDs[s.ID()] {
+				skipped++
+				continue
+			}
+			filtered = append(filtered, s)
+		}
+		selected = filtered
+		if !opts.Quiet && skipped > 0 {
+			fmt.Fprintf(out, "  --fast: skipped %d slow sensor(s)\n", skipped)
+		}
 	}
 
 	// Open DB + logger if .harness/ initialised.
