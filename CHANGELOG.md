@@ -3,6 +3,20 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-19 — v0.129.0 — backup quickstart + tutorial backup section (F94)
+
+### New
+
+- **`harness backup quickstart`** prints a 3-step recipe for adding
+  a remote, setting it as default, and snapshotting. When a default
+  remote is already configured it shortcuts straight to `snapshot`.
+- The `backup: no remote chosen` error from `harness backup
+  snapshot` now references `harness backup quickstart` as the first
+  fix step.
+- Tutorial gained an "Back up the project (optional)" section that
+  walks through the rclone-based snapshot flow with the same
+  commands the quickstart prints.
+
 ## 2026-06-19 — v0.128.0 — Chat /timeline slash command (F93)
 
 ### New

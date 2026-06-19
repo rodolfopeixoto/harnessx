@@ -34,9 +34,46 @@ Recommended: route the bucket through an rclone crypt overlay.`,
 	c.AddCommand(
 		newBackupSnapshotCmd(), newBackupRestoreCmd(), newBackupListCmd(),
 		newBackupSyncCmd(), newBackupRemotesCmd(), newBackupRemoteAddCmd(),
-		newBackupConfigCmd(),
+		newBackupConfigCmd(), newBackupQuickstartCmd(),
 	)
 	return c
+}
+
+func newBackupQuickstartCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "quickstart",
+		Short: "Walk-through: pick a provider, add a remote, set as default",
+		Long: `Prints a 3-step recipe for getting a working remote so that
+'harness backup snapshot' stops failing with "no remote chosen". For an
+end-to-end walk-through scoped to the e-commerce tutorial, see
+docs/TUTORIAL-ECOMMERCE.md.`,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			out := cmd.OutOrStdout()
+			root, err := cwd()
+			if err != nil {
+				return err
+			}
+			cfg, _ := backup.LoadConfig(root)
+			fmt.Fprintln(out, "harness backup quickstart")
+			fmt.Fprintln(out, "")
+			if cfg.DefaultRemote != "" {
+				fmt.Fprintf(out, "  ✓ default remote already set: %q\n", cfg.DefaultRemote)
+				fmt.Fprintln(out, "  next: harness backup snapshot")
+				return nil
+			}
+			fmt.Fprintln(out, "  no default remote yet. choose a provider, then:")
+			fmt.Fprintln(out, "")
+			fmt.Fprintln(out, "  1. harness backup remote add gdrive --provider drive --interactive")
+			fmt.Fprintln(out, "     (replace 'drive' with: s3 | dropbox | onedrive | r2 | webdav | crypt)")
+			fmt.Fprintln(out, "")
+			fmt.Fprintln(out, "  2. harness backup config set-default-remote gdrive")
+			fmt.Fprintln(out, "")
+			fmt.Fprintln(out, "  3. harness backup snapshot")
+			fmt.Fprintln(out, "")
+			fmt.Fprintln(out, "  to verify rclone is installed:  rclone version")
+			return nil
+		},
+	}
 }
 
 func newBackupConfigCmd() *cobra.Command {
@@ -357,7 +394,7 @@ func pickRemote(flag string, cfg backup.Config) (string, error) {
 	if cfg.DefaultRemote != "" {
 		return cfg.DefaultRemote, nil
 	}
-	return "", fmt.Errorf("backup: no remote chosen\n  fix: harness backup remotes                              # list existing\n       harness backup remote add gdrive --provider drive --interactive\n       harness backup config set-default-remote gdrive\n  or pass --remote <name> per call")
+	return "", fmt.Errorf("backup: no remote chosen\n  fix: harness backup quickstart                           # 3-step recipe\n       harness backup remotes                              # list existing\n       harness backup remote add gdrive --provider drive --interactive\n       harness backup config set-default-remote gdrive\n  or pass --remote <name> per call")
 }
 
 func printManifest(out io.Writer, m backup.Manifest) error {
