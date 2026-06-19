@@ -34,9 +34,15 @@ func TestRunPersistsTurnsAcrossPlanAndExecute(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	entries, _ := os.ReadDir(filepath.Join(dir, ".harness", "sessions"))
+	allEntries, _ := os.ReadDir(filepath.Join(dir, ".harness", "sessions"))
+	var entries []os.DirEntry
+	for _, e := range allEntries {
+		if strings.HasSuffix(e.Name(), ".jsonl") {
+			entries = append(entries, e)
+		}
+	}
 	if len(entries) != 1 {
-		t.Fatalf("want 1 session file, got %d", len(entries))
+		t.Fatalf("want 1 jsonl session file, got %d (all: %d)", len(entries), len(allEntries))
 	}
 	body, _ := os.ReadFile(filepath.Join(dir, ".harness", "sessions", entries[0].Name()))
 	lines := strings.Split(strings.TrimSpace(string(body)), "\n")

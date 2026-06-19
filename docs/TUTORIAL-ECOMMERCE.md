@@ -241,6 +241,8 @@ What you have on disk:
 | `/diff`                     | `git diff --stat` + full diff in project root    |
 | `/cost`                     | cumulative session token + USD spend             |
 | `/budget 0.50` / `off`      | refuse further chat turns once spend > cap       |
+| `/save my-feature`          | label this session for `harness chat list`       |
+| `/recap`                    | ask the agent for an ≤8-bullet summary           |
 | `/clear`                    | drop conversation history from the next prompt   |
 | `/auto-gate on` / `off`     | toggle `harness ci` after each agent turn        |
 | `!<shell cmd>`              | run any shell command in the project root        |
@@ -251,8 +253,9 @@ What you have on disk:
 ## Resume an old session
 
 ```bash
-harness chat list                  # newest first
+harness chat list                  # newest first; labels shown as a column
 harness chat --resume <id>         # continues writing to the same .jsonl
+harness chat --replay <id>         # read-only: /history, /agents, /cost, /diff only
 ```
 
 The previous turns flow back into `/history` and the Working Memory

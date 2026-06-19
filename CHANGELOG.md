@@ -3,6 +3,42 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-19 — v0.123.0 — Chat /save /recap + --replay (F88)
+
+### New
+
+- **`/save <name>`** labels the current session with a human-readable
+  alias so `harness chat list` reads
+  `01KX… ecommerce-cart dev turns=12 last=fix 500 on /cart` instead
+  of an opaque ulid. Refuses slashes, leading dots, tabs, and >80
+  chars. Persists into a new `.harness/sessions/<id>.meta.json`
+  sidecar alongside the JSONL turn log so older readers ignore it
+  cleanly.
+- **`/recap`** asks the pinned adapter for an ≤8-bullet summary of
+  the session so far (built, ran, still open). When no adapter is
+  wired the command falls back to a deterministic list of past
+  inputs so the slash is never silent. Cost is recorded in the turn
+  like any other chat invocation.
+- **`harness chat --replay <id>`** opens a session in **read-only**
+  mode: plain text + every mutating slash (`/exec`, `/do`, `/ship`,
+  `/ci`, `/test`, `/lint`, `/use`, `/budget`, `/auto-gate`,
+  `/clear`, `/save`, `/recap`, `/plan`, `/goal`, `/last`, `!shell`)
+  is refused with a clear message, while inspection slashes
+  (`/history`, `/agents`, `/cost`, `/diff`, `/help`) keep working.
+  Mutually exclusive with `--resume`.
+
+### Changed
+
+- `Session` gained `Label` (omitempty JSON) and an unexported
+  `ReadOnly` flag. `persist` now writes a `<id>.meta.json` sidecar
+  alongside the JSONL so the new fields survive across resumes;
+  `LoadSession` ignores a missing sidecar so older session files
+  still load.
+- `harness chat list` renders the new label column (padded to 20 cols
+  with `—` placeholder when the session has no alias).
+- `extra_test.go` filters the session dir by `*.jsonl` to ignore the
+  new sidecar.
+
 ## 2026-06-19 — v0.122.0 — Chat /use /diff /budget + session export (F87)
 
 ### New

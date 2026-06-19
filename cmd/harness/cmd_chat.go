@@ -27,6 +27,7 @@ func newChatCmd() *cobra.Command {
 		stepTimeout time.Duration
 		noAdapter   bool
 		resumeID    string
+		replayID    string
 		autoGate    bool
 	)
 	c := &cobra.Command{
@@ -62,6 +63,9 @@ the deterministic planner.`,
 				StepTimeout: stepTimeout,
 				AutoGate:    autoGate,
 			}
+			if resumeID != "" && replayID != "" {
+				return fmt.Errorf("chat: --resume and --replay are mutually exclusive")
+			}
 			if resumeID != "" {
 				sess, err := repl.LoadSession(dir, resumeID)
 				if err != nil {
@@ -69,6 +73,15 @@ the deterministic planner.`,
 				}
 				opts.Resume = sess
 				fmt.Fprintf(cmd.OutOrStdout(), "chat: resuming session %s (%d prior turns)\n", sess.ID, len(sess.Turns))
+			}
+			if replayID != "" {
+				sess, err := repl.LoadSession(dir, replayID)
+				if err != nil {
+					return fmt.Errorf("chat: replay %q: %w", replayID, err)
+				}
+				sess.ReadOnly = true
+				opts.Resume = sess
+				fmt.Fprintf(cmd.OutOrStdout(), "chat: replay %s (read-only, %d prior turns) — only /history /agents /cost /diff /help allowed\n", sess.ID, len(sess.Turns))
 			}
 			if !noAdapter {
 				adapterID = resolveChatAdapter(dir, adapterID, cmd.OutOrStdout())
@@ -132,6 +145,7 @@ the deterministic planner.`,
 	c.Flags().DurationVar(&stepTimeout, "step-timeout", 5*time.Minute, "per-step timeout")
 	c.Flags().BoolVar(&noAdapter, "no-adapter", false, "force deterministic planner; skip adapter auto-pin")
 	c.Flags().StringVar(&resumeID, "resume", "", "resume a prior session id from .harness/sessions/")
+	c.Flags().StringVar(&replayID, "replay", "", "open a prior session in read-only mode (inspection slashes only)")
 	c.Flags().BoolVar(&autoGate, "auto-gate", false, "run harness ci after every agent turn (toggle in-chat with /auto-gate)")
 	c.AddCommand(newChatListCmd())
 	return c
@@ -183,7 +197,11 @@ func newChatListCmd() *cobra.Command {
 				return nil
 			}
 			for _, r := range rows {
-				fmt.Fprintf(cmd.OutOrStdout(), "%s  %s  turns=%d  last=%s\n", r.ID, r.Goal, r.Turns, r.LastInput)
+				label := r.Label
+				if label == "" {
+					label = "—"
+				}
+				fmt.Fprintf(cmd.OutOrStdout(), "%s  %-20s  %s  turns=%d  last=%s\n", r.ID, label, r.Goal, r.Turns, r.LastInput)
 			}
 			return nil
 		},
