@@ -67,9 +67,15 @@ func (s ShellSensor) Run(rc RunCtx) Result {
 	res := Result{ID: s.IDValue, Category: s.CategoryV, Kind: s.Kind()}
 	lookup := s.Lookup
 	if lookup == nil {
-		lookup = exec.LookPath
+		lookup = func(name string) (string, error) {
+			if p := projectLocalBinary(rc.Root, name); p != "" {
+				return p, nil
+			}
+			return exec.LookPath(name)
+		}
 	}
-	if _, err := lookup(s.Binary); err != nil {
+	resolved, err := lookup(s.Binary)
+	if err != nil {
 		res.Status = ifElse(s.OptionalTool, StatusSkipped, StatusFailed)
 		res.Detail = "binary not on PATH: " + s.Binary
 		res.Duration = time.Since(start)
@@ -83,12 +89,13 @@ func (s ShellSensor) Run(rc RunCtx) Result {
 	ctx, cancel := context.WithTimeout(rc.Ctx, timeout)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, s.Binary, s.Args...)
+	cmd := exec.CommandContext(ctx, resolved, s.Args...)
 	cmd.Dir = rc.Root
+	cmd.Env = projectLocalEnv(rc.Root)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
-	err := cmd.Run()
+	err = cmd.Run()
 	res.Duration = time.Since(start)
 	res.OutputPath = writeOutput(rc.OutputDir, s.IDValue, stdout.Bytes(), stderr.Bytes())
 
@@ -105,6 +112,69 @@ func (s ShellSensor) Run(rc RunCtx) Result {
 		res.Detail = err.Error()
 	}
 	return res
+}
+
+// projectLocalBinary returns an absolute path to a project-scoped binary
+// (`.venv/bin/<name>`, `venv/bin/<name>`, `node_modules/.bin/<name>`)
+// when one exists and is executable. Lets python/node CI run without the
+// user having to `source .venv/bin/activate` before every `harness ci`.
+func projectLocalBinary(root, name string) string {
+	if root == "" || name == "" {
+		return ""
+	}
+	candidates := []string{
+		filepath.Join(root, ".venv", "bin", name),
+		filepath.Join(root, "venv", "bin", name),
+		filepath.Join(root, "node_modules", ".bin", name),
+	}
+	for _, p := range candidates {
+		if st, err := os.Stat(p); err == nil && !st.IsDir() && st.Mode()&0o111 != 0 {
+			return p
+		}
+	}
+	return ""
+}
+
+// projectLocalEnv prepends project-local bin dirs to PATH so children of
+// the wrapped binary (e.g. ruff invoking python via a shebang) also
+// resolve against the project venv before falling back to system tools.
+func projectLocalEnv(root string) []string {
+	if root == "" {
+		return os.Environ()
+	}
+	env := os.Environ()
+	prepend := []string{
+		filepath.Join(root, ".venv", "bin"),
+		filepath.Join(root, "venv", "bin"),
+		filepath.Join(root, "node_modules", ".bin"),
+	}
+	var keep []string
+	for _, p := range prepend {
+		if st, err := os.Stat(p); err == nil && st.IsDir() {
+			keep = append(keep, p)
+		}
+	}
+	if len(keep) == 0 {
+		return env
+	}
+	for i, e := range env {
+		if len(e) >= 5 && e[:5] == "PATH=" {
+			env[i] = "PATH=" + joinWithColons(append(keep, e[5:])...)
+			return env
+		}
+	}
+	return append(env, "PATH="+joinWithColons(append(keep, os.Getenv("PATH"))...))
+}
+
+func joinWithColons(parts ...string) string {
+	out := ""
+	for i, p := range parts {
+		if i > 0 {
+			out += ":"
+		}
+		out += p
+	}
+	return out
 }
 
 func writeOutput(dir, id string, stdout, stderr []byte) string {

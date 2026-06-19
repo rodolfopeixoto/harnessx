@@ -117,6 +117,43 @@ func TestInScopeMatchesGlobs(t *testing.T) {
 	}
 }
 
+func TestInScopeAlwaysAllowsProjectMetadata(t *testing.T) {
+	c := Contract{Files: []string{"app/main.py"}}
+	for _, p := range []string{
+		".gitignore",
+		"README.md",
+		"Makefile",
+		"pyproject.toml",
+		"requirements.txt",
+		"ruff.toml",
+		"package.json",
+		".harness/config/project.yaml",
+	} {
+		if !c.InScope(p) {
+			t.Errorf("%s should be auto-allowed metadata", p)
+		}
+	}
+}
+
+func TestInScopeTrailingSlashAndRecursiveGlob(t *testing.T) {
+	c := Contract{Files: []string{"tests/", "app/**"}}
+	for _, p := range []string{"tests/test_foo.py", "tests/sub/test_bar.py", "app/main.py", "app/routers/products.py"} {
+		if !c.InScope(p) {
+			t.Errorf("%s should be in scope", p)
+		}
+	}
+	if c.InScope("scripts/release.sh") {
+		t.Error("scripts/release.sh should not be in scope")
+	}
+}
+
+func TestInScopeUnconstrainedSentinel(t *testing.T) {
+	c := Contract{Files: []string{"_unconstrained_"}}
+	if !c.InScope("anything/at/all.py") {
+		t.Error("_unconstrained_ sentinel should match anything")
+	}
+}
+
 func TestResolveAbsolutePathPasses(t *testing.T) {
 	got, _ := Resolve("/x", "/y/PLAN.md")
 	if got != "/y/PLAN.md" {
