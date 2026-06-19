@@ -3,6 +3,30 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-19 — v0.118.0 — Python venv sensors + plan_scope metadata defaults (F83)
+
+### Fixed
+
+- **`harness ci` skipped half the python gate with "binary not on PATH"**
+  even after `harness new python-ecommerce --with-deps` installed
+  everything into `.venv/bin/`. `ShellSensor.Run` now resolves the
+  binary against `<root>/.venv/bin/`, `<root>/venv/bin/`,
+  `<root>/node_modules/.bin/`, and only then falls back to
+  `exec.LookPath`. The subprocess is launched with `PATH` prepended
+  to the same dirs so scripts that re-exec their own binary
+  (`ruff` calling `python`, `pytest` finding plugins) still resolve
+  inside the project venv. Four new tests cover the lookup, env
+  prepend, and end-to-end venv-only invocation.
+- **`plan_scope` rejected every project metadata file** during a
+  `harness ship` flow, so editing `.gitignore`, `Makefile`,
+  `pyproject.toml`, `requirements.txt`, `ruff.toml`, `package.json`,
+  `Cargo.toml`, `go.mod`, …  failed the gate even when the user's
+  PLAN only declared the feature files. `Contract.InScope` now has
+  an `alwaysInScope` allowlist for those files plus everything under
+  `.harness/`. It also recognises trailing-slash patterns
+  (`tests/`) and recursive globs (`app/**`, `app/...`) without the
+  user having to write the literal `filepath.Match` glob form.
+
 ## 2026-06-19 — v0.117.0 — audit tail timestamps + do --agent display + orchestrate streaming (F82)
 
 ### Fixed

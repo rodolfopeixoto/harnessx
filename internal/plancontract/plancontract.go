@@ -141,12 +141,75 @@ func (c Contract) InScope(path string) bool {
 		return true
 	}
 	for _, f := range c.Files {
+		if f == "_unconstrained_" {
+			return true
+		}
 		if ok, _ := filepath.Match(f, path); ok {
 			return true
 		}
 		if f == path {
 			return true
 		}
+		// Allow `tests/` to mean `tests/**` so users do not have to write
+		// the glob form by hand. Same for any path ending in a slash.
+		if strings.HasSuffix(f, "/") && strings.HasPrefix(path, f) {
+			return true
+		}
+		// Treat `app/**` and `app/...` as recursive matches. filepath.Match
+		// only handles single segments, so we expand the leading dir match
+		// manually.
+		if rec, dir := recursiveGlob(f); rec && strings.HasPrefix(path, dir+"/") {
+			return true
+		}
+	}
+	return alwaysInScope(path)
+}
+
+// alwaysInScope lists project metadata files that PLAN scope refuses to
+// fence off. Scaffold-driven flows (`harness new`, `harness scaffold
+// apply`) routinely touch these even when the user's plan only names the
+// feature files; failing the gate on them was creating false negatives
+// during real walks of the e-commerce tutorial.
+func alwaysInScope(path string) bool {
+	switch filepath.Base(path) {
+	case ".gitignore",
+		".gitattributes",
+		"README.md",
+		"CHANGELOG.md",
+		"Makefile",
+		"pyproject.toml",
+		"requirements.txt",
+		"requirements-dev.txt",
+		"ruff.toml",
+		".ruff.toml",
+		"mypy.ini",
+		"pytest.ini",
+		"package.json",
+		"package-lock.json",
+		"yarn.lock",
+		"pnpm-lock.yaml",
+		"Cargo.toml",
+		"Cargo.lock",
+		"Gemfile",
+		"Gemfile.lock",
+		"go.mod",
+		"go.sum":
+		return true
+	}
+	// Anything under the harness state dir is always in scope — sensors,
+	// plans, sessions, etc. — because the contract files themselves live
+	// there and committing the plan/spec is part of the flow.
+	if strings.HasPrefix(path, ".harness/") || path == ".harness" {
+		return true
 	}
 	return false
+}
+
+func recursiveGlob(pattern string) (bool, string) {
+	for _, suf := range []string{"/**", "/..."} {
+		if strings.HasSuffix(pattern, suf) {
+			return true, strings.TrimSuffix(pattern, suf)
+		}
+	}
+	return false, ""
 }
