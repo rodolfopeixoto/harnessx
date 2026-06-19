@@ -36,6 +36,7 @@ type shipOptions struct {
 	agentID        string
 	watch          bool
 	watchInterval  time.Duration
+	allowDirty     bool
 }
 
 func newShipCmd() *cobra.Command {
@@ -83,6 +84,7 @@ chain.`,
 	c.Flags().StringVar(&opts.agentID, "agent", "", "force a specific adapter id (overrides router + active pin)")
 	c.Flags().BoolVar(&opts.watch, "watch", false, "re-run ship loop whenever a project file changes")
 	c.Flags().DurationVar(&opts.watchInterval, "watch-interval", 3*time.Second, "polling interval in --watch mode")
+	c.Flags().BoolVar(&opts.allowDirty, "allow-dirty", false, "do not require a clean working tree before shipping")
 	return c
 }
 
@@ -113,8 +115,11 @@ func prepareShip(ctx context.Context, out io.Writer, opts *shipOptions) (string,
 	if err != nil {
 		return "", err
 	}
-	if dirty && !opts.dryRun {
-		return "", errors.New("ship: working tree dirty; commit or stash first")
+	if dirty && !opts.dryRun && !opts.allowDirty {
+		return "", errors.New("ship: working tree dirty; commit, stash, or pass --allow-dirty")
+	}
+	if dirty && opts.allowDirty {
+		fmt.Fprintln(out, "ship: working tree dirty — proceeding because --allow-dirty was set")
 	}
 	if opts.planID != "" {
 		contract, err := plancontract.Load(root, opts.planID)

@@ -130,6 +130,9 @@ func prepareNewTarget(ctx context.Context, opts *newOptions, out io.Writer) (str
 	if err != nil {
 		return "", err
 	}
+	if err := guardNestedTarget(abs); err != nil {
+		return "", err
+	}
 	if err := guardNewTarget(abs); err != nil {
 		return "", err
 	}
@@ -147,6 +150,26 @@ func prepareNewTarget(ctx context.Context, opts *newOptions, out io.Writer) (str
 		return "", err
 	}
 	return abs, nil
+}
+
+func guardNestedTarget(abs string) error {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return nil
+	}
+	cwdAbs, err := filepath.Abs(cwd)
+	if err != nil {
+		return nil
+	}
+	if filepath.Base(cwdAbs) != filepath.Base(abs) {
+		return nil
+	}
+	rel, err := filepath.Rel(cwdAbs, abs)
+	if err != nil || rel == "." || strings.HasPrefix(rel, "..") {
+		return nil
+	}
+	return fmt.Errorf("new: refusing nested target %s — you are already inside a directory named %q. cd .. first, or pick a different path",
+		abs, filepath.Base(abs))
 }
 
 func guardNewTarget(abs string) error {

@@ -3,6 +3,37 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-18 — v0.116.0 — Chat REPL talks to agent + ship --allow-dirty + new nested guard (F81)
+
+### Changed
+
+- **`harness chat` plain text now streams directly to the pinned
+  adapter** (paper §3.1.4). Before, every input was wrapped into a
+  deterministic `do → lint → test → ci` plan, so typing "testando"
+  ran a four-step plan instead of starting a conversation. The new
+  default sends plain text to `Adapter.Run` with `LiveOut` wired
+  to a `│`-prefixed writer, so reads, writes, and diffs appear live
+  on screen. The previous behaviour stays one keystroke away under
+  `/exec <prompt>` (alias `/do <prompt>`).
+- **New slash commands** in chat: `/ship <prompt>` calls
+  `harness ship --yes`, `/ci`, `/test`, `/lint` run the gate, and
+  `!<shell cmd>` escapes to `sh -c` in the project root. The
+  `/help` and greet lines now describe the chat-first contract.
+
+### New
+
+- **`harness ship --allow-dirty`**: opt out of the clean-tree
+  precondition. Useful when the chat REPL has just edited files and
+  the same diff should land in the ship commit.
+- **`harness new` nested-target guard**: aborts with a clear error
+  when the requested target is a sub-folder whose basename matches
+  the current directory (which produced `shop-api/shop-api/shop-api`
+  triple-nested paths in v0.115.0).
+- **Tutorial rewrite** (`docs/TUTORIAL-ECOMMERCE.md`): single
+  chat-driven narrative covering catalogue → cart → checkout,
+  with troubleshooting for the OrbStack/Docker dialog the upstream
+  `claude` CLI shows on first run.
+
 ## 2026-06-18 — v0.115.0 — Health probe + python-ecommerce scaffold (F76–F80)
 
 ### New
