@@ -178,6 +178,58 @@ func TestRunRejectsUnknownGoalInline(t *testing.T) {
 	}
 }
 
+func TestStartSpinnerPlainNoop(t *testing.T) {
+	var buf bytes.Buffer
+	stop := startSpinner(&buf, true)
+	stop()
+	if buf.Len() != 0 {
+		t.Errorf("plain spinner wrote %d bytes; want 0", buf.Len())
+	}
+}
+
+func TestWithConversationContextEmptyReturnsPrompt(t *testing.T) {
+	if got := withConversationContext(&Session{}, "hi"); got != "hi" {
+		t.Errorf("empty session must pass prompt through; got %q", got)
+	}
+}
+
+func TestWithConversationContextThreadsRecentTurns(t *testing.T) {
+	sess := &Session{Goal: intentplan.GoalDev, Turns: []Turn{
+		{Input: "add /products", Action: "chat"},
+		{Input: "/exec foo", Action: "executed"},
+		{Input: "fix 500 in cart", Action: "chat"},
+	}}
+	out := withConversationContext(sess, "checkout next?")
+	for _, want := range []string{
+		"# Conversation so far",
+		"add /products",
+		"fix 500 in cart",
+		"# New user message",
+		"checkout next?",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "/exec foo") {
+		t.Errorf("slash-command turn should be filtered: %s", out)
+	}
+}
+
+func TestWithConversationContextCapsAtFiveTurns(t *testing.T) {
+	sess := &Session{}
+	for i := 0; i < 12; i++ {
+		sess.Turns = append(sess.Turns, Turn{Input: "msg-" + string(rune('a'+i)), Action: "chat"})
+	}
+	out := withConversationContext(sess, "now")
+	if strings.Contains(out, "msg-a") {
+		t.Errorf("oldest turn should be trimmed: %s", out)
+	}
+	if !strings.Contains(out, "msg-l") {
+		t.Errorf("newest turn missing: %s", out)
+	}
+}
+
 func TestRunIgnoresBlankLines(t *testing.T) {
 	bin := writeFakeBin(t, "#!/bin/sh\nexit 0\n")
 	var out bytes.Buffer
