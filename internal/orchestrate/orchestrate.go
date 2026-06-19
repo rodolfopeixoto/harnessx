@@ -8,6 +8,7 @@
 package orchestrate
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -17,6 +18,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -205,7 +207,7 @@ func runCycle(ctx context.Context, opts RunOptions, res *RunResult, stepIdx *int
 	for _, step := range opts.Flow.Steps {
 		entry := BlackboardEntry{Step: *stepIdx, Role: step.Role, Started: time.Now().UTC()}
 		fmt.Fprintf(out, "orchestrate: step %d cycle %d/%d role=%s\n", *stepIdx, c+1, cycles, step.Role)
-		runOneStep(ctx, opts, &entry, step, res, timeout)
+		runOneStep(ctx, opts, &entry, step, res, timeout, out)
 		entry.Ended = time.Now().UTC()
 		res.Entries = append(res.Entries, entry)
 		*stepIdx++
@@ -216,12 +218,12 @@ func runCycle(ctx context.Context, opts RunOptions, res *RunResult, stepIdx *int
 	return false
 }
 
-func runOneStep(ctx context.Context, opts RunOptions, entry *BlackboardEntry, step Step, res *RunResult, timeout time.Duration) {
+func runOneStep(ctx context.Context, opts RunOptions, entry *BlackboardEntry, step Step, res *RunResult, timeout time.Duration, out io.Writer) {
 	switch {
 	case opts.DryRun:
 		entry.Status = "dry-run"
 	case len(step.Command) > 0:
-		stdout, stderr, err := runStep(ctx, opts.Root, step.Command, timeout)
+		stdout, stderr, err := runStep(ctx, opts.Root, step.Command, timeout, string(step.Role), out)
 		entry.Stdout = truncate(stdout, 8_000)
 		entry.Stderr = truncate(stderr, 4_000)
 		if err != nil {
@@ -240,23 +242,73 @@ func runOneStep(ctx context.Context, opts RunOptions, entry *BlackboardEntry, st
 		} else {
 			entry.Status = "ok"
 		}
+		if stdout != "" && out != nil {
+			fmt.Fprint(out, prefixLines(stdout, "  ["+string(step.Role)+"] "))
+		}
 	default:
 		entry.Status = "adapter-step-not-executed-yet"
 	}
 }
 
-func runStep(ctx context.Context, root string, cmd []string, timeout time.Duration) (string, string, error) {
+func runStep(ctx context.Context, root string, cmd []string, timeout time.Duration, role string, out io.Writer) (string, string, error) {
 	cctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	c := exec.CommandContext(cctx, cmd[0], cmd[1:]...)
 	c.Dir = root
 	c.Env = append(os.Environ(), "HARNESS_PLAIN=1", "NO_COLOR=1")
-	stdout, err := c.Output()
-	stderr := ""
-	if ee, ok := err.(*exec.ExitError); ok {
-		stderr = string(ee.Stderr)
+	var outBuf, errBuf bytes.Buffer
+	prefix := "  [" + role + "] "
+	if out != nil {
+		live := &linePrefixWriter{w: out, prefix: prefix}
+		c.Stdout = io.MultiWriter(&outBuf, live)
+		c.Stderr = io.MultiWriter(&errBuf, live)
+	} else {
+		c.Stdout = &outBuf
+		c.Stderr = &errBuf
 	}
-	return string(stdout), stderr, err
+	err := c.Run()
+	return outBuf.String(), errBuf.String(), err
+}
+
+func prefixLines(s, prefix string) string {
+	if s == "" {
+		return ""
+	}
+	lines := strings.Split(strings.TrimRight(s, "\n"), "\n")
+	var b strings.Builder
+	for _, l := range lines {
+		b.WriteString(prefix)
+		b.WriteString(l)
+		b.WriteByte('\n')
+	}
+	return b.String()
+}
+
+type linePrefixWriter struct {
+	w       io.Writer
+	prefix  string
+	started bool
+	midLine bool
+}
+
+func (p *linePrefixWriter) Write(b []byte) (int, error) {
+	if p.prefix == "" {
+		return p.w.Write(b)
+	}
+	out := make([]byte, 0, len(b)+len(p.prefix))
+	for _, c := range b {
+		if !p.started || !p.midLine {
+			out = append(out, []byte(p.prefix)...)
+			p.started = true
+			p.midLine = true
+		}
+		out = append(out, c)
+		if c == '\n' {
+			p.midLine = false
+		}
+	}
+	_, err := p.w.Write(out)
+	return len(b), err
 }
 
 func writeBlackboard(dir string, res RunResult) error {
