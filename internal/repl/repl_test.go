@@ -444,6 +444,118 @@ func TestCheckBudgetAllowsWhenWithinCap(t *testing.T) {
 	}
 }
 
+func TestRunSaveLabelsSessionAndPersists(t *testing.T) {
+	bin := writeFakeBin(t, "#!/bin/sh\nexit 0\n")
+	dir := t.TempDir()
+	var buf bytes.Buffer
+	_ = Run(context.Background(), Options{
+		Root: dir, HarnessBin: bin, Goal: intentplan.GoalDev,
+		In:  strings.NewReader("/save ecommerce-cart\n/exit\n"),
+		Out: &buf,
+	})
+	if !strings.Contains(buf.String(), "labelled \"ecommerce-cart\"") {
+		t.Errorf("missing label confirmation: %s", buf.String())
+	}
+	sessions, _ := ListSessions(dir)
+	if len(sessions) == 0 || sessions[0].Label != "ecommerce-cart" {
+		t.Errorf("label not surfaced in ListSessions: %+v", sessions)
+	}
+}
+
+func TestSetSessionLabelRejectsBadChars(t *testing.T) {
+	sess := &Session{}
+	var buf bytes.Buffer
+	setSessionLabel(sess, &buf, "with/slash")
+	if sess.Label != "" {
+		t.Error("label with slash should be refused")
+	}
+	if !strings.Contains(buf.String(), "unsupported character") {
+		t.Errorf("missing rejection message: %s", buf.String())
+	}
+}
+
+func TestSetSessionLabelEmptyRejected(t *testing.T) {
+	sess := &Session{}
+	var buf bytes.Buffer
+	setSessionLabel(sess, &buf, "")
+	if !strings.Contains(buf.String(), "needs a name") {
+		t.Errorf("missing empty-name rejection: %s", buf.String())
+	}
+}
+
+func TestRunRecapWithoutAdapterListsInputs(t *testing.T) {
+	bin := writeFakeBin(t, "#!/bin/sh\nexit 0\n")
+	prior := &Session{ID: "X", Goal: intentplan.GoalDev, Turns: []Turn{
+		{Input: "add /products", Action: "chat"},
+		{Input: "fix cart 500", Action: "chat"},
+	}}
+	var buf bytes.Buffer
+	_ = Run(context.Background(), Options{
+		Root: t.TempDir(), HarnessBin: bin, Goal: intentplan.GoalDev,
+		In: strings.NewReader("/recap\n/exit\n"), Out: &buf, Resume: prior,
+	})
+	for _, want := range []string{"no adapter wired", "add /products", "fix cart 500"} {
+		if !strings.Contains(buf.String(), want) {
+			t.Errorf("missing %q: %s", want, buf.String())
+		}
+	}
+}
+
+func TestRunRecapEmptyReportsNoTurns(t *testing.T) {
+	bin := writeFakeBin(t, "#!/bin/sh\nexit 0\n")
+	var buf bytes.Buffer
+	_ = Run(context.Background(), Options{
+		Root: t.TempDir(), HarnessBin: bin, Goal: intentplan.GoalDev,
+		In: strings.NewReader("/recap\n/exit\n"), Out: &buf,
+	})
+	if !strings.Contains(buf.String(), "no turns to recap") {
+		t.Errorf("missing empty-recap message: %s", buf.String())
+	}
+}
+
+func TestRunReplayBlocksMutatingInputs(t *testing.T) {
+	bin := writeFakeBin(t, "#!/bin/sh\nexit 0\n")
+	prior := &Session{ID: "X", Goal: intentplan.GoalDev, ReadOnly: true, Turns: []Turn{
+		{Input: "old", Action: "chat"},
+	}}
+	var buf bytes.Buffer
+	_ = Run(context.Background(), Options{
+		Root: t.TempDir(), HarnessBin: bin, Goal: intentplan.GoalDev,
+		In:     strings.NewReader("hello\n/ship something\n/history\n/exit\n"),
+		Out:    &buf,
+		Resume: prior,
+	})
+	if !strings.Contains(buf.String(), "session is read-only") {
+		t.Errorf("missing read-only block: %s", buf.String())
+	}
+	if !strings.Contains(buf.String(), "old") {
+		t.Errorf("/history should still work in replay: %s", buf.String())
+	}
+}
+
+func TestIsMutatingInputClassification(t *testing.T) {
+	tests := map[string]bool{
+		"plain text":    true,
+		"/help":         false,
+		"/history":      false,
+		"/agents":       false,
+		"/diff":         false,
+		"/cost":         false,
+		"/ship foo":     true,
+		"/exec foo":     true,
+		"/use kimi":     true,
+		"/budget 0.50":  true,
+		"/auto-gate on": true,
+		"/recap":        true,
+		"!ls":           true,
+	}
+	for in, want := range tests {
+		if got := isMutatingInput(in); got != want {
+			t.Errorf("isMutatingInput(%q) = %v; want %v", in, got, want)
+		}
+	}
+}
+
 func TestRunIgnoresBlankLines(t *testing.T) {
 	bin := writeFakeBin(t, "#!/bin/sh\nexit 0\n")
 	var out bytes.Buffer

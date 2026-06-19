@@ -32,6 +32,8 @@ type Session struct {
 	ContextMark int             `json:"context_mark,omitempty"`
 	AutoGate    bool            `json:"auto_gate,omitempty"`
 	BudgetUSD   float64         `json:"budget_usd,omitempty"`
+	Label       string          `json:"label,omitempty"`
+	ReadOnly    bool            `json:"-"`
 }
 
 type Turn struct {
@@ -66,6 +68,7 @@ type Options struct {
 
 type SessionSummary struct {
 	ID        string
+	Label     string
 	Goal      intentplan.Goal
 	Turns     int
 	LastInput string
@@ -91,10 +94,21 @@ func LoadSession(root, id string) (*Session, error) {
 		}
 		sess.Turns = append(sess.Turns, t)
 	}
-	for i := len(sess.Turns) - 1; i >= 0; i-- {
-		if sess.Turns[i].Plan != nil {
-			sess.Goal = sess.Turns[i].Plan.Goal
-			break
+	if meta, err := loadSessionMeta(root, id); err == nil {
+		if meta.Goal != "" {
+			sess.Goal = intentplan.Goal(meta.Goal)
+		}
+		sess.Label = meta.Label
+		sess.ContextMark = meta.ContextMark
+		sess.AutoGate = meta.AutoGate
+		sess.BudgetUSD = meta.BudgetUSD
+	}
+	if sess.Goal == "" {
+		for i := len(sess.Turns) - 1; i >= 0; i-- {
+			if sess.Turns[i].Plan != nil {
+				sess.Goal = sess.Turns[i].Plan.Goal
+				break
+			}
 		}
 	}
 	if sess.Goal == "" {
@@ -153,7 +167,10 @@ func ListSessions(root string) ([]SessionSummary, error) {
 				break
 			}
 		}
-		out = append(out, SessionSummary{ID: sess.ID, Goal: sess.Goal, Turns: len(sess.Turns), LastInput: last})
+		out = append(out, SessionSummary{
+			ID: sess.ID, Label: sess.Label,
+			Goal: sess.Goal, Turns: len(sess.Turns), LastInput: last,
+		})
 	}
 	return out, nil
 }
@@ -239,6 +256,8 @@ func Run(ctx context.Context, opts Options) error {
 		sess.AutoGate = opts.Resume.AutoGate
 		sess.ContextMark = opts.Resume.ContextMark
 		sess.BudgetUSD = opts.Resume.BudgetUSD
+		sess.Label = opts.Resume.Label
+		sess.ReadOnly = opts.Resume.ReadOnly
 	}
 	if opts.AutoGate {
 		sess.AutoGate = true
@@ -276,6 +295,11 @@ func Run(ctx context.Context, opts Options) error {
 
 func handleInput(ctx context.Context, sess *Session, opts *Options, input string) Turn {
 	turn := Turn{Time: time.Now().UTC(), Input: input}
+	if sess.ReadOnly && isMutatingInput(input) {
+		fmt.Fprintf(opts.Out, "  ✗ session is read-only (--replay); /history /agents /cost /diff /help are still available\n")
+		turn.Action = "read-only-block"
+		return turn
+	}
 	switch {
 	case strings.HasPrefix(input, "!"):
 		turn.Action = "shell"
@@ -311,6 +335,13 @@ func handleInput(ctx context.Context, sess *Session, opts *Options, input string
 	case strings.HasPrefix(input, "/budget "):
 		turn.Action = "budget"
 		setBudget(sess, opts.Out, strings.TrimSpace(strings.TrimPrefix(input, "/budget ")))
+	case strings.HasPrefix(input, "/save "):
+		turn.Action = "save"
+		name := strings.TrimSpace(strings.TrimPrefix(input, "/save "))
+		setSessionLabel(sess, opts.Out, name)
+	case input == "/recap":
+		turn.Action = "recap"
+		recapSession(ctx, sess, *opts, &turn)
 	case input == "/clear":
 		turn.Action = "clear-context"
 		sess.ContextMark = len(sess.Turns)
@@ -418,6 +449,92 @@ func setBudget(sess *Session, out io.Writer, raw string) {
 	}
 	sess.BudgetUSD = v
 	fmt.Fprintf(out, "  ✓ budget set to $%.4f for this session\n", v)
+}
+
+// isMutatingInput reports whether an input would change state or
+// call out to an agent. Used by --replay to refuse anything beyond
+// inspection commands.
+func isMutatingInput(input string) bool {
+	if input == "" {
+		return false
+	}
+	if strings.HasPrefix(input, "!") {
+		return true
+	}
+	mutating := []string{
+		"/exec ", "/do ", "/ship ", "/ci", "/test", "/lint",
+		"/use ", "/budget ", "/auto-gate", "/autogate",
+		"/clear", "/save ", "/recap", "/plan ", "/goal ",
+		"/last",
+	}
+	for _, p := range mutating {
+		if input == strings.TrimSpace(p) || strings.HasPrefix(input, p) {
+			return true
+		}
+	}
+	if strings.HasPrefix(input, "/") {
+		return false
+	}
+	return true // plain text → would call adapter
+}
+
+// setSessionLabel tags the session with a human-readable alias so
+// `harness chat list` and exports show "shop-api-checkout" instead of
+// an opaque ulid. Refuses obviously broken inputs (slashes, dot
+// prefix) so it stays safe to interpolate into paths and CLI output.
+func setSessionLabel(sess *Session, out io.Writer, label string) {
+	if label == "" {
+		fmt.Fprintln(out, "  ✗ /save needs a name (try /save my-feature)")
+		return
+	}
+	if strings.ContainsAny(label, "/\\\n\t") || strings.HasPrefix(label, ".") {
+		fmt.Fprintf(out, "  ✗ /save: %q contains an unsupported character\n", label)
+		return
+	}
+	if len(label) > 80 {
+		label = label[:80]
+	}
+	sess.Label = label
+	fmt.Fprintf(out, "  ✓ session labelled %q\n", label)
+}
+
+// recapSession asks the pinned adapter for a short summary of the
+// current session and prints the reply inline. Useful at the end of a
+// long chat to capture intent + decisions into the persistence layer.
+// Falls back to a deterministic bullet list when no adapter is wired.
+func recapSession(ctx context.Context, sess *Session, opts Options, turn *Turn) {
+	if sess == nil || len(sess.Turns) == 0 {
+		fmt.Fprintln(opts.Out, "  no turns to recap yet")
+		return
+	}
+	if opts.Adapter == nil {
+		fmt.Fprintln(opts.Out, "  [recap] (no adapter wired — listing inputs)")
+		for i, t := range sess.Turns {
+			if t.Input == "" {
+				continue
+			}
+			fmt.Fprintf(opts.Out, "  %d. %s\n", i+1, truncateForContext(t.Input, 120))
+		}
+		return
+	}
+	prompt := buildRecapPrompt(sess)
+	chatTurn(ctx, sess, opts, prompt, turn)
+}
+
+func buildRecapPrompt(sess *Session) string {
+	var b strings.Builder
+	b.WriteString("Summarise this HarnessX chat session in <=8 bullet points. ")
+	b.WriteString("Focus on: what was built, what tests/sensors ran, what is still open. ")
+	b.WriteString("Do NOT make plans; this is a recap, not a new task.\n\n")
+	b.WriteString("# Session turns\n\n")
+	for i, t := range sess.Turns {
+		in := strings.TrimSpace(t.Input)
+		if in == "" {
+			continue
+		}
+		fmt.Fprintf(&b, "%d. [%s] %s\n", i+1, t.Action, truncateForContext(in, 200))
+	}
+	return b.String()
 }
 
 // checkBudget returns false when running another chat turn would push
@@ -714,6 +831,8 @@ func printHelp(out io.Writer) {
 	fmt.Fprintln(out, "  /diff                          git diff --stat + full diff (project root)")
 	fmt.Fprintln(out, "  /cost                          cumulative session token + USD spend")
 	fmt.Fprintln(out, "  /budget <usd|off>              cap session spend (refuses turns when exceeded)")
+	fmt.Fprintln(out, "  /save <name>                   label this session for harness chat list")
+	fmt.Fprintln(out, "  /recap                         ask the agent to summarise the session so far")
 	fmt.Fprintln(out, "  /clear                         drop conversation history from next prompt")
 	fmt.Fprintln(out, "  /auto-gate on|off              toggle harness ci after each agent turn")
 	fmt.Fprintln(out, "  /goal <dev|ads|research|ops>   switch session goal")
@@ -792,6 +911,22 @@ func sessionPath(root, id string) string {
 	return filepath.Join(root, ".harness", "sessions", id+".jsonl")
 }
 
+func sessionMetaPath(root, id string) string {
+	return filepath.Join(root, ".harness", "sessions", id+".meta.json")
+}
+
+// sessionMeta carries the Session fields that do not fit in the
+// per-turn JSONL stream. Persisted as a sidecar alongside the JSONL so
+// older readers (which ignore it) keep working.
+type sessionMeta struct {
+	ID          string  `json:"id"`
+	Goal        string  `json:"goal"`
+	Label       string  `json:"label,omitempty"`
+	ContextMark int     `json:"context_mark,omitempty"`
+	AutoGate    bool    `json:"auto_gate,omitempty"`
+	BudgetUSD   float64 `json:"budget_usd,omitempty"`
+}
+
 func persist(root string, s Session) error {
 	p := sessionPath(root, s.ID)
 	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
@@ -808,5 +943,29 @@ func persist(root string, s Session) error {
 			return err
 		}
 	}
-	return nil
+	meta := sessionMeta{
+		ID:          s.ID,
+		Goal:        string(s.Goal),
+		Label:       s.Label,
+		ContextMark: s.ContextMark,
+		AutoGate:    s.AutoGate,
+		BudgetUSD:   s.BudgetUSD,
+	}
+	body, err := json.MarshalIndent(meta, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(sessionMetaPath(root, s.ID), body, 0o644)
+}
+
+func loadSessionMeta(root, id string) (sessionMeta, error) {
+	body, err := os.ReadFile(sessionMetaPath(root, id))
+	if err != nil {
+		return sessionMeta{}, err
+	}
+	var m sessionMeta
+	if err := json.Unmarshal(body, &m); err != nil {
+		return sessionMeta{}, err
+	}
+	return m, nil
 }
