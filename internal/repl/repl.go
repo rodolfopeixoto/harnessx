@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -30,6 +31,7 @@ type Session struct {
 	Root        string          `json:"root"`
 	ContextMark int             `json:"context_mark,omitempty"`
 	AutoGate    bool            `json:"auto_gate,omitempty"`
+	BudgetUSD   float64         `json:"budget_usd,omitempty"`
 }
 
 type Turn struct {
@@ -59,6 +61,7 @@ type Options struct {
 	Resume       *Session
 	AutoGate     bool
 	AdaptersList []string
+	SwitchTo     func(id string) (agents.AgentAdapter, string, error)
 }
 
 type SessionSummary struct {
@@ -235,6 +238,7 @@ func Run(ctx context.Context, opts Options) error {
 		sess.Turns = append(sess.Turns, opts.Resume.Turns...)
 		sess.AutoGate = opts.Resume.AutoGate
 		sess.ContextMark = opts.Resume.ContextMark
+		sess.BudgetUSD = opts.Resume.BudgetUSD
 	}
 	if opts.AutoGate {
 		sess.AutoGate = true
@@ -261,7 +265,7 @@ func Run(ctx context.Context, opts Options) error {
 			fmt.Fprintln(opts.Out, "bye")
 			break
 		}
-		turn := handleInput(ctx, &sess, opts, input)
+		turn := handleInput(ctx, &sess, &opts, input)
 		sess.Turns = append(sess.Turns, turn)
 		if err := persist(opts.Root, sess); err != nil {
 			fmt.Fprintf(opts.Out, "warn: persist: %v\n", err)
@@ -270,34 +274,43 @@ func Run(ctx context.Context, opts Options) error {
 	return persist(opts.Root, sess)
 }
 
-func handleInput(ctx context.Context, sess *Session, opts Options, input string) Turn {
+func handleInput(ctx context.Context, sess *Session, opts *Options, input string) Turn {
 	turn := Turn{Time: time.Now().UTC(), Input: input}
 	switch {
 	case strings.HasPrefix(input, "!"):
 		turn.Action = "shell"
-		runShell(ctx, opts, strings.TrimSpace(input[1:]))
+		runShell(ctx, *opts, strings.TrimSpace(input[1:]))
 	case strings.HasPrefix(input, "/exec "), strings.HasPrefix(input, "/do "):
 		prompt := strings.TrimSpace(strings.TrimPrefix(strings.TrimPrefix(input, "/exec"), "/do"))
-		executePlan(ctx, sess, opts, prompt, &turn)
+		executePlan(ctx, sess, *opts, prompt, &turn)
 	case strings.HasPrefix(input, "/ship "):
 		args := []string{"ship", strings.TrimSpace(strings.TrimPrefix(input, "/ship ")), "--yes", "--allow-dirty"}
-		runHarnessCmd(ctx, opts, args)
+		runHarnessCmd(ctx, *opts, args)
 		turn.Action = "ship"
 	case strings.HasPrefix(input, "/ci"):
-		runHarnessCmd(ctx, opts, []string{"ci"})
+		runHarnessCmd(ctx, *opts, []string{"ci"})
 		turn.Action = "ci"
 	case strings.HasPrefix(input, "/test"):
-		runHarnessCmd(ctx, opts, []string{"test"})
+		runHarnessCmd(ctx, *opts, []string{"test"})
 		turn.Action = "test"
 	case strings.HasPrefix(input, "/lint"):
-		runHarnessCmd(ctx, opts, []string{"lint"})
+		runHarnessCmd(ctx, *opts, []string{"lint"})
 		turn.Action = "lint"
 	case input == "/agents":
 		turn.Action = "agents"
-		printAgents(opts)
+		printAgents(*opts)
 	case input == "/cost":
 		turn.Action = "cost"
 		printCost(opts.Out, sess)
+	case input == "/diff":
+		turn.Action = "diff"
+		runShell(ctx, *opts, "git diff --stat HEAD && echo '---' && git diff HEAD")
+	case strings.HasPrefix(input, "/use "):
+		turn.Action = "use"
+		switchAdapter(opts, strings.TrimSpace(strings.TrimPrefix(input, "/use ")))
+	case strings.HasPrefix(input, "/budget "):
+		turn.Action = "budget"
+		setBudget(sess, opts.Out, strings.TrimSpace(strings.TrimPrefix(input, "/budget ")))
 	case input == "/clear":
 		turn.Action = "clear-context"
 		sess.ContextMark = len(sess.Turns)
@@ -349,17 +362,80 @@ func handleInput(ctx context.Context, sess *Session, opts Options, input string)
 		return handleInput(ctx, sess, opts, last)
 	default:
 		if opts.Adapter != nil {
+			if !checkBudget(sess, opts.Out) {
+				turn.Action = "budget-exceeded"
+				return turn
+			}
 			turn.Action = "chat"
-			chatTurn(ctx, sess, opts, input, &turn)
+			chatTurn(ctx, sess, *opts, input, &turn)
 			if sess.AutoGate || opts.AutoGate {
 				fmt.Fprintln(opts.Out, "  [auto-gate] running harness ci…")
-				runHarnessCmd(ctx, opts, []string{"ci"})
+				runHarnessCmd(ctx, *opts, []string{"ci"})
 			}
 			return turn
 		}
-		executePlan(ctx, sess, opts, input, &turn)
+		executePlan(ctx, sess, *opts, input, &turn)
 	}
 	return turn
+}
+
+// switchAdapter performs /use mid-session. Delegates to the SwitchTo
+// callback that cmd_chat wires in — keeps the repl package free of the
+// agentcmd registry dependency.
+func switchAdapter(opts *Options, id string) {
+	if id == "" {
+		fmt.Fprintln(opts.Out, "  ✗ /use needs an adapter id (try /agents)")
+		return
+	}
+	if opts.SwitchTo == nil {
+		fmt.Fprintln(opts.Out, "  ✗ /use unavailable: chat was started without an adapter")
+		return
+	}
+	adapter, canonical, err := opts.SwitchTo(id)
+	if err != nil {
+		fmt.Fprintf(opts.Out, "  ✗ /use %s: %v\n", id, err)
+		return
+	}
+	opts.Adapter = adapter
+	opts.AdapterID = canonical
+	fmt.Fprintf(opts.Out, "  ✓ switched to %s\n", canonical)
+}
+
+// setBudget parses a USD value from /budget and stores it on the
+// session. Cumulative spend is enforced by checkBudget before each
+// chat turn.
+func setBudget(sess *Session, out io.Writer, raw string) {
+	raw = strings.TrimPrefix(raw, "$")
+	if raw == "" || raw == "off" || raw == "0" {
+		sess.BudgetUSD = 0
+		fmt.Fprintln(out, "  ✓ budget cleared")
+		return
+	}
+	v, err := strconv.ParseFloat(raw, 64)
+	if err != nil || v < 0 {
+		fmt.Fprintf(out, "  ✗ /budget needs a non-negative USD number (e.g. /budget 0.50)\n")
+		return
+	}
+	sess.BudgetUSD = v
+	fmt.Fprintf(out, "  ✓ budget set to $%.4f for this session\n", v)
+}
+
+// checkBudget returns false when running another chat turn would push
+// cumulative spend over the configured cap. Prints why and refuses.
+func checkBudget(sess *Session, out io.Writer) bool {
+	if sess == nil || sess.BudgetUSD <= 0 {
+		return true
+	}
+	var spent float64
+	for _, t := range sess.Turns {
+		spent += t.CostUSD
+	}
+	if spent >= sess.BudgetUSD {
+		fmt.Fprintf(out, "  ✗ budget exhausted: $%.4f spent of $%.4f cap. /budget off to reset.\n",
+			spent, sess.BudgetUSD)
+		return false
+	}
+	return true
 }
 
 func executePlan(ctx context.Context, sess *Session, opts Options, prompt string, turn *Turn) {
@@ -634,7 +710,10 @@ func printHelp(out io.Writer) {
 	fmt.Fprintln(out, "  /ship <prompt>                 harness ship (branch + spec + loop + commit)")
 	fmt.Fprintln(out, "  /ci | /test | /lint            run harness gate")
 	fmt.Fprintln(out, "  /agents                        list registered adapters; mark active")
+	fmt.Fprintln(out, "  /use <id>                      switch adapter mid-session")
+	fmt.Fprintln(out, "  /diff                          git diff --stat + full diff (project root)")
 	fmt.Fprintln(out, "  /cost                          cumulative session token + USD spend")
+	fmt.Fprintln(out, "  /budget <usd|off>              cap session spend (refuses turns when exceeded)")
 	fmt.Fprintln(out, "  /clear                         drop conversation history from next prompt")
 	fmt.Fprintln(out, "  /auto-gate on|off              toggle harness ci after each agent turn")
 	fmt.Fprintln(out, "  /goal <dev|ads|research|ops>   switch session goal")

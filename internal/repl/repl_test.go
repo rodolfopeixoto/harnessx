@@ -358,6 +358,92 @@ func TestRunAutoGateToggle(t *testing.T) {
 	}
 }
 
+func TestRunUseUnavailableWithoutSwitcher(t *testing.T) {
+	bin := writeFakeBin(t, "#!/bin/sh\nexit 0\n")
+	var buf bytes.Buffer
+	_ = Run(context.Background(), Options{
+		Root: t.TempDir(), HarnessBin: bin, Goal: intentplan.GoalDev,
+		In:  strings.NewReader("/use kimi\n/exit\n"),
+		Out: &buf,
+	})
+	if !strings.Contains(buf.String(), "/use unavailable") {
+		t.Errorf("/use with no SwitchTo should print unavailable: %s", buf.String())
+	}
+}
+
+func TestRunBudgetRejectsWhenExhausted(t *testing.T) {
+	bin := writeFakeBin(t, "#!/bin/sh\nexit 0\n")
+	prior := &Session{ID: "X", Goal: intentplan.GoalDev, BudgetUSD: 0.01, Turns: []Turn{
+		{Action: "chat", CostUSD: 0.05},
+	}}
+	var buf bytes.Buffer
+	_ = Run(context.Background(), Options{
+		Root: t.TempDir(), HarnessBin: bin, Goal: intentplan.GoalDev,
+		In:     strings.NewReader("/cost\n/exit\n"),
+		Out:    &buf,
+		Resume: prior,
+	})
+	if !strings.Contains(buf.String(), "$0.0500") {
+		t.Errorf("expected cost output to reflect resumed turn cost: %s", buf.String())
+	}
+}
+
+func TestRunBudgetSetAndClear(t *testing.T) {
+	bin := writeFakeBin(t, "#!/bin/sh\nexit 0\n")
+	var buf bytes.Buffer
+	_ = Run(context.Background(), Options{
+		Root: t.TempDir(), HarnessBin: bin, Goal: intentplan.GoalDev,
+		In:  strings.NewReader("/budget 0.5\n/budget off\n/exit\n"),
+		Out: &buf,
+	})
+	for _, want := range []string{"budget set to $0.5000", "budget cleared"} {
+		if !strings.Contains(buf.String(), want) {
+			t.Errorf("missing %q: %s", want, buf.String())
+		}
+	}
+}
+
+func TestRunBudgetRejectsBadInput(t *testing.T) {
+	bin := writeFakeBin(t, "#!/bin/sh\nexit 0\n")
+	var buf bytes.Buffer
+	_ = Run(context.Background(), Options{
+		Root: t.TempDir(), HarnessBin: bin, Goal: intentplan.GoalDev,
+		In:  strings.NewReader("/budget abc\n/exit\n"),
+		Out: &buf,
+	})
+	if !strings.Contains(buf.String(), "needs a non-negative USD") {
+		t.Errorf("missing budget validation: %s", buf.String())
+	}
+}
+
+func TestSetBudgetDirect(t *testing.T) {
+	sess := &Session{}
+	var buf bytes.Buffer
+	setBudget(sess, &buf, "1.25")
+	if sess.BudgetUSD != 1.25 {
+		t.Errorf("budget not set: %f", sess.BudgetUSD)
+	}
+}
+
+func TestCheckBudgetBlocksWhenSpent(t *testing.T) {
+	sess := &Session{BudgetUSD: 0.10, Turns: []Turn{{CostUSD: 0.20}}}
+	var buf bytes.Buffer
+	if checkBudget(sess, &buf) {
+		t.Error("budget should block when spent exceeds cap")
+	}
+	if !strings.Contains(buf.String(), "budget exhausted") {
+		t.Errorf("missing exhausted message: %s", buf.String())
+	}
+}
+
+func TestCheckBudgetAllowsWhenWithinCap(t *testing.T) {
+	sess := &Session{BudgetUSD: 1.0, Turns: []Turn{{CostUSD: 0.20}}}
+	var buf bytes.Buffer
+	if !checkBudget(sess, &buf) {
+		t.Error("budget should allow when under cap")
+	}
+}
+
 func TestRunIgnoresBlankLines(t *testing.T) {
 	bin := writeFakeBin(t, "#!/bin/sh\nexit 0\n")
 	var out bytes.Buffer

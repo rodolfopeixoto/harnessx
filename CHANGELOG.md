@@ -3,6 +3,40 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-19 — v0.122.0 — Chat /use /diff /budget + session export (F87)
+
+### New
+
+- **`/use <id>`** switches the pinned adapter mid-session via a new
+  `Options.SwitchTo(id) (agents.AgentAdapter, string, error)`
+  callback. `cmd_chat` wires it against the registry that was already
+  loaded for `/agents`, so swapping between claude/codex/kimi/gemini
+  is two keystrokes.
+- **`/diff`** runs `git diff --stat HEAD && git diff HEAD` from the
+  project root so the user can review what the last few agent turns
+  actually wrote without leaving the REPL.
+- **`/budget <usd>`** (and `/budget off`) sets a per-session USD cap
+  on cumulative chat spend. The next plain-text chat turn is refused
+  with a clear message once the cap is exceeded; toggles persist in
+  `Session.BudgetUSD` and survive `--resume`.
+- **`harness session export <id>`** emits a sharable JSON envelope
+  for any `.harness/sessions/<id>.jsonl`: id, goal, started, root,
+  turn counts, cumulative `in_tokens`/`out_tokens`/`cost_usd`, the
+  three session toggles, and every Turn record. Useful for pasting
+  into a code review, bug report, or backup.
+
+### Changed
+
+- `repl.handleInput` now takes `*Options` so `/use` can mutate the
+  live Adapter without a registry import in the repl package. All
+  other slashes still see a pointer-to-value with the same semantics.
+- `Session.BudgetUSD` (omitempty) backs the new `/budget` toggle and
+  is loaded by `LoadSession` so `--resume` continues honouring the
+  cap. Older session files keep loading because the field is
+  zero-valued when absent.
+- Tutorial cheat sheet covers `/use`, `/diff`, `/budget`, and the new
+  `session export` flow.
+
 ## 2026-06-19 — v0.121.0 — Chat /agents /cost /clear + --auto-gate (F86)
 
 ### New
