@@ -3,6 +3,31 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-19 — v0.127.0 — Wave 10 bug pass: no-adapter refuse, update --force, typo suggest (F92)
+
+### Fixed
+
+- **`harness chat --no-adapter` no longer drops plain text into a
+  3-minute deterministic-planner loop**. The flag now propagates as
+  `Options.NoAdapter`; plain text turns are refused with
+  `✗ no adapter wired (chat --no-adapter). use /exec <prompt> or pin
+  one with 'harness use <id>'`. Slashes (`/exec`, `/history`, etc.)
+  keep working so the no-LLM smoke flow is fast end-to-end.
+- **`harness update --force` now also reinstalls the same tag**. Was
+  scoped to "allow downgrade" before; the v0.116 walk surfaced the
+  need to reinstall after a botched `cp` to `/usr/local/bin/`. Help
+  text updated.
+
+### New
+
+- **`repl.SuggestSession`** returns the closest known label or ulid
+  via Levenshtein distance (max 3). `harness chat --resume X` /
+  `--replay X` now print
+  `chat: resume "X": session not found (did you mean "Y"?)` when a
+  typo is close to a real session. Four new tests cover the
+  Levenshtein helper, the close-match path, and the far-match
+  fallthrough.
+
 ## 2026-06-19 — v0.126.0 — session show chat fallback + ci --fast + tutorial smoke (F91)
 
 ### Changed

@@ -72,6 +72,7 @@ the deterministic planner.`,
 				Out:         cmd.OutOrStdout(),
 				StepTimeout: stepTimeout,
 				AutoGate:    autoGate,
+				NoAdapter:   noAdapter,
 			}
 			if resumeID != "" && replayID != "" {
 				return fmt.Errorf("chat: --resume and --replay are mutually exclusive")
@@ -79,6 +80,9 @@ the deterministic planner.`,
 			if resumeID != "" {
 				sess, err := repl.LoadSession(dir, resumeID)
 				if err != nil {
+					if hint := repl.SuggestSession(dir, resumeID); hint != "" {
+						return fmt.Errorf("chat: resume %q: %w (did you mean %q?)", resumeID, err, hint)
+					}
 					return fmt.Errorf("chat: resume %q: %w", resumeID, err)
 				}
 				opts.Resume = sess
@@ -87,6 +91,9 @@ the deterministic planner.`,
 			if replayID != "" {
 				sess, err := repl.LoadSession(dir, replayID)
 				if err != nil {
+					if hint := repl.SuggestSession(dir, replayID); hint != "" {
+						return fmt.Errorf("chat: replay %q: %w (did you mean %q?)", replayID, err, hint)
+					}
 					return fmt.Errorf("chat: replay %q: %w", replayID, err)
 				}
 				sess.ReadOnly = true
