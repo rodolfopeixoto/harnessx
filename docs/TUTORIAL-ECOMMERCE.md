@@ -306,6 +306,23 @@ the receiver can replay it locally with `jq` or load it back through
 
 ---
 
+## Back up the project (optional)
+
+`harness backup snapshot` ships your `.harness/` state to any
+rclone-supported remote (Drive, S3, R2, Dropbox, …). First time on a
+project:
+
+```bash
+harness backup quickstart                # prints the 3-step recipe
+harness backup remote add gdrive --provider drive --interactive
+harness backup config set-default-remote gdrive
+harness backup snapshot
+```
+
+Secrets are excluded by default; route the bucket through an `rclone
+crypt` overlay if you need them and re-run with
+`--include-secrets HARNESS_BACKUP_I_UNDERSTAND_SECRETS=1`.
+
 ## When something goes sideways
 
 - **Agent CLI prompts for an OS dialog** (Docker, OrbStack, keychain):
