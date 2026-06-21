@@ -883,7 +883,7 @@ func chatTurnFor(ctx context.Context, sess *Session, opts Options, prompt, task 
 	fmt.Fprintf(opts.Out, "  %s %s %s\n",
 		ui.Accent.Render("[agent]"),
 		ui.Info.Render("calling "+adapterID),
-		ui.Muted.Render("("+task+")…"))
+		ui.Muted.Render("("+task+", "+adapterBillingMode(adapterID)+")…"))
 	live := &prefixWriter{w: opts.Out, prefix: "  │ "}
 	timeout := opts.StepTimeout
 	if timeout <= 0 {
@@ -1121,7 +1121,8 @@ func inKnownGoals(g intentplan.Goal) bool {
 
 func greet(out io.Writer, s Session) {
 	fmt.Fprintf(out, "harness chat — session %s, goal=%s\n", s.ID, s.Goal)
-	fmt.Fprintln(out, "plain text → talk to agent · /exec → plan+run · !<cmd> → shell · /help · /exit")
+	fmt.Fprintln(out, `plain text → talk to agent · /exec → plan+run · !<cmd> → shell · /help · /exit`)
+	fmt.Fprintln(out, ui.Muted.Render(`multi-line: end line with \  ·  or wrap with """ … """  ·  / lists slashes`))
 }
 
 func printHelp(out io.Writer) {
@@ -1178,6 +1179,25 @@ func printTimeline(out io.Writer, sess *Session) {
 		fmt.Fprintf(out, "  %3d  %s  [%-15s] %s%s\n", i+1, clock, t.Action, input, cost)
 	}
 	fmt.Fprintf(out, "\n  total: %d turns, ~$%.4f\n", len(sess.Turns), total)
+}
+
+// adapterBillingMode tells the user whether the adapter is going to
+// charge against their API key (oneshot CLI: claude --print, codex
+// exec, gemini -p) or against a logged-in plan/subscription
+// (interactive CLI: claude-interactive, kimi chat). The distinction
+// matters because oneshot calls show up on a separate invoice while
+// interactive ones drain the user's chat-mode token quota.
+func adapterBillingMode(id string) string {
+	switch id {
+	case "claude", "codex", "gemini", "anthropic-api", "openai-api",
+		"gemini-api", "moonshot-api", "minimax-api":
+		return "oneshot · API-billed"
+	case "claude-interactive", "kimi", "ollama":
+		return "interactive · plan/local"
+	case "fake":
+		return "fake · free"
+	}
+	return "unknown billing"
 }
 
 func printSlashMenu(out io.Writer) {

@@ -3,6 +3,40 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-21 — v0.137.0 — Wave 13: """ heredoc + adapter billing-mode disclosure (F102)
+
+### New
+
+- **`"""` heredoc multi-line input** in both the bufio and chzyer
+  prompters. Type `"""` at the start of a line to enter heredoc
+  mode, paste/type as many newlines as needed, close with `"""`
+  on its own line. Fixes the v0.136 walk's worst gotcha: pasting
+  a two-line `/drive` prompt only sent the first line because
+  terminals split clipboard newlines into separate Enters.
+- **Adapter billing-mode shown in the chat header**:
+  `[agent] calling claude (implementation, oneshot · API-billed)…`
+  vs `[agent] calling kimi (cheap_review, interactive · plan/local)…`.
+  Lets users see whether the call charges their API key or
+  drains their plan/subscription quota before they hit Enter.
+  Helper: `adapterBillingMode(id)` table covering claude/codex/
+  gemini/anthropic-api/openai-api/gemini-api/moonshot-api/
+  minimax-api (oneshot), claude-interactive/kimi/ollama
+  (interactive), fake (free).
+- **Greet line** announces the multi-line escapes so users
+  discover them without reading the tutorial first.
+
+### Tests
+
+- `TestBufioPromptReaderHandlesTripleQuoteHeredoc` — heredoc
+  payload captured, marker not leaked.
+- `TestAdapterBillingModeKnownIDs` — table covers every bundled
+  adapter id plus an unknown fallback.
+
+### Docs
+
+- `docs/TUTORIAL-ECOMMERCE.md` gained "Pasting multi-line prompts"
+  and "Adapter billing mode" sections with concrete examples.
+
 ## 2026-06-21 — v0.136.0 — Wave 12: REPL polish, slash menu, colored drive output (F101)
 
 ### New

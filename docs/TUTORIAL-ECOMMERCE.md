@@ -272,6 +272,53 @@ all keep working so you can walk the past run safely.
 | ↑ / ↓                       | scroll input history (readline)                  |
 | TAB                         | autocomplete slash commands + adapter ids        |
 
+## 8b · Pasting multi-line prompts
+
+Terminals split clipboard content into one Enter per newline, which
+used to send only the first line. Two ways to send a real multi-line
+prompt:
+
+```text
+[dev|claude ✓]> add a stock check on cart add: \
+                fail with 409 when quantity exceeds Product.stock \
+                and cover the path with pytest
+```
+
+Backslash-continuation joins lines into one prompt.
+
+Or wrap with `"""`:
+
+```text
+[dev|claude ✓]> """
+                /drive include a fixed 10% tax in cart.total_cents
+                and expose the breakdown on Cart.tax_cents
+                """
+```
+
+The first `"""` opens heredoc mode; the second one closes it and the
+whole block ships as one input. Works for slash commands too.
+
+## 8c · Adapter billing mode
+
+The chat header now tells you which side pays for the call:
+
+```text
+  [agent] calling claude (implementation, oneshot · API-billed)…
+  [agent] calling kimi   (cheap_review, interactive · plan/local)…
+```
+
+- **oneshot · API-billed** — adapter runs the CLI in print/exec mode
+  (e.g. `claude --print`, `codex exec`, `gemini -p`); spend lands on
+  your API key, separate from any plan quota.
+- **interactive · plan/local** — adapter drives an interactive CLI
+  (`claude-interactive`, `kimi chat`, `ollama` local); spend drains
+  your subscription plan tokens or your own GPU.
+- **fake · free** — `fake` adapter used in tests + smoke.
+
+`/cost` aggregates everything together; route deliberately if you
+care about the split (e.g. `harness use claude-interactive` to stay
+on the plan).
+
 ## 9 · Troubleshooting
 
 - **Agent CLI prompts for an OS dialog** (Docker, OrbStack, keychain):
