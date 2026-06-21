@@ -7,10 +7,8 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/signal"
 	"path/filepath"
 	"strings"
-	"syscall"
 
 	"github.com/chzyer/readline"
 	"golang.org/x/term"
@@ -138,24 +136,6 @@ type readlinePromptReader struct {
 	closed chan struct{}
 }
 
-func (r *readlinePromptReader) startWinch() {
-	r.winch = make(chan os.Signal, 1)
-	r.closed = make(chan struct{})
-	signal.Notify(r.winch, syscall.SIGWINCH)
-	go func() {
-		for {
-			select {
-			case <-r.closed:
-				return
-			case <-r.winch:
-				if r.rl != nil {
-					r.rl.Refresh()
-				}
-			}
-		}
-	}()
-}
-
 func (r *readlinePromptReader) ReadInput(prompt, continuation string) (string, error) {
 	r.rl.SetPrompt(prompt)
 	var parts []string
@@ -200,10 +180,7 @@ func (r *readlinePromptReader) ReadInput(prompt, continuation string) (string, e
 }
 
 func (r *readlinePromptReader) Close() error {
-	if r.winch != nil {
-		signal.Stop(r.winch)
-		close(r.closed)
-	}
+	r.stopWinch()
 	if r.out != nil {
 		_, _ = io.WriteString(r.out, bracketedPasteDisableSeq)
 	}

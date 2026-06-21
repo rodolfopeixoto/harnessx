@@ -3,6 +3,18 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-21 — v0.142.0 — Wave 16: Windows build fix (F107)
+
+### Fixed
+
+- **Windows release artifacts came out 0 bytes** since v0.140
+  because `internal/repl/prompt.go` referenced `syscall.SIGWINCH`,
+  which only exists on Unix. The SIGWINCH watcher is now split
+  across `prompt_unix.go` (build tag `!windows`) and a no-op
+  `prompt_windows.go`. `make release` builds clean for every
+  platform again; the GH release uploads include the windows
+  amd64 + arm64 binaries.
+
 ## 2026-06-21 — v0.141.0 — Wave 16: Todoist tutorial end-to-end (F106)
 
 ### Docs
