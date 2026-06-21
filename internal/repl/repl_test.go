@@ -852,6 +852,51 @@ func TestRenderCostReportEmpty(t *testing.T) {
 	}
 }
 
+func TestRunSlashAloneShowsMenu(t *testing.T) {
+	bin := writeFakeBin(t, "#!/bin/sh\nexit 0\n")
+	var buf bytes.Buffer
+	_ = Run(context.Background(), Options{
+		Root: t.TempDir(), HarnessBin: bin, Goal: intentplan.GoalDev,
+		In:  strings.NewReader("/\n/exit\n"),
+		Out: &buf,
+	})
+	for _, want := range []string{
+		"slash commands",
+		"chat",
+		"plain text",
+		"/drive",
+		"/cost",
+		"session",
+		"exit",
+	} {
+		if !strings.Contains(buf.String(), want) {
+			t.Errorf("missing %q in slash menu: %s", want, buf.String())
+		}
+	}
+}
+
+func TestPrintSlashMenuQuestionMark(t *testing.T) {
+	bin := writeFakeBin(t, "#!/bin/sh\nexit 0\n")
+	var buf bytes.Buffer
+	_ = Run(context.Background(), Options{
+		Root: t.TempDir(), HarnessBin: bin, Goal: intentplan.GoalDev,
+		In:  strings.NewReader("/?\n/exit\n"),
+		Out: &buf,
+	})
+	if !strings.Contains(buf.String(), "slash commands") {
+		t.Errorf("/? should also open the menu: %s", buf.String())
+	}
+}
+
+func TestPadRightFillsToWidth(t *testing.T) {
+	if padRight("ab", 5) != "ab   " {
+		t.Errorf("padRight wrong")
+	}
+	if padRight("hello", 3) != "hello" {
+		t.Errorf("padRight should not truncate")
+	}
+}
+
 func TestRunIgnoresBlankLines(t *testing.T) {
 	bin := writeFakeBin(t, "#!/bin/sh\nexit 0\n")
 	var out bytes.Buffer
