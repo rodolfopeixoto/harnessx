@@ -3,6 +3,37 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-21 — v0.135.0 — Wave 12: drive no-op abort, per-model cost, py dev tools (F100)
+
+### Fixed
+
+- **`harness drive` now aborts when the agent produces zero file
+  changes** instead of looping the same prompt three times against
+  a confused model. Implemented with a pre/post `git status
+  --porcelain` snapshot in `driveImplLoop`; the error explicitly
+  asks the user to refine the prompt. Caught the v0.133 walk's
+  worst spend (3 wasted opus attempts on a truncated "and").
+- **Python scaffolds ship the optional security/typecheck tools**
+  (`bandit`, `mypy`, `pip-audit`) in `requirements.txt`. The
+  `--with-deps` install now wires every dev-loop sensor green on a
+  fresh `harness new python(-ecommerce)`.
+
+### Changed
+
+- **`/cost` is now a per-adapter table**. `Turn` gained `AdapterID`
+  and `TaskTag` columns (omitempty, backwards compatible), `printCost`
+  delegates to `aggregateCost` + `renderCostReport`. Output:
+  ```
+  session 01KX…: 4 chat turns
+    ADAPTER      TASK             TURNS       IN      OUT       COST
+    claude       implementation       2     4310      812 $   0.1929
+    gemini       cheap_review         1      150       80 $   0.0019
+    ───────────────────────────────────────────────────────────────
+    TOTAL                             3     4460      892 $   0.1948
+  ```
+- Three new unit tests cover `aggregateCost` grouping + ordering,
+  the rendered table, and the empty-session case.
+
 ## 2026-06-21 — v0.134.0 — Wave 11 cleanup: SOLID + constants + coverage (F99)
 
 ### Changed

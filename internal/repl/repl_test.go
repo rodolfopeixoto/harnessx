@@ -384,7 +384,7 @@ func TestRunBudgetRejectsWhenExhausted(t *testing.T) {
 		Out:    &buf,
 		Resume: prior,
 	})
-	if !strings.Contains(buf.String(), "$0.0500") {
+	if !strings.Contains(buf.String(), "0.0500") {
 		t.Errorf("expected cost output to reflect resumed turn cost: %s", buf.String())
 	}
 }
@@ -791,6 +791,64 @@ func TestRunTimelineEmpty(t *testing.T) {
 	})
 	if !strings.Contains(buf.String(), "no turns yet") {
 		t.Errorf("missing empty timeline message: %s", buf.String())
+	}
+}
+
+func TestAggregateCostGroupsByAdapterAndTask(t *testing.T) {
+	turns := []Turn{
+		{Action: "chat", AdapterID: "claude", TaskTag: "implementation", InTokens: 100, OutTokens: 50, CostUSD: 0.10},
+		{Action: "chat", AdapterID: "claude", TaskTag: "implementation", InTokens: 200, OutTokens: 100, CostUSD: 0.20},
+		{Action: "chat", AdapterID: "gemini", TaskTag: "cheap_review", InTokens: 50, OutTokens: 20, CostUSD: 0.01},
+		{Action: "save", Input: "/save x"},
+	}
+	totals := aggregateCost(turns)
+	if totals.ChatTurns != 3 {
+		t.Errorf("want 3 chat turns, got %d", totals.ChatTurns)
+	}
+	if len(totals.PerAgent) != 2 {
+		t.Fatalf("want 2 adapter rows, got %d", len(totals.PerAgent))
+	}
+	if totals.PerAgent[0].AdapterID != "claude" {
+		t.Errorf("first row should be claude (highest cost): %+v", totals.PerAgent)
+	}
+	if totals.PerAgent[0].Turns != 2 || totals.PerAgent[0].CostUSD < 0.299 {
+		t.Errorf("claude row aggregated wrong: %+v", totals.PerAgent[0])
+	}
+	if totals.Total.CostUSD < 0.30 || totals.Total.CostUSD > 0.32 {
+		t.Errorf("total cost wrong: %f", totals.Total.CostUSD)
+	}
+}
+
+func TestRenderCostReportShowsAdapterColumns(t *testing.T) {
+	var buf bytes.Buffer
+	totals := costTotals{
+		ChatTurns: 2,
+		Total:     costRow{Turns: 2, InTokens: 300, OutTokens: 150, CostUSD: 0.30},
+		PerAgent: []costRow{
+			{AdapterID: "claude", Task: "implementation", Turns: 1, InTokens: 200, OutTokens: 100, CostUSD: 0.25},
+			{AdapterID: "gemini", Task: "cheap_review", Turns: 1, InTokens: 100, OutTokens: 50, CostUSD: 0.05},
+		},
+	}
+	renderCostReport(&buf, "01ABC", totals)
+	for _, want := range []string{
+		"session 01ABC",
+		"ADAPTER",
+		"claude", "implementation",
+		"gemini", "cheap_review",
+		"TOTAL",
+		"0.3000",
+	} {
+		if !strings.Contains(buf.String(), want) {
+			t.Errorf("missing %q\n%s", want, buf.String())
+		}
+	}
+}
+
+func TestRenderCostReportEmpty(t *testing.T) {
+	var buf bytes.Buffer
+	renderCostReport(&buf, "X", costTotals{ChatTurns: 0})
+	if !strings.Contains(buf.String(), "no recorded usage") {
+		t.Errorf("missing empty marker: %s", buf.String())
 	}
 }
 

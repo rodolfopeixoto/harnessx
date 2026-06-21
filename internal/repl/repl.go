@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -42,6 +43,8 @@ type Turn struct {
 	Time      time.Time              `json:"time"`
 	Input     string                 `json:"input"`
 	Action    string                 `json:"action"`
+	AdapterID string                 `json:"adapter_id,omitempty"`
+	TaskTag   string                 `json:"task_tag,omitempty"`
 	Plan      *intentplan.Plan       `json:"plan,omitempty"`
 	Result    *intentplan.ExecResult `json:"result,omitempty"`
 	InTokens  int                    `json:"in_tokens,omitempty"`
@@ -907,6 +910,8 @@ func chatTurnFor(ctx context.Context, sess *Session, opts Options, prompt, task 
 		turn.InTokens = res.Usage.InputTokens
 		turn.OutTokens = res.Usage.OutputTokens
 		turn.CostUSD = res.Usage.EstimatedCostUSD
+		turn.AdapterID = adapterID
+		turn.TaskTag = task
 	}
 }
 
@@ -1185,19 +1190,83 @@ func printCost(out io.Writer, sess *Session) {
 		fmt.Fprintln(out, "no agent turns yet")
 		return
 	}
-	var inTok, outTok int
-	var usd float64
+	totals := aggregateCost(sess.Turns)
+	renderCostReport(out, sess.ID, totals)
+}
+
+type costRow struct {
+	AdapterID string
+	Task      string
+	Turns     int
+	InTokens  int
+	OutTokens int
+	CostUSD   float64
+}
+
+type costTotals struct {
+	ChatTurns int
+	Total     costRow
+	PerAgent  []costRow
+}
+
+func aggregateCost(turns []Turn) costTotals {
+	byKey := map[string]*costRow{}
+	keys := []string{}
+	total := costRow{AdapterID: "TOTAL"}
 	chatTurns := 0
-	for _, t := range sess.Turns {
+	for _, t := range turns {
 		if t.Action == "chat" {
 			chatTurns++
 		}
-		inTok += t.InTokens
-		outTok += t.OutTokens
-		usd += t.CostUSD
+		if t.InTokens == 0 && t.OutTokens == 0 && t.CostUSD == 0 {
+			continue
+		}
+		id := t.AdapterID
+		if id == "" {
+			id = "unknown"
+		}
+		key := id + "|" + t.TaskTag
+		row, ok := byKey[key]
+		if !ok {
+			row = &costRow{AdapterID: id, Task: t.TaskTag}
+			byKey[key] = row
+			keys = append(keys, key)
+		}
+		row.Turns++
+		row.InTokens += t.InTokens
+		row.OutTokens += t.OutTokens
+		row.CostUSD += t.CostUSD
+		total.Turns++
+		total.InTokens += t.InTokens
+		total.OutTokens += t.OutTokens
+		total.CostUSD += t.CostUSD
 	}
-	fmt.Fprintf(out, "session %s: %d chat turns, in=%d out=%d ~$%.4f\n",
-		sess.ID, chatTurns, inTok, outTok, usd)
+	rows := make([]costRow, 0, len(keys))
+	for _, k := range keys {
+		rows = append(rows, *byKey[k])
+	}
+	sort.SliceStable(rows, func(i, j int) bool { return rows[i].CostUSD > rows[j].CostUSD })
+	return costTotals{ChatTurns: chatTurns, Total: total, PerAgent: rows}
+}
+
+func renderCostReport(out io.Writer, sessionID string, t costTotals) {
+	fmt.Fprintf(out, "session %s: %d chat turns\n", sessionID, t.ChatTurns)
+	if len(t.PerAgent) == 0 {
+		fmt.Fprintln(out, "  (no recorded usage)")
+		return
+	}
+	fmt.Fprintf(out, "  %-12s %-16s %5s %8s %8s %10s\n", "ADAPTER", "TASK", "TURNS", "IN", "OUT", "COST")
+	for _, r := range t.PerAgent {
+		task := r.Task
+		if task == "" {
+			task = "-"
+		}
+		fmt.Fprintf(out, "  %-12s %-16s %5d %8d %8d $%9.4f\n",
+			r.AdapterID, task, r.Turns, r.InTokens, r.OutTokens, r.CostUSD)
+	}
+	fmt.Fprintln(out, "  "+strings.Repeat("─", 64))
+	fmt.Fprintf(out, "  %-12s %-16s %5d %8d %8d $%9.4f\n",
+		"TOTAL", "", t.Total.Turns, t.Total.InTokens, t.Total.OutTokens, t.Total.CostUSD)
 }
 
 func printHistory(out io.Writer, sess *Session) {
