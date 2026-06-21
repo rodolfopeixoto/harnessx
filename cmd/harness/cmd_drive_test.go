@@ -200,6 +200,42 @@ func TestNewDriveCmdRegistersFlags(t *testing.T) {
 	}
 }
 
+func TestExtractPythonBodyFromCodeFence(t *testing.T) {
+	cases := []string{
+		"sure. ```python\ndef test_x():\n    assert True\n```\nthanks.",
+		"```py\ndef test_x():\n    assert True\n```",
+		"```\ndef test_x():\n    assert True\n```",
+	}
+	for _, in := range cases {
+		body := extractPythonBody(in)
+		if !strings.Contains(body, "def test_x") {
+			t.Errorf("missing test func from %q: %q", in, body)
+		}
+	}
+}
+
+func TestExtractPythonBodyFallsThroughOnBareTest(t *testing.T) {
+	body := extractPythonBody("def test_foo(): assert True")
+	if !strings.Contains(body, "def test_foo") {
+		t.Errorf("bare test missed: %q", body)
+	}
+}
+
+func TestExtractPythonBodyEmptyWhenNoTest(t *testing.T) {
+	if extractPythonBody("no code here") != "" {
+		t.Error("want empty for no test/no fence")
+	}
+}
+
+func TestRenderTestEmitPromptIncludesFeatureSlug(t *testing.T) {
+	got := renderTestEmitPrompt("add stock field", "add-stock", "/p/proj")
+	for _, want := range []string{"add stock field", "add-stock", "/p/proj", "triple-backtick"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %q in prompt", want)
+		}
+	}
+}
+
 func TestDriveCommitWritesCommit(t *testing.T) {
 	dir := t.TempDir()
 	for _, args := range [][]string{

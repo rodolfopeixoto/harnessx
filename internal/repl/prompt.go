@@ -7,8 +7,10 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"github.com/chzyer/readline"
 	"golang.org/x/term"
@@ -53,7 +55,9 @@ func newPromptReader(in io.Reader, out io.Writer, historyPath string, completer 
 		return &bufioPromptReader{r: bufio.NewReader(in), w: out}
 	}
 	_, _ = io.WriteString(out, bracketedPasteEnableSeq)
-	return &readlinePromptReader{rl: rl, paste: paste, out: out}
+	r := &readlinePromptReader{rl: rl, paste: paste, out: out}
+	r.startWinch()
+	return r
 }
 
 func isTerminal(x interface{}) bool {
@@ -127,9 +131,29 @@ func readBackslashContinuation(r *bufio.Reader, w io.Writer, continuation string
 const hereDocMarker = `"""`
 
 type readlinePromptReader struct {
-	rl    *readline.Instance
-	paste *pasteCoalescingReader
-	out   io.Writer
+	rl     *readline.Instance
+	paste  *pasteCoalescingReader
+	out    io.Writer
+	winch  chan os.Signal
+	closed chan struct{}
+}
+
+func (r *readlinePromptReader) startWinch() {
+	r.winch = make(chan os.Signal, 1)
+	r.closed = make(chan struct{})
+	signal.Notify(r.winch, syscall.SIGWINCH)
+	go func() {
+		for {
+			select {
+			case <-r.closed:
+				return
+			case <-r.winch:
+				if r.rl != nil {
+					r.rl.Refresh()
+				}
+			}
+		}
+	}()
 }
 
 func (r *readlinePromptReader) ReadInput(prompt, continuation string) (string, error) {
@@ -176,6 +200,10 @@ func (r *readlinePromptReader) ReadInput(prompt, continuation string) (string, e
 }
 
 func (r *readlinePromptReader) Close() error {
+	if r.winch != nil {
+		signal.Stop(r.winch)
+		close(r.closed)
+	}
 	if r.out != nil {
 		_, _ = io.WriteString(r.out, bracketedPasteDisableSeq)
 	}
