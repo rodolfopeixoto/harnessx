@@ -43,9 +43,7 @@ def add_to_cart(user_id: str, product_id: str, quantity: int) -> Cart:
                 break
         else:
             cart.items.append(CartItem(product_id=product_id, quantity=quantity))
-        cart.total_cents = sum(
-            _PRODUCTS[i.product_id].price_cents * i.quantity for i in cart.items
-        )
+        cart.total_cents = sum(_PRODUCTS[i.product_id].price_cents * i.quantity for i in cart.items)
         _CARTS[user_id] = cart
         return cart
 

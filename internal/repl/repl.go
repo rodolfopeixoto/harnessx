@@ -366,14 +366,28 @@ func Run(ctx context.Context, opts Options) error {
 		sess.AutoGate = true
 	}
 	greet(opts.Out, sess)
-	rd := bufio.NewReader(opts.In)
+	labels := []string{}
+	for _, s := range opts.AdaptersList {
+		labels = append(labels, s)
+	}
+	if rows, err := ListSessions(opts.Root); err == nil {
+		for _, r := range rows {
+			if r.Label != "" {
+				labels = append(labels, r.Label)
+			}
+		}
+	}
+	historyPath := filepath.Join(opts.Root, ".harness", "sessions", sess.ID+".history")
+	prompter := newPromptReader(opts.In, opts.Out, historyPath, chatCompleter(opts.AdaptersList, labels))
+	defer prompter.Close()
 	for {
 		badge := ""
 		if opts.HealthProbe != nil {
 			badge = agenthealth.Badge(opts.HealthProbe.Snapshot(), opts.Plain)
 		}
-		fmt.Fprintf(opts.Out, "\n[%s%s]> ", sess.Goal, badge)
-		input, err := readMultilineInput(rd, opts.Out, sess.Goal)
+		prompt := fmt.Sprintf("\n[%s%s]> ", sess.Goal, badge)
+		continuation := fmt.Sprintf("[%s]… ", sess.Goal)
+		input, err := prompter.ReadInput(prompt, continuation)
 		if err != nil {
 			if errors.Is(err, io.EOF) {
 				break
