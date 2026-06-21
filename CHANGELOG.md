@@ -3,6 +3,30 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-21 — v0.132.0 — Wave 11 spec-driven, test-first `harness drive` (F97)
+
+### New
+
+- **`harness drive "<prompt>"`** (paper §3.4 PEV + §3.4.2 plan-as-
+  contract) chains the deterministic feature spec, a placeholder
+  pytest emitter routed through the cheap_review router chain, the
+  test-first red bar assertion, the implementation chain via
+  `harness do`, and the gate. On green it commits with a
+  `feat: <prompt>` conventional subject. The expensive model only
+  sees the spec + the test-shaped hole to fill, so per-feature
+  token spend stays bounded.
+- **`/drive <prompt>` slash command** in the chat REPL invokes the
+  same flow. `chat list` / `--replay` already track it via the
+  Action label and the mutating-input refuse list.
+
+### Notes
+
+The test-emit step today writes a placeholder failing test so the
+loop runs deterministically without an LLM bill (verified by the
+existing tutorial-smoke script and the new fake-adapter path).
+Future patches will swap in the cheap chain's actual emission once
+the cheap adapter prompt template is tuned.
+
 ## 2026-06-21 — v0.131.0 — Wave 11 humanised JSON stream + multi-agent routing (F96)
 
 ### Fixed
