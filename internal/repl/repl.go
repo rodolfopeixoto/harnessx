@@ -24,6 +24,7 @@ import (
 	"github.com/ropeixoto/harnessx/internal/intentplan"
 	"github.com/ropeixoto/harnessx/internal/platform/ids"
 	"github.com/ropeixoto/harnessx/internal/prompttpl"
+	"github.com/ropeixoto/harnessx/internal/ui"
 )
 
 type Session struct {
@@ -530,6 +531,9 @@ func handleInput(ctx context.Context, sess *Session, opts *Options, input string
 		turn.Action = "plan"
 		body, _ := plan.MarshalPretty()
 		fmt.Fprintln(opts.Out, string(body))
+	case input == "/", input == "/?":
+		turn.Action = "slash-menu"
+		printSlashMenu(opts.Out)
 	case input == "/help":
 		turn.Action = "help"
 		printHelp(opts.Out)
@@ -876,7 +880,10 @@ func chatTurnFor(ctx context.Context, sess *Session, opts Options, prompt, task 
 		fmt.Fprintln(opts.Out, "✗ no adapter wired")
 		return
 	}
-	fmt.Fprintf(opts.Out, "  [agent] calling %s (%s)…\n", adapterID, task)
+	fmt.Fprintf(opts.Out, "  %s %s %s\n",
+		ui.Accent.Render("[agent]"),
+		ui.Info.Render("calling "+adapterID),
+		ui.Muted.Render("("+task+")…"))
 	live := &prefixWriter{w: opts.Out, prefix: "  │ "}
 	timeout := opts.StepTimeout
 	if timeout <= 0 {
@@ -903,9 +910,12 @@ func chatTurnFor(ctx context.Context, sess *Session, opts Options, prompt, task 
 	if msg := strings.TrimSpace(res.Output.FinalMessage); msg != "" {
 		fmt.Fprintln(opts.Out, msg)
 	}
-	fmt.Fprintf(opts.Out, "  ✓ %s done in %s (in=%d out=%d ~$%.4f)\n",
-		adapterID, res.Duration.Round(time.Millisecond),
-		res.Usage.InputTokens, res.Usage.OutputTokens, res.Usage.EstimatedCostUSD)
+	fmt.Fprintf(opts.Out, "  %s %s %s\n",
+		ui.MarkSuccess(),
+		ui.Accent.Render(adapterID),
+		ui.Muted.Render(fmt.Sprintf("done in %s · in=%d out=%d · ~$%.4f",
+			res.Duration.Round(time.Millisecond),
+			res.Usage.InputTokens, res.Usage.OutputTokens, res.Usage.EstimatedCostUSD)))
 	if turn != nil {
 		turn.InTokens = res.Usage.InputTokens
 		turn.OutTokens = res.Usage.OutputTokens
@@ -1168,6 +1178,75 @@ func printTimeline(out io.Writer, sess *Session) {
 		fmt.Fprintf(out, "  %3d  %s  [%-15s] %s%s\n", i+1, clock, t.Action, input, cost)
 	}
 	fmt.Fprintf(out, "\n  total: %d turns, ~$%.4f\n", len(sess.Turns), total)
+}
+
+func printSlashMenu(out io.Writer) {
+	groups := []struct {
+		title string
+		items []slashEntry
+	}{
+		{"chat", []slashEntry{
+			{"plain text", "talk to pinned agent (implementation chain)"},
+			{"!<cmd>", "run shell command in project root"},
+			{"/exec <p>", "deterministic plan: do + lint + test + ci"},
+			{"/ship <p>", "branch + spec + loop + commit"},
+			{"/drive <p>", "spec → failing tests → impl → ci"},
+			{"/recap", "cheap chain summary of session so far"},
+		}},
+		{"gate", []slashEntry{
+			{"/ci", "harness ci"},
+			{"/test", "harness test"},
+			{"/lint", "harness lint"},
+			{"/auto-gate on|off", "run ci after each agent turn"},
+		}},
+		{"agents + cost", []slashEntry{
+			{"/agents", "list registered adapters"},
+			{"/use <id>", "switch active adapter"},
+			{"/cost", "per-adapter token + USD spend"},
+			{"/budget <usd|off>", "cap session spend"},
+			{"/timeline", "ASCII turn timeline"},
+			{"/diff", "git diff in project root"},
+		}},
+		{"memory", []slashEntry{
+			{"/clear", "drop conversation history"},
+			{"/history", "list previous prompts"},
+			{"/last", "replay previous prompt"},
+		}},
+		{"session", []slashEntry{
+			{"/save <name>", "label session for chat list"},
+			{"/branch <name>", "git checkout -B + auto-label"},
+			{"/save-prompt <n>", "capture last plain text template"},
+			{"/prompt <n>", "replay saved template"},
+			{"/prompts", "list saved templates"},
+			{"/goal <id>", "switch session goal"},
+			{"/plan <p>", "emit plan JSON without executing"},
+		}},
+		{"exit", []slashEntry{
+			{"/exit · /quit", "leave the session"},
+			{"/help", "long-form help"},
+		}},
+	}
+	fmt.Fprintln(out, ui.Heading.Render("slash commands"))
+	for _, g := range groups {
+		fmt.Fprintln(out, "  "+ui.Accent.Render(g.title))
+		for _, it := range g.items {
+			fmt.Fprintf(out, "    %s  %s\n",
+				ui.Info.Render(padRight(it.name, 22)),
+				ui.Muted.Render(it.desc))
+		}
+	}
+	fmt.Fprintln(out, ui.Muted.Render("  tip: ↑/↓ scrolls history, TAB completes a slash, /<TAB> shows all"))
+}
+
+type slashEntry struct {
+	name, desc string
+}
+
+func padRight(s string, w int) string {
+	if len(s) >= w {
+		return s
+	}
+	return s + strings.Repeat(" ", w-len(s))
 }
 
 func printAgents(opts Options) {

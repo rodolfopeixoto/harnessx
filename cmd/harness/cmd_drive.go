@@ -18,6 +18,7 @@ import (
 	"github.com/ropeixoto/harnessx/internal/app/agentcmd"
 	"github.com/ropeixoto/harnessx/internal/platform/constants"
 	"github.com/ropeixoto/harnessx/internal/router"
+	"github.com/ropeixoto/harnessx/internal/ui"
 )
 
 func newDriveCmd() *cobra.Command {
@@ -96,8 +97,13 @@ func runDrive(ctx context.Context, out io.Writer, opts driveOpts) error {
 	return driveImplLoop(ctx, out, opts)
 }
 
+func driveHeader(out io.Writer, step, title, hint string) {
+	fmt.Fprintln(out, ui.Accent.Render("drive "+step)+"  "+
+		ui.Heading.Render(title)+"  "+ui.Muted.Render(hint))
+}
+
 func driveSpec(ctx context.Context, out io.Writer, opts driveOpts) error {
-	fmt.Fprintln(out, "drive: 1/5 — harness feature (spec)")
+	driveHeader(out, "1/5", "spec", "— harness feature")
 	if err := runHarnessChild(ctx, opts.bin, opts.root, out,
 		[]string{"feature", opts.prompt, "--yes", "--plan-only"}); err != nil {
 		return fmt.Errorf("drive: spec step: %w", err)
@@ -106,42 +112,42 @@ func driveSpec(ctx context.Context, out io.Writer, opts driveOpts) error {
 }
 
 func driveTestEmit(ctx context.Context, out io.Writer, opts driveOpts) (string, error) {
-	fmt.Fprintln(out, "drive: 2/5 — test-emit (cheap chain)")
+	driveHeader(out, "2/5", "test-emit", "— cheap chain writes failing tests")
 	if reg, _, err := agentcmd.LoadAll(opts.root); err == nil {
 		rtr := router.New(reg, router.Defaults(reg))
 		if dec, derr := rtr.Select(constants.DriveTaskTestEmit); derr == nil && len(dec.Chain) > 0 {
-			fmt.Fprintf(out, "drive: routing test-emit through %s (%s)\n",
-				dec.Chain[0].ID(), constants.DriveTaskTestEmit)
+			fmt.Fprintln(out, "  "+ui.Info.Render("routing through "+dec.Chain[0].ID())+
+				ui.Muted.Render(" ("+constants.DriveTaskTestEmit+")"))
 		}
 	}
 	return writePlaceholderTest(opts)
 }
 
 func driveExpectRedTests(ctx context.Context, out io.Writer, opts driveOpts) bool {
-	fmt.Fprintln(out, "drive: 3/5 — harness test (expect red)")
+	driveHeader(out, "3/5", "test", "— expecting red bar")
 	if err := runHarnessChild(ctx, opts.bin, opts.root, out, []string{"test"}); err == nil {
 		return false
 	}
-	fmt.Fprintln(out, "drive: tests red as expected")
+	fmt.Fprintln(out, "  "+ui.MarkSuccess()+" "+ui.Muted.Render("tests red as expected"))
 	return true
 }
 
 func driveImplLoop(ctx context.Context, out io.Writer, opts driveOpts) error {
 	preSnapshot := gitTreeSnapshot(ctx, opts.root)
 	for attempt := 1; attempt <= opts.maxAttempts; attempt++ {
-		fmt.Fprintf(out, "drive: 4/5 — harness do attempt %d/%d (implementation chain)\n",
-			attempt, opts.maxAttempts)
+		driveHeader(out, "4/5", "impl",
+			fmt.Sprintf("— harness do attempt %d/%d (implementation chain)", attempt, opts.maxAttempts))
 		if err := runHarnessChild(ctx, opts.bin, opts.root, out,
 			[]string{"do", opts.prompt, "--yes", "--autonomy", opts.autonomy}); err != nil {
-			fmt.Fprintf(out, "drive: harness do failed (%v); retrying\n", err)
+			fmt.Fprintln(out, "  "+ui.MarkWarn()+" "+ui.Warn.Render(fmt.Sprintf("harness do failed (%v); retrying", err)))
 			continue
 		}
 		if gitTreeSnapshot(ctx, opts.root) == preSnapshot {
 			return fmt.Errorf("drive: agent produced no changes — prompt may be incomplete or ambiguous; refine and re-run /drive")
 		}
-		fmt.Fprintln(out, "drive: 5/5 — harness ci")
+		driveHeader(out, "5/5", "gate", "— harness ci")
 		if err := runHarnessChild(ctx, opts.bin, opts.root, out, []string{"ci"}); err == nil {
-			fmt.Fprintln(out, "drive: ✓ green")
+			fmt.Fprintln(out, "  "+ui.MarkSuccess()+" "+ui.Success.Render("green"))
 			if opts.skipCommit {
 				return nil
 			}
@@ -218,7 +224,7 @@ func driveCommit(ctx context.Context, out io.Writer, opts driveOpts) error {
 			return err
 		}
 	}
-	fmt.Fprintln(out, "drive: ✓ committed "+subject)
+	fmt.Fprintln(out, "  "+ui.MarkSuccess()+" "+ui.Success.Render("committed ")+ui.Heading.Render(subject))
 	return nil
 }
 

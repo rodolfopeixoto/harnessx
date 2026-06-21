@@ -3,6 +3,26 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-21 — v0.136.0 — Wave 12: REPL polish, slash menu, colored drive output (F101)
+
+### New
+
+- **Type `/` (or `/?`) at the prompt to open the grouped slash
+  menu** — chat / gate / agents+cost / memory / session / exit.
+  Saves users from memorising the 30 slashes; the existing
+  `/help` long-form still works for anyone scripting against it.
+- **Chat header + drive output are colourised** via lipgloss
+  styles already shipped in `internal/ui`. `[agent] calling X
+  (task)…` and `✓ done · in=… out=… ~$…` use accent + info +
+  muted styles; `drive 1/5 spec — harness feature` and the
+  `committed feat:` line use heading + success. `--plain` /
+  `HARNESS_PLAIN=1` still suppresses every ANSI escape.
+
+### Tests
+
+- `TestRunSlashAloneShowsMenu`, `TestPrintSlashMenuQuestionMark`,
+  `TestPadRightFillsToWidth` — slash menu happy path + helper.
+
 ## 2026-06-21 — v0.135.0 — Wave 12: drive no-op abort, per-model cost, py dev tools (F100)
 
 ### Fixed
