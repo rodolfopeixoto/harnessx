@@ -3,6 +3,57 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-21 — v0.134.0 — Wave 11 cleanup: SOLID + constants + coverage (F99)
+
+### Changed
+
+- **Wave 11 code reaudited against CLAUDE.md house rules.** `cmd_drive`,
+  `stream_json`, and `prompt` no longer carry WHAT-comments — only the
+  rare WHY remains where a future reader would otherwise be surprised
+  by intent. Files reorganised for single-responsibility: `runDrive`
+  delegates to `driveSpec`, `driveTestEmit`, `driveExpectRedTests`,
+  `driveImplLoop`, `driveCommit`; `stream_json` splits `handleEvent` /
+  `renderAssistantBlock` / `renderToolUse` / `emitIfPath`; `prompt`
+  factors `readBackslashContinuation` and `toPcItems` so both
+  prompters share one continuation contract.
+- **Magic strings + ints moved to `internal/platform/constants`** under
+  new `Chat REPL UI` and `Drive command` sections (gutter prefix,
+  thinking frame ms, history suffix, chat result/bash/grep/glob/raw
+  caps, recap byte cap, label max, test-file prefix/suffix, commit
+  type, slug max, default autonomy, task tags). Files reference the
+  shared names; future drift gets caught at the constants file.
+
+### New tests (raise coverage on wave 11 surface)
+
+- `internal/agents/yaml/stream_json_test.go` — tool_use branches
+  (Edit/Grep/Glob/unknown), `Flush` partial line, `user` and
+  `rate_limit_event` swallow, `system.init` dedup, `jsonString`
+  nil/garbage/missing/wrong-type paths, `jsonFormat` aliases,
+  `truncForChat` boundary.
+- `internal/repl/prompt_test.go` — bufio reader single-line,
+  backslash continuation, EOF, `Close`, non-TTY fallback,
+  `isTerminal` negative, `chatCompleter` tree, `toPcItems` order,
+  `asReadCloser` plain reader.
+- `cmd/harness/cmd_drive_test.go` — `sanitisePyIdent` table,
+  `truncSubject` edges, `conventionalDriveSubject` length budget,
+  `renderPlaceholderTest` content, `writePlaceholderTest` on-disk,
+  `runHarnessChild` exit-code propagation, `runGitInDir` error,
+  `driveCommit` real git, `runDrive` spec failure + already-green
+  short-circuit, `driveExpectRedTests` both branches, `driveImplLoop`
+  green + exhaustion, `driveTestEmit` no-agents fallback,
+  `newDriveCmd` flag registration.
+
+Coverage on the wave 11 files now reads:
+
+| file                                     | coverage |
+|-----------------------------------------|---------:|
+| `internal/agents/yaml/stream_json.go`   | 96.6 %  |
+| `internal/repl/prompt.go` (bufio path)  | 88.2 %  |
+| `cmd/harness/cmd_drive.go` (business)   | 93.1 %  |
+
+The remaining gaps are the readline TTY branch (needs a pty harness)
+and the cobra `RunE` closure (covered by tutorial-smoke end-to-end).
+
 ## 2026-06-21 — v0.133.0 — Wave 11 tutorial rewrite around `harness drive` (F98)
 
 ### Changed
