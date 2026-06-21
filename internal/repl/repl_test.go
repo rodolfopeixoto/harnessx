@@ -917,6 +917,98 @@ func TestAdapterBillingModeKnownIDs(t *testing.T) {
 	}
 }
 
+func TestSuggestSlashPicksClosestMatch(t *testing.T) {
+	var buf bytes.Buffer
+	suggestSlash(&buf, "/drv")
+	if !strings.Contains(buf.String(), "/drive") {
+		t.Errorf("want /drive suggestion, got %q", buf.String())
+	}
+	if !strings.Contains(buf.String(), "did you mean") {
+		t.Errorf("missing 'did you mean' phrasing: %q", buf.String())
+	}
+}
+
+func TestSuggestSlashEmptyDoesNothing(t *testing.T) {
+	var buf bytes.Buffer
+	suggestSlash(&buf, "")
+	if buf.Len() != 0 {
+		t.Errorf("empty attempt should print nothing, got %q", buf.String())
+	}
+}
+
+func TestSuggestSlashFarAttemptFallsBack(t *testing.T) {
+	var buf bytes.Buffer
+	suggestSlash(&buf, "/totally-unrelated-name-here")
+	if !strings.Contains(buf.String(), "/ for the menu") {
+		t.Errorf("missing fallback message: %q", buf.String())
+	}
+}
+
+func TestFirstToken(t *testing.T) {
+	cases := map[string]string{
+		"/drive foo bar": "/drive",
+		"/cost":          "/cost",
+		"  /agents  ":    "/agents",
+		"":               "",
+	}
+	for in, want := range cases {
+		if got := firstToken(in); got != want {
+			t.Errorf("firstToken(%q)=%q want %q", in, got, want)
+		}
+	}
+}
+
+func TestSummariseSessionPrintsRecap(t *testing.T) {
+	sess := &Session{
+		ID: "01ABC", Goal: intentplan.GoalDev, Label: "ecommerce",
+		Turns: []Turn{
+			{Action: "chat", AdapterID: "claude", InTokens: 100, OutTokens: 50, CostUSD: 0.10},
+			{Action: "save", Input: "/save x"},
+		},
+	}
+	var buf bytes.Buffer
+	summariseSession(&buf, sess)
+	for _, want := range []string{"session recap", "01ABC", "ecommerce", "dev", "turns  2", "tokens", "0.1000"} {
+		if !strings.Contains(buf.String(), want) {
+			t.Errorf("missing %q\n%s", want, buf.String())
+		}
+	}
+}
+
+func TestSummariseSessionEmpty(t *testing.T) {
+	var buf bytes.Buffer
+	summariseSession(&buf, &Session{})
+	if buf.Len() != 0 {
+		t.Errorf("empty session should print nothing, got %q", buf.String())
+	}
+}
+
+func TestRunUnknownSlashSuggests(t *testing.T) {
+	bin := writeFakeBin(t, "#!/bin/sh\nexit 0\n")
+	var buf bytes.Buffer
+	_ = Run(context.Background(), Options{
+		Root: t.TempDir(), HarnessBin: bin, Goal: intentplan.GoalDev,
+		In:  strings.NewReader("/drv\n/exit\n"),
+		Out: &buf,
+	})
+	if !strings.Contains(buf.String(), "/drive") {
+		t.Errorf("expected /drive suggestion: %s", buf.String())
+	}
+}
+
+func TestRunExitPrintsRecap(t *testing.T) {
+	bin := writeFakeBin(t, "#!/bin/sh\nexit 0\n")
+	var buf bytes.Buffer
+	_ = Run(context.Background(), Options{
+		Root: t.TempDir(), HarnessBin: bin, Goal: intentplan.GoalDev,
+		In:  strings.NewReader("/help\n/exit\n"),
+		Out: &buf,
+	})
+	if !strings.Contains(buf.String(), "session recap") {
+		t.Errorf("missing recap on exit: %s", buf.String())
+	}
+}
+
 func TestRunIgnoresBlankLines(t *testing.T) {
 	bin := writeFakeBin(t, "#!/bin/sh\nexit 0\n")
 	var out bytes.Buffer

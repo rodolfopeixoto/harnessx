@@ -407,6 +407,7 @@ func Run(ctx context.Context, opts Options) error {
 			continue
 		}
 		if shouldExit(input) {
+			summariseSession(opts.Out, &sess)
 			fmt.Fprintln(opts.Out, "bye")
 			break
 		}
@@ -550,6 +551,11 @@ func handleInput(ctx context.Context, sess *Session, opts *Options, input string
 		fmt.Fprintf(opts.Out, "↻ replaying: %s\n", last)
 		return handleInput(ctx, sess, opts, last)
 	default:
+		if strings.HasPrefix(input, "/") {
+			turn.Action = "slash-unknown"
+			suggestSlash(opts.Out, firstToken(input))
+			return turn
+		}
 		if opts.Adapter != nil {
 			if !checkBudget(sess, opts.Out) {
 				turn.Action = "budget-exceeded"
@@ -1179,6 +1185,81 @@ func printTimeline(out io.Writer, sess *Session) {
 		fmt.Fprintf(out, "  %3d  %s  [%-15s] %s%s\n", i+1, clock, t.Action, input, cost)
 	}
 	fmt.Fprintf(out, "\n  total: %d turns, ~$%.4f\n", len(sess.Turns), total)
+}
+
+var knownSlashes = []string{
+	"/help", "/exit", "/quit", "/history", "/last",
+	"/agents", "/cost", "/diff", "/clear", "/timeline",
+	"/auto-gate", "/autogate",
+	"/save", "/branch", "/recap",
+	"/save-prompt", "/prompt", "/prompts",
+	"/exec", "/do", "/ship", "/drive", "/ci", "/test", "/lint",
+	"/use", "/budget", "/goal", "/plan",
+}
+
+func firstToken(s string) string {
+	s = strings.TrimSpace(s)
+	if idx := strings.IndexAny(s, " \t"); idx > 0 {
+		return s[:idx]
+	}
+	return s
+}
+
+func suggestSlash(out io.Writer, attempt string) {
+	if attempt == "" {
+		return
+	}
+	best := ""
+	bestScore := 999
+	for _, c := range knownSlashes {
+		score := slashScore(attempt, c)
+		if score < bestScore {
+			bestScore = score
+			best = c
+		}
+	}
+	if best == "" || bestScore > 6 {
+		fmt.Fprintf(out, "  %s unknown slash %q. try / for the menu or /help for long-form\n", ui.MarkWarn(), attempt)
+		return
+	}
+	fmt.Fprintf(out, "  %s unknown slash %q — did you mean %s? (/ for menu, /help for long-form)\n",
+		ui.MarkWarn(), attempt, ui.Accent.Render(best))
+}
+
+func slashScore(attempt, candidate string) int {
+	dist := levenshtein(attempt, candidate)
+	prefix := commonPrefixLen(attempt, candidate)
+	return dist*2 - prefix
+}
+
+func commonPrefixLen(a, b string) int {
+	n := len(a)
+	if len(b) < n {
+		n = len(b)
+	}
+	for i := 0; i < n; i++ {
+		if a[i] != b[i] {
+			return i
+		}
+	}
+	return n
+}
+
+func summariseSession(out io.Writer, sess *Session) {
+	if sess == nil || len(sess.Turns) == 0 {
+		return
+	}
+	totals := aggregateCost(sess.Turns)
+	fmt.Fprintln(out, ui.Heading.Render("session recap"))
+	fmt.Fprintf(out, "  %s id     %s\n", ui.Muted.Render("·"), ui.Accent.Render(sess.ID))
+	if sess.Label != "" {
+		fmt.Fprintf(out, "  %s label  %s\n", ui.Muted.Render("·"), ui.Accent.Render(sess.Label))
+	}
+	fmt.Fprintf(out, "  %s goal   %s\n", ui.Muted.Render("·"), string(sess.Goal))
+	fmt.Fprintf(out, "  %s turns  %d (chat=%d)\n", ui.Muted.Render("·"), len(sess.Turns), totals.ChatTurns)
+	fmt.Fprintf(out, "  %s tokens in=%d out=%d\n", ui.Muted.Render("·"), totals.Total.InTokens, totals.Total.OutTokens)
+	fmt.Fprintf(out, "  %s cost   %s\n", ui.Muted.Render("·"),
+		ui.Success.Render(fmt.Sprintf("$%.4f", totals.Total.CostUSD)))
 }
 
 // adapterBillingMode tells the user whether the adapter is going to
