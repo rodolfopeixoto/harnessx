@@ -897,6 +897,26 @@ func TestPadRightFillsToWidth(t *testing.T) {
 	}
 }
 
+func TestAdapterBillingModeKnownIDs(t *testing.T) {
+	cases := map[string]string{
+		"claude":             "oneshot · API-billed",
+		"codex":              "oneshot · API-billed",
+		"gemini":             "oneshot · API-billed",
+		"anthropic-api":      "oneshot · API-billed",
+		"openai-api":         "oneshot · API-billed",
+		"kimi":               "interactive · plan/local",
+		"claude-interactive": "interactive · plan/local",
+		"ollama":             "interactive · plan/local",
+		"fake":               "fake · free",
+		"unknown":            "unknown billing",
+	}
+	for id, want := range cases {
+		if got := adapterBillingMode(id); got != want {
+			t.Errorf("adapterBillingMode(%q)=%q want %q", id, got, want)
+		}
+	}
+}
+
 func TestRunIgnoresBlankLines(t *testing.T) {
 	bin := writeFakeBin(t, "#!/bin/sh\nexit 0\n")
 	var out bytes.Buffer

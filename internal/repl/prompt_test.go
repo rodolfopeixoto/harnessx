@@ -42,6 +42,23 @@ func TestBufioPromptReaderHandlesBackslashContinuation(t *testing.T) {
 	}
 }
 
+func TestBufioPromptReaderHandlesTripleQuoteHeredoc(t *testing.T) {
+	out := &bytes.Buffer{}
+	r := &bufioPromptReader{r: bufioReader("\"\"\"\nline one\nline two\nthird\n\"\"\"\n"), w: out}
+	got, err := r.ReadInput(">> ", "→ ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"line one", "line two", "third"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("heredoc missing %q in %q", want, got)
+		}
+	}
+	if strings.Contains(got, hereDocMarker) {
+		t.Errorf("heredoc marker leaked into payload: %q", got)
+	}
+}
+
 func TestBufioPromptReaderEOF(t *testing.T) {
 	r := &bufioPromptReader{r: bufioReader(""), w: io.Discard}
 	if _, err := r.ReadInput(">> ", "..."); err == nil {

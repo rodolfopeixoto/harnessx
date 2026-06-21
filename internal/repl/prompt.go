@@ -92,12 +92,26 @@ func (b *bufioPromptReader) Close() error { return nil }
 
 func readBackslashContinuation(r *bufio.Reader, w io.Writer, continuation string) ([]string, error) {
 	var parts []string
+	heredoc := false
 	for {
 		line, err := r.ReadString('\n')
 		if err != nil && line == "" {
 			return nil, err
 		}
 		trimmed := strings.TrimRight(line, "\n")
+		if heredoc {
+			if strings.TrimSpace(trimmed) == hereDocMarker {
+				return parts, nil
+			}
+			parts = append(parts, trimmed)
+			_, _ = fmt.Fprint(w, continuation)
+			continue
+		}
+		if strings.TrimSpace(trimmed) == hereDocMarker {
+			heredoc = true
+			_, _ = fmt.Fprint(w, continuation)
+			continue
+		}
 		if strings.HasSuffix(trimmed, "\\") {
 			parts = append(parts, strings.TrimSuffix(trimmed, "\\"))
 			_, _ = fmt.Fprint(w, continuation)
@@ -108,6 +122,8 @@ func readBackslashContinuation(r *bufio.Reader, w io.Writer, continuation string
 	}
 }
 
+const hereDocMarker = `"""`
+
 type readlinePromptReader struct {
 	rl *readline.Instance
 }
@@ -115,12 +131,14 @@ type readlinePromptReader struct {
 func (r *readlinePromptReader) ReadInput(prompt, continuation string) (string, error) {
 	r.rl.SetPrompt(prompt)
 	var parts []string
+	heredoc := false
 	for {
 		line, err := r.rl.Readline()
 		if err != nil {
 			if err == readline.ErrInterrupt {
 				if len(parts) > 0 {
 					parts = parts[:0]
+					heredoc = false
 					r.rl.SetPrompt(prompt)
 					continue
 				}
@@ -129,6 +147,19 @@ func (r *readlinePromptReader) ReadInput(prompt, continuation string) (string, e
 			return "", err
 		}
 		trimmed := strings.TrimRight(line, "\n")
+		if heredoc {
+			if strings.TrimSpace(trimmed) == hereDocMarker {
+				break
+			}
+			parts = append(parts, trimmed)
+			r.rl.SetPrompt(continuation)
+			continue
+		}
+		if strings.TrimSpace(trimmed) == hereDocMarker {
+			heredoc = true
+			r.rl.SetPrompt(continuation)
+			continue
+		}
 		if strings.HasSuffix(trimmed, "\\") {
 			parts = append(parts, strings.TrimSuffix(trimmed, "\\"))
 			r.rl.SetPrompt(continuation)
