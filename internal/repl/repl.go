@@ -435,6 +435,10 @@ func handleInput(ctx context.Context, sess *Session, opts *Options, input string
 		args := []string{"ship", strings.TrimSpace(strings.TrimPrefix(input, "/ship ")), "--yes", "--allow-dirty"}
 		runHarnessCmd(ctx, *opts, args)
 		turn.Action = "ship"
+	case strings.HasPrefix(input, "/drive "):
+		args := []string{"drive", strings.TrimSpace(strings.TrimPrefix(input, "/drive "))}
+		runHarnessCmd(ctx, *opts, args)
+		turn.Action = "drive"
 	case strings.HasPrefix(input, "/ci"):
 		runHarnessCmd(ctx, *opts, []string{"ci"})
 		turn.Action = "ci"
@@ -638,7 +642,7 @@ func isMutatingInput(input string) bool {
 		return true
 	}
 	mutating := []string{
-		"/exec ", "/do ", "/ship ", "/ci", "/test", "/lint",
+		"/exec ", "/do ", "/ship ", "/drive ", "/ci", "/test", "/lint",
 		"/use ", "/budget ", "/auto-gate", "/autogate",
 		"/clear", "/save ", "/recap", "/plan ", "/goal ",
 		"/last", "/branch ", "/save-prompt ", "/prompt ",
@@ -1112,6 +1116,7 @@ func printHelp(out io.Writer) {
 	fmt.Fprintln(out, "  /exec <prompt>                 deterministic plan: do + lint + test + ci")
 	fmt.Fprintln(out, "  /do <prompt>                   alias for /exec")
 	fmt.Fprintln(out, "  /ship <prompt>                 harness ship (branch + spec + loop + commit)")
+	fmt.Fprintln(out, "  /drive <prompt>                spec → failing tests → impl → ci (paper §3.4)")
 	fmt.Fprintln(out, "  /ci | /test | /lint            run harness gate")
 	fmt.Fprintln(out, "  /agents                        list registered adapters; mark active")
 	fmt.Fprintln(out, "  /use <id>                      switch adapter mid-session")
