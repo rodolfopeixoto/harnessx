@@ -236,6 +236,75 @@ func TestRenderTestEmitPromptIncludesFeatureSlug(t *testing.T) {
 	}
 }
 
+func TestLoadFeatureFileSkipsBlanksAndComments(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "features.md")
+	body := `# header comment
+
+- first feature
+* second feature
+third feature plain
+
+# another comment
+- fourth feature
+`
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got, err := loadFeatureFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{
+		"first feature",
+		"second feature",
+		"third feature plain",
+		"fourth feature",
+	}
+	if len(got) != len(want) {
+		t.Fatalf("want %d, got %d: %v", len(want), len(got), got)
+	}
+	for i, w := range want {
+		if got[i] != w {
+			t.Errorf("pos %d: got %q want %q", i, got[i], w)
+		}
+	}
+}
+
+func TestLoadFeatureFileMissingErrors(t *testing.T) {
+	if _, err := loadFeatureFile("/nope/file.md"); err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestRunDriveBatchContinuesOnFail(t *testing.T) {
+	out := &bytes.Buffer{}
+	err := runDriveBatch(context.Background(), out, driveOpts{
+		root: t.TempDir(), bin: "/usr/bin/false",
+		autonomy: "safe_execute", maxAttempts: 1,
+	}, []string{"a", "b"}, true)
+	if err == nil {
+		t.Fatal("want error reporting failures")
+	}
+	if !strings.Contains(err.Error(), "2 of 2 features failed") {
+		t.Errorf("want batch failure summary, got %v", err)
+	}
+}
+
+func TestRunDriveBatchAbortsByDefault(t *testing.T) {
+	out := &bytes.Buffer{}
+	err := runDriveBatch(context.Background(), out, driveOpts{
+		root: t.TempDir(), bin: "/usr/bin/false",
+		autonomy: "safe_execute", maxAttempts: 1,
+	}, []string{"a", "b"}, false)
+	if err == nil {
+		t.Fatal("want abort error")
+	}
+	if !strings.Contains(err.Error(), "aborted on feature 1/2") {
+		t.Errorf("want first-feature abort, got %v", err)
+	}
+}
+
 func TestDriveCommitWritesCommit(t *testing.T) {
 	dir := t.TempDir()
 	for _, args := range [][]string{

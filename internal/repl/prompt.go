@@ -37,10 +37,12 @@ func newPromptReader(in io.Reader, out io.Writer, historyPath string, completer 
 		_ = os.MkdirAll(filepath.Dir(historyPath), 0o755)
 	}
 	paste := newPasteCoalescingReader(asReadCloser(in))
+	suggester := newSlashSuggester(out)
 	cfg := &readline.Config{
 		HistoryFile:            historyPath,
 		HistorySearchFold:      true,
 		AutoComplete:           completer,
+		Listener:               suggester.Listener(),
 		InterruptPrompt:        "^C",
 		EOFPrompt:              "exit",
 		DisableAutoSaveHistory: false,

@@ -25,13 +25,15 @@ import (
 
 func newDriveCmd() *cobra.Command {
 	var (
-		slug        string
-		autonomy    string
-		maxAttempts int
-		skipCommit  bool
+		slug           string
+		autonomy       string
+		maxAttempts    int
+		skipCommit     bool
+		featuresPath   string
+		continueOnFail bool
 	)
 	c := &cobra.Command{
-		Use:   "drive <prompt>",
+		Use:   "drive [<prompt>]",
 		Short: "Spec → failing tests → impl → ci loop (paper §3.4 PEV)",
 		Long: `Deterministic test-first cycle:
 
@@ -40,10 +42,12 @@ func newDriveCmd() *cobra.Command {
   3. harness test      → asserts the new tests fail (red bar)
   4. harness do        → implementation LLM fills them in
   5. harness ci        → gate
-  6. conventional commit on green (unless --skip-commit)`,
-		Args: cobra.MinimumNArgs(1),
+  6. conventional commit on green (unless --skip-commit)
+
+Pass --features <file.md> to drive a backlog: one prompt per
+non-empty, non-comment line (bullet "- " prefix optional).`,
+		Args: cobra.MinimumNArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			prompt := strings.Join(args, " ")
 			dir, err := cwd()
 			if err != nil {
 				return err
@@ -52,6 +56,23 @@ func newDriveCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			if featuresPath != "" {
+				prompts, err := loadFeatureFile(featuresPath)
+				if err != nil {
+					return err
+				}
+				if len(prompts) == 0 {
+					return fmt.Errorf("drive: --features %s yielded zero prompts", featuresPath)
+				}
+				return runDriveBatch(cmd.Context(), cmd.OutOrStdout(), driveOpts{
+					root: dir, bin: bin, autonomy: autonomy,
+					maxAttempts: maxAttempts, skipCommit: skipCommit,
+				}, prompts, continueOnFail)
+			}
+			if len(args) == 0 {
+				return fmt.Errorf("drive: pass a prompt or --features <file>")
+			}
+			prompt := strings.Join(args, " ")
 			if slug == "" {
 				slug = slugify(prompt)
 			}
@@ -65,7 +86,53 @@ func newDriveCmd() *cobra.Command {
 	c.Flags().StringVar(&autonomy, "autonomy", constants.DriveAutonomyDefault, "autonomy forwarded to harness do")
 	c.Flags().IntVar(&maxAttempts, "max-attempts", constants.DriveDefaultMaxAttempt, "max impl→ci attempts")
 	c.Flags().BoolVar(&skipCommit, "skip-commit", false, "do not commit on green")
+	c.Flags().StringVar(&featuresPath, "features", "", "path to a markdown file; one prompt per line")
+	c.Flags().BoolVar(&continueOnFail, "continue-on-fail", false, "with --features: keep going after a failed feature")
 	return c
+}
+
+func runDriveBatch(ctx context.Context, out io.Writer, base driveOpts, prompts []string, continueOnFail bool) error {
+	fmt.Fprintln(out, ui.Heading.Render(fmt.Sprintf("drive: %d feature(s) queued", len(prompts))))
+	var failed []string
+	for i, p := range prompts {
+		fmt.Fprintln(out, ui.Accent.Render(fmt.Sprintf("\n=== feature %d/%d ===", i+1, len(prompts))))
+		opts := base
+		opts.prompt = p
+		opts.slug = slugify(p)
+		if err := runDrive(ctx, out, opts); err != nil {
+			fmt.Fprintln(out, "  "+ui.MarkFail()+" "+ui.Error.Render(err.Error()))
+			failed = append(failed, p)
+			if !continueOnFail {
+				return fmt.Errorf("drive batch aborted on feature %d/%d: %w", i+1, len(prompts), err)
+			}
+		}
+	}
+	if len(failed) > 0 {
+		return fmt.Errorf("drive batch: %d of %d features failed", len(failed), len(prompts))
+	}
+	fmt.Fprintln(out, ui.Success.Render(fmt.Sprintf("drive batch: all %d features green", len(prompts))))
+	return nil
+}
+
+func loadFeatureFile(path string) ([]string, error) {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("drive: read features %s: %w", path, err)
+	}
+	var prompts []string
+	for _, line := range strings.Split(string(raw), "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		trimmed = strings.TrimPrefix(trimmed, "- ")
+		trimmed = strings.TrimPrefix(trimmed, "* ")
+		if trimmed == "" {
+			continue
+		}
+		prompts = append(prompts, trimmed)
+	}
+	return prompts, nil
 }
 
 type driveOpts struct {

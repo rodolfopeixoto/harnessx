@@ -3,6 +3,47 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-21 — v0.143.0 — Wave 17: inline / popup + drive --features + onboarding + VCR adapter (F108)
+
+### New
+
+- **Inline `/` popup in chat REPL** via chzyer/readline's
+  `Listener` interface. `internal/repl/slash_popup.go` watches
+  every key, matches the typed slash prefix against the static
+  command list, and renders up to 6 candidates under the prompt
+  (TAB still completes via the existing PrefixCompleter). Cursor
+  is preserved with save/restore escapes, the strip clears as
+  soon as the buffer stops looking like a slash. 8 unit tests
+  cover prefix match, exact-match suppression, args-tail
+  handling, render+clear, idempotent clear, nil-writer safety,
+  and the row cap.
+- **`harness drive --features <file.md>`** chains a backlog: one
+  prompt per non-empty/non-comment line, leading `- ` or `* `
+  bullet stripped. `--continue-on-fail` keeps going after a
+  failed feature and surfaces the count at the end. Header for
+  every feature: `=== feature i/N ===`. 4 unit tests cover file
+  parsing + abort-by-default + continue-on-fail.
+- **`harness onboarding`** detects the seven system tools (git,
+  python3, node, uv, rg, jq, rclone) and the five bundled agent
+  CLIs (claude, codex, gemini, kimi, ollama), prints version
+  lines for what's installed and per-tool install hints for
+  what's not. Picks a suggested adapter (preferring registered
+  bundled ones in claude/codex/kimi/gemini/ollama order),
+  prints a 5-step next-actions list (`harness use`, `harness
+  new`, `harness chat --auto-gate`, `/drive`, tutorial pointer).
+  6 unit tests cover the helpers + render shape.
+- **`internal/agents/vcr`** wraps any AgentAdapter to record real
+  CLI output on first call (fingerprint = SHA-1 of adapter id +
+  model + working-dir basename + prompt) and replay it on every
+  subsequent call. Three modes: `ModeAuto` (default — replay if
+  cassette exists else record), `ModeReplay` (error on missing
+  cassette), `ModeRecord` (always re-record). Lets E2E tests
+  exercise the real Claude JSON-Lines / Codex exec stream
+  without burning tokens. 9 unit tests cover record→replay,
+  replay-missing-error, force-rerecord, fingerprint stability +
+  invalidation, save/load round-trip, error restoration, and
+  delegation of ParseUsage/ClassifyFailure.
+
 ## 2026-06-21 — v0.142.0 — Wave 16: Windows build fix (F107)
 
 ### Fixed
