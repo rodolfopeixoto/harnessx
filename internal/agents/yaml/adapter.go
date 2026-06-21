@@ -132,8 +132,17 @@ func (a *Adapter) Run(ctx context.Context, req agents.AgentRequest) agents.Agent
 	var stdout, stderr []byte
 	var code int
 	var err error
-	if req.LiveOut != nil {
-		stdout, stderr, code, err = runStreamed(rctx, a.Spec.Command.Binary, args, stdin, wd, req.LiveOut)
+	live := req.LiveOut
+	var jsonFmt *jsonStreamFormatter
+	if live != nil && jsonFormat(a.Spec.Output.Format) {
+		jsonFmt = newJSONStreamFormatter(live)
+		live = jsonFmt
+	}
+	if live != nil {
+		stdout, stderr, code, err = runStreamed(rctx, a.Spec.Command.Binary, args, stdin, wd, live)
+		if jsonFmt != nil {
+			jsonFmt.Flush()
+		}
 	} else {
 		stdout, stderr, code, err = a.Runner.Run(rctx, a.Spec.Command.Binary, args, stdin, wd)
 	}

@@ -66,6 +66,11 @@ type Options struct {
 	AutoGate     bool
 	AdaptersList []string
 	SwitchTo     func(id string) (agents.AgentAdapter, string, error)
+	// Route selects an adapter from the registry for the given task tag
+	// (planning, implementation, cheap_review, …). Lets `/plan` go to a
+	// cheap model and plain text go to the implementation chain
+	// without the REPL needing to import the router package directly.
+	Route func(task string) (agents.AgentAdapter, string, error)
 	// NoAdapter is true when the user passed --no-adapter; plain text
 	// is refused with a clear message instead of falling into the
 	// deterministic-planner harness do loop, which routinely takes
@@ -761,12 +766,15 @@ func setSessionLabel(sess *Session, out io.Writer, label string) {
 // current session and prints the reply inline. Useful at the end of a
 // long chat to capture intent + decisions into the persistence layer.
 // Falls back to a deterministic bullet list when no adapter is wired.
+// recapSession asks the cheapest review model to summarise the session
+// — typically gemini/kimi according to the cheap_review route — so
+// the recap does not burn opus tokens just to bullet-list intent.
 func recapSession(ctx context.Context, sess *Session, opts Options, turn *Turn) {
 	if sess == nil || len(sess.Turns) == 0 {
 		fmt.Fprintln(opts.Out, "  no turns to recap yet")
 		return
 	}
-	if opts.Adapter == nil {
+	if opts.Adapter == nil && opts.Route == nil {
 		fmt.Fprintln(opts.Out, "  [recap] (no adapter wired — listing inputs)")
 		for i, t := range sess.Turns {
 			if t.Input == "" {
@@ -777,7 +785,7 @@ func recapSession(ctx context.Context, sess *Session, opts Options, turn *Turn) 
 		return
 	}
 	prompt := buildRecapPrompt(sess)
-	chatTurn(ctx, sess, opts, prompt, turn)
+	chatTurnFor(ctx, sess, opts, prompt, "cheap_review", turn)
 }
 
 func buildRecapPrompt(sess *Session) string {
@@ -841,7 +849,27 @@ func executePlan(ctx context.Context, sess *Session, opts Options, prompt string
 }
 
 func chatTurn(ctx context.Context, sess *Session, opts Options, prompt string, turn *Turn) {
-	fmt.Fprintf(opts.Out, "  [agent] calling %s…\n", opts.AdapterID)
+	chatTurnFor(ctx, sess, opts, prompt, "implementation", turn)
+}
+
+// chatTurnFor is the routed variant: when opts.Route is wired and the
+// task tag resolves to a registered adapter, we hand the request to
+// that adapter instead of opts.Adapter. Lets `/plan` use a cheap
+// model while plain text keeps using the implementation chain.
+func chatTurnFor(ctx context.Context, sess *Session, opts Options, prompt, task string, turn *Turn) {
+	adapter := opts.Adapter
+	adapterID := opts.AdapterID
+	if opts.Route != nil {
+		if a, id, err := opts.Route(task); err == nil && a != nil {
+			adapter = a
+			adapterID = id
+		}
+	}
+	if adapter == nil {
+		fmt.Fprintln(opts.Out, "✗ no adapter wired")
+		return
+	}
+	fmt.Fprintf(opts.Out, "  [agent] calling %s (%s)…\n", adapterID, task)
 	live := &prefixWriter{w: opts.Out, prefix: "  │ "}
 	timeout := opts.StepTimeout
 	if timeout <= 0 {
@@ -851,25 +879,25 @@ func chatTurn(ctx context.Context, sess *Session, opts Options, prompt string, t
 	defer cancel()
 	spinStop := startSpinner(opts.Out, opts.Plain)
 	defer spinStop()
-	res := opts.Adapter.Run(rctx, agents.AgentRequest{
+	res := adapter.Run(rctx, agents.AgentRequest{
 		Prompt:     withConversationContext(sess, prompt),
 		Model:      opts.Model,
 		WorkingDir: opts.Root,
 		Timeout:    timeout,
 		LiveOut:    live,
-		Extra:      map[string]string{"task": "chat"},
+		Extra:      map[string]string{"task": task},
 	})
 	spinStop()
 	live.flush()
 	if res.Err != nil {
-		fmt.Fprintf(opts.Out, "✗ %s: %v\n", opts.AdapterID, res.Err)
+		fmt.Fprintf(opts.Out, "✗ %s: %v\n", adapterID, res.Err)
 		return
 	}
 	if msg := strings.TrimSpace(res.Output.FinalMessage); msg != "" {
 		fmt.Fprintln(opts.Out, msg)
 	}
 	fmt.Fprintf(opts.Out, "  ✓ %s done in %s (in=%d out=%d ~$%.4f)\n",
-		opts.AdapterID, res.Duration.Round(time.Millisecond),
+		adapterID, res.Duration.Round(time.Millisecond),
 		res.Usage.InputTokens, res.Usage.OutputTokens, res.Usage.EstimatedCostUSD)
 	if turn != nil {
 		turn.InTokens = res.Usage.InputTokens
