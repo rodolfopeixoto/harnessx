@@ -259,3 +259,35 @@ const (
 	ExitNotImpl  = 2 // historical; new commands should not use this
 	ExitUserDeny = 3
 )
+
+// --- Chat REPL UI ---------------------------------------------------------
+
+const (
+	ChatGutterPrefix        = "  │ "
+	ChatThinkingFrameMS     = 120
+	ChatHistoryFileSuffix   = ".history"
+	ChatPromptTextMax       = 200
+	ChatBashCommandMax      = 120
+	ChatGrepGlobMax         = 80
+	ChatResultMax           = 400
+	ChatRawFallbackMax      = 200
+	ChatRecapMaxBytes       = 1200
+	ChatLastInputDisplayMax = 60
+	ChatLabelMax            = 80
+)
+
+// --- Drive command --------------------------------------------------------
+
+const (
+	DriveTestFilePrefix    = "test_drive_"
+	DriveTestFileSuffix    = ".py"
+	DriveDefaultMaxAttempt = 3
+	DriveCommitSubjectMax  = 50
+	DriveCommitTypeFeat    = "feat"
+	DriveSlugMaxLen        = 50
+	DriveAutonomyDefault   = "safe_execute"
+
+	DriveTaskTestEmit       = "cheap_review"
+	DriveTaskImplementation = "implementation"
+	DriveTaskPlanning       = "planning"
+)

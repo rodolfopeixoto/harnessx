@@ -64,6 +64,100 @@ func TestJSONStreamFormatterDeduplicatesThinking(t *testing.T) {
 	}
 }
 
+func TestJSONStreamFormatterToolUseBranches(t *testing.T) {
+	var buf bytes.Buffer
+	f := newJSONStreamFormatter(&buf)
+	lines := []string{
+		`{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Edit","input":{"file_path":"/p/a.py"}}]}}`,
+		`{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Grep","input":{"pattern":"foo"}}]}}`,
+		`{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Glob","input":{"pattern":"*.py"}}]}}`,
+		`{"type":"assistant","message":{"content":[{"type":"tool_use","name":"WebFetch","input":{}}]}}`,
+		`{"type":"assistant","message":{"content":[{"type":"text","text":"  hi  "}]}}`,
+	}
+	for _, l := range lines {
+		_, _ = f.Write([]byte(l + "\n"))
+	}
+	got := buf.String()
+	for _, want := range []string{
+		"● Edit", "● Grep foo", "● Glob *.py", "● WebFetch", "» hi",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %q in %q", want, got)
+		}
+	}
+}
+
+func TestJSONStreamFormatterFlushHandlesPartialLine(t *testing.T) {
+	var buf bytes.Buffer
+	f := newJSONStreamFormatter(&buf)
+	_, _ = f.Write([]byte(`{"type":"result","result":"all good"}`))
+	f.Flush()
+	if !strings.Contains(buf.String(), "✓ all good") {
+		t.Errorf("flush missed: %q", buf.String())
+	}
+}
+
+func TestJSONStreamFormatterUserAndRateLimitIgnored(t *testing.T) {
+	var buf bytes.Buffer
+	f := newJSONStreamFormatter(&buf)
+	_, _ = f.Write([]byte(`{"type":"user"}` + "\n"))
+	_, _ = f.Write([]byte(`{"type":"rate_limit_event"}` + "\n"))
+	if buf.Len() != 0 {
+		t.Errorf("user/rate_limit leaked: %q", buf.String())
+	}
+}
+
+func TestJSONStreamFormatterSystemInitOnce(t *testing.T) {
+	var buf bytes.Buffer
+	f := newJSONStreamFormatter(&buf)
+	for i := 0; i < 3; i++ {
+		_, _ = f.Write([]byte(`{"type":"system","subtype":"init"}` + "\n"))
+	}
+	if c := strings.Count(buf.String(), "session ready"); c != 1 {
+		t.Errorf("session ready emitted %d times", c)
+	}
+}
+
+func TestJSONStringMissingOrInvalidReturnsEmpty(t *testing.T) {
+	if jsonString(nil, "x") != "" {
+		t.Error("nil raw should yield empty")
+	}
+	if jsonString([]byte(`not json`), "x") != "" {
+		t.Error("invalid json should yield empty")
+	}
+	if jsonString([]byte(`{"y":1}`), "x") != "" {
+		t.Error("missing key should yield empty")
+	}
+	if jsonString([]byte(`{"x":1}`), "x") != "" {
+		t.Error("non-string value should yield empty")
+	}
+}
+
+func TestJsonFormatRecognisedAliases(t *testing.T) {
+	for _, v := range []string{"json", "JSON", "jsonl", "json-lines"} {
+		if !jsonFormat(v) {
+			t.Errorf("%q should be json", v)
+		}
+	}
+	for _, v := range []string{"", "text", "yaml"} {
+		if jsonFormat(v) {
+			t.Errorf("%q should not be json", v)
+		}
+	}
+}
+
+func TestTruncForChatBoundary(t *testing.T) {
+	if truncForChat("abcdef", 3) != "abc…" {
+		t.Errorf("truncate wrong")
+	}
+	if truncForChat("abc", 0) != "abc" {
+		t.Errorf("max=0 should return as-is")
+	}
+	if truncForChat("  x  ", 10) != "x" {
+		t.Errorf("trim spaces")
+	}
+}
+
 func TestShortenPathTrimsToLastTwoSegments(t *testing.T) {
 	cases := map[string]string{
 		"/Users/x/dev/p/app/storage.py": "app/storage.py",
