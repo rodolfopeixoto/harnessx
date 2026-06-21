@@ -10,7 +10,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/ropeixoto/harnessx/internal/adapters/logger"
@@ -79,6 +81,16 @@ type RunOptions struct {
 	// Fast drops the slowest sensors so the auto-gate flow inside
 	// `harness chat` stays snappy. Today: secrets_scan (ripgrep walk).
 	Fast bool
+	// InstallMissing pip-installs the optional python dev tools that
+	// the gate reported as "binary not on PATH" before returning, so
+	// the next harness ci run finds them and stops skipping sensors.
+	InstallMissing bool
+}
+
+var installableBySensorID = map[string]string{
+	"py_bandit":    "bandit",
+	"py_mypy":      "mypy",
+	"py_pip_audit": "pip-audit",
 }
 
 // slowSensorIDs is the denylist consulted when Fast is true.
@@ -172,6 +184,17 @@ func Run(ctx context.Context, opts RunOptions, out io.Writer) ([]sensors.Result,
 	sum := sensors.Summarize(results)
 	fmt.Fprintf(out, "\nsummary: %d passed, %d failed, %d skipped (of %d)\n", sum.Passed, sum.Failed, sum.Skipped, sum.Total)
 
+	if missing := missingInstallables(results); len(missing) > 0 {
+		if opts.InstallMissing {
+			if err := installPythonTools(ctx, rc.root, missing, out); err != nil {
+				fmt.Fprintf(out, "  install-missing: %v\n", err)
+			}
+		} else {
+			fmt.Fprintf(out, "  hint: %d optional python tool(s) missing (%s) — rerun with `harness ci --install-missing` to fix\n",
+				len(missing), strings.Join(missing, ", "))
+		}
+	}
+
 	if hasDB {
 		end := time.Now().UTC()
 		status := domain.StatusSucceeded
@@ -228,4 +251,49 @@ func ifFail(b bool) int {
 		return 1
 	}
 	return 0
+}
+
+func missingInstallables(results []sensors.Result) []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, r := range results {
+		pkg, ok := installableBySensorID[r.ID]
+		if !ok {
+			continue
+		}
+		if !strings.HasPrefix(r.Detail, "binary not on PATH") {
+			continue
+		}
+		if seen[pkg] {
+			continue
+		}
+		seen[pkg] = true
+		out = append(out, pkg)
+	}
+	return out
+}
+
+func installPythonTools(ctx context.Context, root string, pkgs []string, out io.Writer) error {
+	venvPython := filepath.Join(root, ".venv", "bin", "python")
+	if _, err := os.Stat(venvPython); err != nil {
+		return fmt.Errorf(".venv missing — run `harness new <stack> --with-deps` or `uv venv .venv && uv pip install -r requirements.txt`")
+	}
+	fmt.Fprintf(out, "  → installing into .venv: %s\n", strings.Join(pkgs, " "))
+	args := append([]string{"pip", "install", "--python", venvPython}, pkgs...)
+	cmd := exec.CommandContext(ctx, "uv", args...)
+	cmd.Dir = root
+	cmd.Stdout = out
+	cmd.Stderr = out
+	if err := cmd.Run(); err == nil {
+		return nil
+	}
+	pipArgs := append([]string{"-m", "pip", "install"}, pkgs...)
+	pipCmd := exec.CommandContext(ctx, venvPython, pipArgs...)
+	pipCmd.Dir = root
+	pipCmd.Stdout = out
+	pipCmd.Stderr = out
+	if err := pipCmd.Run(); err != nil {
+		return fmt.Errorf("install failed via uv and pip: %w", err)
+	}
+	return nil
 }

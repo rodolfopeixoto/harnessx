@@ -76,7 +76,10 @@ func newCheckCmd() *cobra.Command {
 }
 
 func newCICmd() *cobra.Command {
-	var fast bool
+	var (
+		fast           bool
+		installMissing bool
+	)
 	c := &cobra.Command{
 		Use:   "ci",
 		Short: "Run every applicable sensor; exit non-zero on any failure",
@@ -86,7 +89,7 @@ func newCICmd() *cobra.Command {
 				return err
 			}
 			if _, err := sensorcmd.Run(cmd.Context(), sensorcmd.RunOptions{
-				StartDir: dir, FailOnError: true, Fast: fast,
+				StartDir: dir, FailOnError: true, Fast: fast, InstallMissing: installMissing,
 			}, cmd.OutOrStdout()); err != nil {
 				os.Exit(1)
 			}
@@ -94,5 +97,6 @@ func newCICmd() *cobra.Command {
 		},
 	}
 	c.Flags().BoolVar(&fast, "fast", false, "skip slow sensors (today: secrets_scan)")
+	c.Flags().BoolVar(&installMissing, "install-missing", false, "pip-install optional python tools (bandit, mypy, pip-audit) if absent")
 	return c
 }
