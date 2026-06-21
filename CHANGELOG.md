@@ -3,6 +3,35 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-21 — v0.140.0 — Wave 16: real cheap-chain test-emit + SIGWINCH refresh (F105)
+
+### Changed
+
+- **`harness drive` test-emit now calls the cheap_review router
+  chain for real**. The old placeholder failing test was a stopgap
+  that left the user wondering whether the LLM ever ran. The new
+  path renders a deterministic prompt template asking the cheap
+  chain to emit a pytest module covering happy + error paths,
+  extracts the python body from the response code fence, validates
+  it contains a `def test_…`, and writes it to disk. Falls back to
+  the placeholder when no adapter is registered, no chain is
+  available, the adapter call fails, or the response has no
+  python block — smoke runs untouched, real walks now produce
+  real failing tests.
+- **chzyer/readline SIGWINCH handler**. The chat REPL now listens
+  for terminal resizes and calls `rl.Refresh()` so the prompt and
+  history line-wrap correctly when the window changes width.
+  Hooked + cleaned up in `readlinePromptReader.startWinch` and
+  `Close`.
+
+### Tests
+
+- `TestExtractPythonBodyFromCodeFence` covers \`\`\`python /
+  \`\`\`py / bare \`\`\` fences.
+- `TestExtractPythonBodyFallsThroughOnBareTest`,
+  `TestExtractPythonBodyEmptyWhenNoTest`,
+  `TestRenderTestEmitPromptIncludesFeatureSlug`.
+
 ## 2026-06-21 — v0.139.0 — Wave 15: slash typo suggest + session recap + adapter quick-pick (F104)
 
 ### New
