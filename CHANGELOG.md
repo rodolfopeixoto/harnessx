@@ -3,6 +3,39 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-21 — v0.131.0 — Wave 11 humanised JSON stream + multi-agent routing (F96)
+
+### Fixed
+
+- **Chat REPL dumped raw Claude JSON-Lines** (tools[], mcp_servers[],
+  slash_commands[], thinking blocks, tool_use chains, …) into every
+  turn. New `internal/agents/yaml/stream_json.go` wraps the live
+  writer for JSON-output adapters and emits one humanised line per
+  significant event:
+    `• session ready` · `⋯ thinking…` · `● Read app/storage.py` ·
+    `● Write tests/test_products.py` · `$ pytest -q` ·
+    `» Done. 9/9 pass.` · `✓ Done. 9/9 pass.`
+  The huge `system.init` envelope is swallowed; tool paths trim to
+  their last two segments; unknown shapes fall back to a truncated
+  raw-line passthrough so the user never sees nothing. Four unit
+  tests cover the happy path, dedup, garbage fallback, and path
+  shortening.
+
+### New
+
+- **Multi-agent routing inside chat** (paper §3.5.3 governed
+  mutation). `repl.Options.Route(task)` plugs the existing
+  `internal/router.Router` (with `router.Defaults`) into every chat
+  turn:
+    - plain text → `implementation` chain (codex → claude → kimi …)
+    - `/recap` → `cheap_review` (gemini → kimi → codex …) so summaries
+      do not burn opus tokens.
+  The header line now prints `[agent] calling <id> (<task>)…` so the
+  user sees which model is doing what. Falls back to the pinned
+  adapter when the route resolves to nothing registered. cmd_chat
+  wires the registry into the router; existing `/use <id>` override
+  still wins over routing for the current turn.
+
 ## 2026-06-21 — v0.130.0 — Wave 11 polish: ship --yes, ruff-format scaffold, readline history + TAB (F95)
 
 ### Fixed

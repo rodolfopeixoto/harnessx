@@ -16,6 +16,7 @@ import (
 	"github.com/ropeixoto/harnessx/internal/app/agentcmd"
 	"github.com/ropeixoto/harnessx/internal/intentplan"
 	"github.com/ropeixoto/harnessx/internal/repl"
+	"github.com/ropeixoto/harnessx/internal/router"
 	"github.com/ropeixoto/harnessx/internal/ui"
 )
 
@@ -145,6 +146,18 @@ the deterministic planner.`,
 						return a, req, nil
 					}
 					return nil, "", fmt.Errorf("adapter %q not registered", req)
+				}
+				// Multi-agent routing: route plain text and slash
+				// commands through the router so /plan reaches the
+				// cheap chain and plain text reaches the implementation
+				// chain instead of always hitting the pinned adapter.
+				rtr := router.New(registry, router.Defaults(registry))
+				opts.Route = func(task string) (agents.AgentAdapter, string, error) {
+					dec, err := rtr.Select(task)
+					if err != nil || len(dec.Chain) == 0 {
+						return adapter, adapterID, nil
+					}
+					return dec.Chain[0], dec.Chain[0].ID(), nil
 				}
 				fmt.Fprintf(cmd.OutOrStdout(), "chat: %s wired — plain text streams to agent; /exec for harness plan\n", adapterID)
 				probe := agenthealth.New(adapter, 30*time.Second)
