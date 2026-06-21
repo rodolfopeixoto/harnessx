@@ -1,42 +1,35 @@
-# Tutorial — Build an e-commerce API by chatting with HarnessX
+# Tutorial — Build a real e-commerce backend with HarnessX
 
-You build a small **FastAPI e-commerce backend** (products → cart →
-checkout) by **talking to a pinned agent inside `harness chat`**.
-Every paragraph below is one chunk you can paste and watch happen.
+A complete, file-by-file walk that takes a fresh laptop to a green
+FastAPI + Vitest-tested React e-commerce app. Every step lists the
+files HarnessX touches, the agent it calls (cheap vs expensive),
+and what to expect on screen. No skipped phases, no magic — the
+commands here are the same the smoke script asserts on every
+release.
 
-This is the narrative version of the workflow.
-For raw command reference jump to [`COMMANDS.md`](COMMANDS.md). For the
-paper mapping see [`PAPER-MAPPING.md`](PAPER-MAPPING.md).
+Estimated time: 30–60 min with `--with-deps`, depending on your
+network. Requires macOS or Linux, Python 3.11+, Node 20+, git,
+and at least one agent CLI configured (`claude`, `codex`, `kimi`,
+`gemini`, or `ollama`).
 
-The harness chat REPL (v0.116.0+) treats:
-
-- **plain text** → chat directly with the pinned agent (streams reads,
-  writes, diffs);
-- **`/exec <prompt>`** (alias `/do`) → deterministic harness plan
-  (`do` → `lint` → `test` → `ci`);
-- **`/ship <prompt>`** → `harness ship` (branch + spec + loop + commit);
-- **`/ci` `/test` `/lint`** → run the gate directly;
-- **`!<shell>`** → escape to a shell command in the project root.
-
-You never leave the chat window. CTRL-C aborts the current turn (the spinner clears, you land back at
-the prompt); `/exit` or CTRL-D ends the session.
-
----
-
-## 0. Install once
+## 0 · Install
 
 ```bash
 brew tap rodolfopeixoto/harnessx https://github.com/rodolfopeixoto/harnessx
 brew install harness
-harness doctor          # flags missing python/uv/git/agent CLI
+harness doctor       # flags missing python/node/uv/git/agent CLIs
+harness --version    # v0.132.0 or newer
 ```
 
-Pick at least one agent CLI: `claude`, `codex`, `gemini`, `kimi`, or
-`ollama`. The tutorial below pins **claude** — substitute freely.
+If you have an existing install:
 
----
+```bash
+harness update            # latest stable
+harness update --force    # reinstall the current tag if a botched cp
+                          # left the binary out of date
+```
 
-## 1. Bootstrap the project
+## 1 · Scaffold the FastAPI backend
 
 ```bash
 cd ~/dev
@@ -44,301 +37,259 @@ harness new python-ecommerce ./shop-api --yes --with-deps
 cd shop-api
 ```
 
-What just happened (one line each):
+What landed on disk:
 
-- `git init` on `main`;
-- `.harness/` created (config + db + logs);
-- 20 scaffold files written: `app/main.py`, routers, models, storage,
-  tests for `/healthz`;
-- `requirements.txt` installed into `.venv` via `uv`;
-- pre-push hook installed; baseline commit `chore: scaffold baseline`.
+```text
+shop-api/
+├── .harness/                 # config + session DB + audit log
+├── .venv/                    # ruff + pytest + fastapi (uv-installed)
+├── app/
+│   ├── main.py               # FastAPI app + /healthz
+│   ├── models.py             # Pydantic Product / Cart / Checkout
+│   ├── storage.py            # thread-safe in-memory store
+│   └── routers/
+│       ├── products.py       # GET /products, GET /products/{id}
+│       ├── cart.py           # GET/POST /cart/{user}
+│       └── checkout.py       # POST /checkout
+├── tests/
+│   ├── conftest.py
+│   ├── test_healthz.py
+│   ├── test_products.py
+│   ├── test_cart.py
+│   └── test_checkout.py
+├── pyproject.toml · README.md · requirements.txt · ruff.toml · Makefile
+└── pre-push hook installed (runs `harness ci`)
+```
 
 Sanity check the floor:
 
 ```bash
-harness lint    # ruff
-harness test    # pytest — 9 tests pass
-harness ci      # full sensor gate — green
+harness lint     # → All checks passed!
+harness test     # → 9 passed
+harness ci       # → 7 sensors green, 4 skipped (bandit/mypy/pip-audit missing locally)
 ```
 
-> If `harness new` errors with "refusing nested target", you are
-> standing inside a folder of the same name. `cd ..` and rerun.
-
----
-
-## 2. Pin an agent and open chat
+## 2 · Open the chat and pin an agent
 
 ```bash
-harness use claude          # pins claude as the active adapter
-harness chat --goal dev     # auto-picks up the pin; --adapter still works
+harness use claude         # pin (optional — auto-pin still works)
+harness chat --goal dev    # readline TAB + ↑/↓ history active in TTY mode
 ```
 
-Pass `--auto-gate` if you want `harness ci` to run after every agent
-turn — handy for tight feedback during the cart/checkout iterations
-below. You can toggle it later from inside chat with `/auto-gate on`
-or `/auto-gate off`.
+The header line tells you what is wired:
 
-You land in:
-
-```
+```text
+chat: auto-pinned claude from .harness/config/active.yaml
 chat: claude wired — plain text streams to agent; /exec for harness plan
-harness chat — session 01..., goal=dev
-plain text → talk to agent · /exec → plan+run · !<cmd> → shell · /help · /exit
 
 [dev|claude ✓]>
 ```
 
-The badge `|claude ✓` means the periodic health probe pinged the
-adapter successfully.
+You will see one of two header forms when an agent turn runs:
 
----
-
-## 3. Add the product catalogue (talking to claude)
-
-At the prompt, type the feature in your own words:
-
-```
-[dev|claude ✓]> add a real product catalogue: hard-code 3 products in app/storage.py
-with name, price_cents, stock. Update GET /products to return them.
-Add pytest in tests/test_products.py covering 3-item response and 200
-status. Keep the existing /healthz green.
+```text
+  [agent] calling claude (implementation)…      # plain text → impl chain
+  [agent] calling gemini (cheap_review)…        # /recap → cheap chain
 ```
 
-You will watch a live stream like:
+The `(task)` suffix shows the router decision. `/cost` after the
+session lists every adapter touched so you can audit the spend.
 
+## 3 · Feature 1 — Product stock via `/drive`
+
+`/drive` is the spec-driven, test-first slash. It writes a spec to
+`.harness/artifacts/specs/`, drops a failing pytest placeholder,
+calls the implementation chain only after the red bar is real, and
+gates the result with `harness ci`. On green it commits with a
+Conventional Commit subject.
+
+```text
+[dev|claude ✓]> /drive add a stock field to Product (int >= 0) and
+                seed every SKU with a stock count
 ```
+
+What appears on screen:
+
+```text
+drive: "add a stock field to Product (int >= 0) and seed every SKU…" (slug=add-a-stock-field-to-product-int…)
+drive: 1/5 — harness feature (spec)
+  spec written: .harness/artifacts/specs/01KX…SPEC.md
+drive: 2/5 — test-emit (cheap chain)
+drive: routing test-emit through gemini (cheap_review)
+drive: tests written at tests/test_drive_add-a-stock-field-to-product….py
+drive: 3/5 — harness test (expect red)
+  test_drive_add_a_stock_field_to_product FAILED
+drive: tests red as expected
+drive: 4/5 — harness do attempt 1/3 (implementation chain)
   [agent] calling claude…
-  │ ● Reading app/storage.py
-  │ ● Reading app/routers/products.py
-  │ ● Writing app/storage.py
-  │ ● Writing tests/test_products.py
-  │ ● Diff: 2 files changed, +18 -1
-  ✓ claude done in 22s (in=4310 out=812 ~$0.0254)
+  │ ● Read app/models.py
+  │ ● Edit app/models.py
+  │ ● Edit app/storage.py
+  │ ● Write tests/test_drive_add-a-stock-field-to-product….py
+  │ ✓ Added stock field with ge=0; seeded 25/10/50 per SKU.
+drive: 5/5 — harness ci
+  9 passed, 0 failed
+drive: ✓ green
+drive: ✓ committed feat: add a stock field to Product (int >= 0) and seed…
 ```
 
-When it stops, verify in the same chat:
+Verify on disk:
 
-```
-[dev|claude ✓]> /test
-[dev|claude ✓]> /ci
-```
-
-Both must come back green. If they fail, **stay in the chat** and
-describe the failure in plain text — claude will read the failing
-output and patch.
-
----
-
-## 4. Cart (multi-turn iteration)
-
-Same chat, next feature. Notice every line is conversational — no
-shell escaping, no flag soup:
-
-```
-[dev|claude ✓]> implement POST /cart/{user_id} and GET /cart/{user_id}
-backed by an in-memory dict in app/storage.py. POST takes
-{product_id, quantity}; GET returns the running total. Cover both with
-pytest in tests/test_cart.py including missing-product 404.
+```bash
+git log --oneline -1            # the new commit
+git diff HEAD~1 app/models.py   # +stock: int = Field(ge=0)
+git diff HEAD~1 app/storage.py  # +stock=25/10/50 per SKU
+ls tests/test_drive*            # the test file the cycle wrote
 ```
 
-Watch the diff stream. Then gate it:
+## 4 · Feature 2 — Cart accumulation iteration
 
-```
-[dev|claude ✓]> /ci
-```
+The cart router exists; this iteration adds a "total includes tax"
+behaviour to show how the same `/drive` flow handles edits, not
+just additions.
 
-If the gate breaks, debug conversationally:
-
-```
-[dev|claude ✓]> the 404 path returns 500; trace it and fix
-```
-
-claude will read the traceback, propose the patch, and re-run.
-
----
-
-## 5. Checkout + a one-shot ship
-
-For the third feature use the **`/ship`** slash command. That switches
-to `harness ship` under the hood: a branch is cut, a spec is written,
-`harness do` runs in a bounded loop, and the green result is committed
-with a Conventional Commit subject.
-
-```
-[dev|claude ✓]> /ship implement POST /checkout that clears the cart for
-                 a user and returns the total; tests in tests/test_checkout.py
+```text
+[dev|claude ✓]> /drive include a fixed 10% tax in cart.total_cents
+                and expose the breakdown on Cart.tax_cents
 ```
 
-Stream looks like:
+Watch the same five steps. The cheap chain writes a failing test
+that asserts `cart.tax_cents == round(subtotal * 0.10)`. The
+implementation chain edits `app/models.py` (new field) and
+`app/storage.py` (tax math) until `harness ci` is green.
 
-```
-  $ harness ship implement POST /checkout … --yes
-  ship: agent=claude
-  ship: branch feature/implement-post-checkout ← develop
-  ship: feature spec — harness feature implement POST /checkout … --yes
-  ship: do attempt 1 — harness do … --autonomy ask --yes
-    [agent] calling claude…
-    | ● Reading app/routers/checkout.py
-    | ● Writing tests/test_checkout.py
-  ship: ci attempt 1 — harness ci
-  ✓ ship: green
-```
+Now run it for real:
 
-> If you start a `/ship` with uncommitted work in the tree (because
-> you were iterating in chat first), add **`--allow-dirty`** to the
-> ship command — the dirty diff becomes part of the same commit.
-
----
-
-## 6. Run the API and curl it
-
-```
-[dev|claude ✓]> !.venv/bin/uvicorn app.main:app --reload &
-[dev|claude ✓]> !curl -s localhost:8000/products | jq
-[dev|claude ✓]> !curl -s -X POST localhost:8000/cart/alice \
-                  -H 'content-type: application/json' \
-                  -d '{"product_id":"sku-001","quantity":2}' | jq
-[dev|claude ✓]> !curl -s -X POST localhost:8000/checkout \
-                  -H 'content-type: application/json' \
-                  -d '{"user_id":"alice"}' | jq
-[dev|claude ✓]> !pkill -f uvicorn
+```bash
+harness dev &                   # uvicorn on :8000 with reload
+sleep 1
+curl -s -X POST localhost:8000/cart/alice \
+   -H 'content-type: application/json' \
+   -d '{"product_id":"sku-001","quantity":2}' | jq
+# {"user_id":"alice","items":[{"product_id":"sku-001","quantity":2}],
+#  "total_cents":3296,"tax_cents":300}
+pkill -f uvicorn
 ```
 
-The `!` prefix runs the line through `sh -c` from the project root,
-so you stay inside the chat session.
+## 5 · Feature 3 — Checkout finalisation
 
----
-
-## 7. Wrap up
-
-```
-[dev|claude ✓]> /exit
-bye
+```text
+[dev|claude ✓]> /drive POST /checkout must zero out the cart and
+                return an order summary including tax_cents
 ```
 
-What you have on disk:
+After green you have one commit per feature on the current branch.
+Run `git log --oneline` — the three Conventional Commits read like
+a release note.
 
-- 4 routers, 1 storage layer, ~12 pytest cases — all green;
-- one feature branch per `/ship` with a Conventional Commit;
-- `.harness/sessions/<id>.jsonl` with every turn, plan, and result
-  (replayable with `harness chat --replay <id>` — see roadmap);
-- `.harness/artifacts/specs/*.md` for every feature you shipped;
-- a pre-push hook that re-runs `harness ci` before any `git push`.
+## 6 · React frontend with the same loop
 
----
+`harness new react` + `harness drive` works the same. The cheap
+chain emits a Vitest skeleton, the implementation chain wires the
+components, and `harness ci` runs the JS gate.
 
-## Cheat sheet inside the chat
+```bash
+cd ~/dev
+harness new react ./shop-web --yes --with-deps
+cd shop-web
+harness chat --goal dev
+```
+
+```text
+[dev|claude ✓]> /drive render a /products list calling
+                http://localhost:8000/products with a Vitest test
+```
+
+```text
+drive: 1/5 — harness feature (spec)
+drive: 2/5 — test-emit (cheap chain) → vitest skeleton
+drive: 3/5 — npm test (expect red)
+drive: 4/5 — harness do (implementation chain)
+  │ ● Write src/components/ProductList.tsx
+  │ ● Write src/components/ProductList.test.tsx
+  │ ● Edit src/App.tsx
+drive: 5/5 — harness ci
+drive: ✓ committed feat: render /products list calling localhost:8000…
+```
+
+Start both processes:
+
+```bash
+# terminal 1 — api
+cd ~/dev/shop-api && harness dev
+
+# terminal 2 — web
+cd ~/dev/shop-web && harness dev   # vite on :5173
+open http://localhost:5173
+```
+
+## 7 · Inspect what happened
+
+`harness session show <label>` dumps the chat-side view; the
+`.harness/artifacts/` tree gives the agentic-side view.
+
+```bash
+harness chat list                       # newest first; labels visible
+harness session show shop-api           # chat session with cost + turns
+tree .harness/artifacts/specs           # one .md per /drive feature
+tree .harness/artifacts/runs            # blackboards per orchestrate run
+harness audit tail --limit 30           # cross-cmd event timeline
+```
+
+To replay a chat session without writing anything, attach with
+`--replay <label>`. Mutating slashes (`/drive`, `/ship`, `/ci`, …)
+are refused; `/history`, `/agents`, `/cost`, `/diff`, `/timeline`
+all keep working so you can walk the past run safely.
+
+## 8 · Cheat sheet inside the chat
 
 | You type                    | What happens                                     |
 |-----------------------------|--------------------------------------------------|
-| `add /products endpoint`    | streams a chat turn to the pinned agent          |
-| `/exec add /products`       | deterministic harness plan: do + lint + test + ci|
-| `/ship add /products`       | branch + spec + loop + commit (auto `--allow-dirty`)|
+| `add a /widgets endpoint`   | streams plain text to the implementation chain   |
+| `/drive add /widgets`       | spec → failing tests → impl → ci → commit        |
+| `/exec add /widgets`        | deterministic harness plan: do + lint + test + ci|
+| `/ship add /widgets`        | branch + spec + loop + commit (auto allow-dirty) |
 | `/ci`, `/test`, `/lint`     | run the gate                                     |
-| `/plan add /products`       | print the plan JSON without executing            |
-| `/agents`                   | list registered adapters; mark the active one    |
-| `/use <id>`                 | switch adapter mid-session (kimi/codex/gemini/…) |
-| `/diff`                     | `git diff --stat` + full diff in project root    |
+| `/plan add /widgets`        | print the plan JSON without executing            |
+| `/agents`                   | list registered adapters with the active marker  |
+| `/use <id>`                 | switch adapter mid-session                       |
+| `/diff`                     | `git diff --stat` + full diff in the project root|
 | `/cost`                     | cumulative session token + USD spend             |
-| `/timeline`                 | ASCII timeline of every turn (clock, action, $)  |
 | `/budget 0.50` / `off`      | refuse further chat turns once spend > cap       |
 | `/save my-feature`          | label this session for `harness chat list`       |
 | `/branch feature/cart`      | `git checkout -B …` + auto-label session         |
 | `/save-prompt add-endpoint` | capture the last plain text into a template      |
-| `/prompt add-endpoint`      | replay a saved template as a new chat input      |
-| `/prompts`                  | list saved prompt templates                      |
-| `/recap`                    | ask the agent for an ≤8-bullet summary           |
+| `/prompt add-endpoint`      | replay a saved template                          |
+| `/prompts`                  | list saved templates                             |
+| `/recap`                    | cheap chain summary of the session so far        |
+| `/timeline`                 | ASCII timeline of every turn (clock, action, $)  |
 | `/clear`                    | drop conversation history from the next prompt   |
 | `/auto-gate on` / `off`     | toggle `harness ci` after each agent turn        |
 | `!<shell cmd>`              | run any shell command in the project root        |
 | `/goal ops`                 | switch session goal (dev/ops/research/ads)       |
 | `/history`, `/last`         | inspect / replay previous prompts                |
 | `/help`, `/exit`            | usual                                            |
+| ↑ / ↓                       | scroll input history (readline)                  |
+| TAB                         | autocomplete slash commands + adapter ids        |
 
-## Resume an old session
-
-```bash
-harness chat list                  # newest first; labels shown as a column
-harness chat <id|label>            # positional shortcut for --resume
-harness chat --resume <id|label>   # continues writing to the same .jsonl
-harness chat --replay <id|label>   # read-only: /history, /agents, /cost, /diff only
-```
-
-`<label>` is anything you typed into `/save`. Passing a string that
-matches neither a saved label nor a known ulid falls through to
-`--resume` and produces a clean "session not found" error.
-
-The previous turns flow back into `/history` and the Working Memory
-preamble, so the agent reads the conversation as one thread instead of
-a cold start. `/clear` resets that preamble without ending the session.
-
-## Reusable prompt templates
-
-If you find yourself typing the same instruction every time you add a
-new endpoint, capture it:
-
-```
-[dev|claude ✓]> add a /<name> endpoint with pytest tests and update README
-[dev|claude ✓]> /save-prompt add-endpoint
-  ✓ prompt "add-endpoint" saved (74 chars)
-
-# later, in a fresh session:
-[dev|claude ✓]> /prompt add-endpoint
-↻ replaying prompt "add-endpoint"
-  [agent] calling claude…
-```
-
-Templates live in `.harness/prompts/<name>.md` and ship with the
-repo when you commit them. `/prompts` lists every name currently
-saved.
-
-## Share a session
-
-```bash
-harness session export <id> > session.json
-```
-
-Emits one JSON envelope with the goal, started timestamp, every turn,
-cumulative tokens/USD, plus the toggles (`auto_gate`, `budget_usd`,
-`context_mark`). Drop the file into a code review or a bug report —
-the receiver can replay it locally with `jq` or load it back through
-`harness chat --resume`.
-
----
-
-## Back up the project (optional)
-
-`harness backup snapshot` ships your `.harness/` state to any
-rclone-supported remote (Drive, S3, R2, Dropbox, …). First time on a
-project:
-
-```bash
-harness backup quickstart                # prints the 3-step recipe
-harness backup remote add gdrive --provider drive --interactive
-harness backup config set-default-remote gdrive
-harness backup snapshot
-```
-
-Secrets are excluded by default; route the bucket through an `rclone
-crypt` overlay if you need them and re-run with
-`--include-secrets HARNESS_BACKUP_I_UNDERSTAND_SECRETS=1`.
-
-## When something goes sideways
+## 9 · Troubleshooting
 
 - **Agent CLI prompts for an OS dialog** (Docker, OrbStack, keychain):
-  that is the upstream CLI, not HarnessX. Approve it once. From then
-  on the same install is fine; if the dialog keeps reappearing
-  switch with `harness use codex` (or any other adapter), or run
-  `harness chat --no-adapter` to fall back to the deterministic
-  planner.
+  upstream CLI behaviour, not HarnessX. Approve it once. `harness use
+  codex` (or `--no-adapter`) is the deterministic escape hatch.
+- **Chat looks frozen** during a long agent call: spinner + dots
+  indicate progress. Ctrl-C cancels the turn cleanly; Ctrl-D exits
+  the REPL.
 - **`harness ship` rejects a dirty tree**: pass `--allow-dirty`, or
   `!git stash` first.
 - **`harness new` refuses target**: you are inside a folder with the
-  same basename. `cd ..` and rerun.
-- **`harness ci` skips `py_ruff`/`py_pytest` with "binary not on PATH"**:
-  activate the venv first — `source .venv/bin/activate`.
-- **Adapter health badge flips to `⚠`**: the periodic probe failed.
-  Run `harness doctor` or check the CLI is logged in.
+  same basename — `cd ..` and rerun.
+- **`harness ci` skips `py_ruff`/`py_pytest`**: activate the venv —
+  `source .venv/bin/activate` — or rerun the project with
+  `--with-deps`.
+- **Adapter badge flips to `⚠`**: the periodic health probe failed —
+  run `harness doctor` or re-login the agent CLI.
 
-That is the whole workflow. Plain text → agent. Slash → harness.
-Bang → shell. Everything else is documentation.
+That is the whole workflow. **Plain text → impl chain. `/drive` →
+spec/test/impl/ci. `/recap` → cheap chain. ↑/↓ + TAB on every
+prompt.** Everything else is documentation.

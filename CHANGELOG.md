@@ -3,6 +3,20 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-21 — v0.133.0 — Wave 11 tutorial rewrite around `harness drive` (F98)
+
+### Changed
+
+- **`docs/TUTORIAL-ECOMMERCE.md` is now a real end-to-end walk**.
+  Three `/drive` features against the FastAPI scaffold (product
+  stock, cart tax, checkout finalisation) plus a fourth `/drive`
+  feature against a brand-new React scaffold so the same loop is
+  proved across stacks. Each step lists the files touched, the
+  router decision (cheap vs implementation chain), and the
+  expected on-screen output (`│ ● Read app/storage.py`,
+  `drive: 5/5 — harness ci`, `drive: ✓ committed feat: …`). Cheat
+  sheet covers every slash up to `/drive` + readline ↑/↓ + TAB.
+
 ## 2026-06-21 — v0.132.0 — Wave 11 spec-driven, test-first `harness drive` (F97)
 
 ### New
