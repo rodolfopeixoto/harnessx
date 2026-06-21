@@ -3,6 +3,33 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-21 — v0.130.0 — Wave 11 polish: ship --yes, ruff-format scaffold, readline history + TAB (F95)
+
+### Fixed
+
+- **`/ship "..."` from inside chat failed** with `Error: unknown flag:
+  --yes` because the REPL appended `--yes` (mirroring `harness do
+  --yes`) but `cmd_ship.go` never registered the flag. `--yes` is now
+  accepted as a documented no-op for symmetry with the rest of the
+  surface.
+- **`harness ci` was red on a fresh `python-ecommerce` scaffold**
+  because `app/storage.py` had a multi-line `sum(...)` that the
+  current ruff (0.15) wants collapsed onto one line. Template
+  reformatted. New `make scaffold-fmt` target re-runs `ruff format`
+  against every bundled python scaffold so regressions stay out.
+
+### New
+
+- **Chat REPL gets readline ergonomics**. New `internal/repl/prompt.go`
+  picks `github.com/chzyer/readline` whenever stdin+stdout are both
+  TTYs, falling back to the existing `bufio.NewReader` for piped
+  input so `scripts/tutorial-smoke.sh` keeps working unmodified.
+  History persists per session at `.harness/sessions/<id>.history`
+  (up/down navigates). TAB completes the static slash list, the
+  registered adapter ids on `/use`, and saved session labels on
+  `/resume`. Ctrl-C clears the current entry instead of killing the
+  REPL; Ctrl-D exits.
+
 ## 2026-06-19 — v0.129.0 — backup quickstart + tutorial backup section (F94)
 
 ### New
