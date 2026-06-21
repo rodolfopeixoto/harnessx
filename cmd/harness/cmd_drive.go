@@ -127,6 +127,7 @@ func driveExpectRedTests(ctx context.Context, out io.Writer, opts driveOpts) boo
 }
 
 func driveImplLoop(ctx context.Context, out io.Writer, opts driveOpts) error {
+	preSnapshot := gitTreeSnapshot(ctx, opts.root)
 	for attempt := 1; attempt <= opts.maxAttempts; attempt++ {
 		fmt.Fprintf(out, "drive: 4/5 — harness do attempt %d/%d (implementation chain)\n",
 			attempt, opts.maxAttempts)
@@ -134,6 +135,9 @@ func driveImplLoop(ctx context.Context, out io.Writer, opts driveOpts) error {
 			[]string{"do", opts.prompt, "--yes", "--autonomy", opts.autonomy}); err != nil {
 			fmt.Fprintf(out, "drive: harness do failed (%v); retrying\n", err)
 			continue
+		}
+		if gitTreeSnapshot(ctx, opts.root) == preSnapshot {
+			return fmt.Errorf("drive: agent produced no changes — prompt may be incomplete or ambiguous; refine and re-run /drive")
 		}
 		fmt.Fprintln(out, "drive: 5/5 — harness ci")
 		if err := runHarnessChild(ctx, opts.bin, opts.root, out, []string{"ci"}); err == nil {
@@ -146,6 +150,16 @@ func driveImplLoop(ctx context.Context, out io.Writer, opts driveOpts) error {
 		fmt.Fprintf(out, "drive: ci red on attempt %d; retrying\n", attempt)
 	}
 	return fmt.Errorf("drive: ci still red after %d attempts", opts.maxAttempts)
+}
+
+func gitTreeSnapshot(ctx context.Context, root string) string {
+	c := exec.CommandContext(ctx, "git", "status", "--porcelain")
+	c.Dir = root
+	out, err := c.Output()
+	if err != nil {
+		return ""
+	}
+	return string(out)
 }
 
 func writePlaceholderTest(opts driveOpts) (string, error) {
