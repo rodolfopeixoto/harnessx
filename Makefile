@@ -107,6 +107,19 @@ tutorial-replay: build
 tutorial-smoke: build
 	HARNESS_BIN=$(BIN) bash scripts/tutorial-smoke.sh
 
+# scaffold-fmt: run ruff format against every bundled python scaffold so
+# fresh `harness new python*` projects stay green under
+# `harness ci` (which includes the py_ruff_format sensor with --check).
+# Requires ruff on PATH; pulls it from the local .venv when available.
+scaffold-fmt:
+	@RUFF="$$(command -v ruff || true)"; \
+	if [ -z "$$RUFF" ] && [ -x ./.venv/bin/ruff ]; then RUFF=./.venv/bin/ruff; fi; \
+	if [ -z "$$RUFF" ]; then echo 'ruff not on PATH (install: pip install ruff)'; exit 1; fi; \
+	for dir in internal/scaffoldpkg/templates/python internal/scaffoldpkg/templates/python-ecommerce; do \
+		echo "→ $$dir"; \
+		"$$RUFF" format $$dir/app $$dir/tests 2>/dev/null || true; \
+	done
+
 # ci: full local CI gate. Wired to the pre-push hook by `make install-hooks`.
 ci: lint check coverage-gate coverage-shell test-sh e2e-all
 

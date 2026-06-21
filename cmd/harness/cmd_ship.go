@@ -85,6 +85,12 @@ chain.`,
 	c.Flags().BoolVar(&opts.watch, "watch", false, "re-run ship loop whenever a project file changes")
 	c.Flags().DurationVar(&opts.watchInterval, "watch-interval", 3*time.Second, "polling interval in --watch mode")
 	c.Flags().BoolVar(&opts.allowDirty, "allow-dirty", false, "do not require a clean working tree before shipping")
+	// --yes is accepted as a no-op so `harness ship` can be invoked the same
+	// way every other harness command is (`harness do --yes`, `harness new
+	// --yes`). The REPL /ship slash appends it automatically.
+	var yesNoop bool
+	c.Flags().BoolVar(&yesNoop, "yes", false, "accepted for parity with other harness commands; no prompts to skip")
+	_ = yesNoop
 	return c
 }
 
