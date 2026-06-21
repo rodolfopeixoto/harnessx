@@ -36,6 +36,7 @@ func newPromptReader(in io.Reader, out io.Writer, historyPath string, completer 
 	if historyPath != "" {
 		_ = os.MkdirAll(filepath.Dir(historyPath), 0o755)
 	}
+	paste := newPasteCoalescingReader(asReadCloser(in))
 	cfg := &readline.Config{
 		HistoryFile:            historyPath,
 		HistorySearchFold:      true,
@@ -43,7 +44,7 @@ func newPromptReader(in io.Reader, out io.Writer, historyPath string, completer 
 		InterruptPrompt:        "^C",
 		EOFPrompt:              "exit",
 		DisableAutoSaveHistory: false,
-		Stdin:                  asReadCloser(in),
+		Stdin:                  paste,
 		Stdout:                 out,
 		Stderr:                 out,
 	}
@@ -51,7 +52,8 @@ func newPromptReader(in io.Reader, out io.Writer, historyPath string, completer 
 	if err != nil {
 		return &bufioPromptReader{r: bufio.NewReader(in), w: out}
 	}
-	return &readlinePromptReader{rl: rl}
+	_, _ = io.WriteString(out, bracketedPasteEnableSeq)
+	return &readlinePromptReader{rl: rl, paste: paste, out: out}
 }
 
 func isTerminal(x interface{}) bool {
@@ -125,7 +127,9 @@ func readBackslashContinuation(r *bufio.Reader, w io.Writer, continuation string
 const hereDocMarker = `"""`
 
 type readlinePromptReader struct {
-	rl *readline.Instance
+	rl    *readline.Instance
+	paste *pasteCoalescingReader
+	out   io.Writer
 }
 
 func (r *readlinePromptReader) ReadInput(prompt, continuation string) (string, error) {
@@ -171,7 +175,12 @@ func (r *readlinePromptReader) ReadInput(prompt, continuation string) (string, e
 	return strings.TrimSpace(strings.Join(parts, "\n")), nil
 }
 
-func (r *readlinePromptReader) Close() error { return r.rl.Close() }
+func (r *readlinePromptReader) Close() error {
+	if r.out != nil {
+		_, _ = io.WriteString(r.out, bracketedPasteDisableSeq)
+	}
+	return r.rl.Close()
+}
 
 func chatCompleter(adapterIDs, labels []string) readline.AutoCompleter {
 	items := make([]readline.PrefixCompleterInterface, 0, len(staticSlashCommands)+2)

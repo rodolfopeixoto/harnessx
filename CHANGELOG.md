@@ -3,6 +3,31 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-21 — v0.138.0 — Wave 14: bracketed paste + ci --install-missing (F103)
+
+### New
+
+- **Bracketed paste mode in the chat REPL TTY**. On enter the REPL
+  emits `\x1b[?2004h`, on leave `\x1b[?2004l`. Stdin is wrapped in
+  `pasteCoalescingReader` that detects the `\x1b[200~ … \x1b[201~`
+  markers and replaces embedded newlines with `\\\n` so the existing
+  backslash-continuation logic glues them into one prompt. No more
+  "pasted three lines, only the first ran" — the whole clipboard
+  arrives as a single input automatically (heredoc still works).
+- **`harness ci --install-missing`** auto-installs the optional
+  python dev tools (`bandit`, `mypy`, `pip-audit`) into the
+  project's `.venv` whenever a sensor reports
+  `binary not on PATH`. Uses `uv pip install --python .venv/bin/python`
+  first, falls back to `.venv/bin/python -m pip install`. Without the
+  flag the gate prints a hint: `hint: 3 optional python tool(s)
+  missing (bandit, mypy, pip-audit) — rerun with
+  \`harness ci --install-missing\` to fix`.
+
+### Tests
+
+- `paste_test.go` — passthrough, in-paste newline escape, marker
+  split across reads, `isPartialPrefix` helper, `Close`.
+
 ## 2026-06-21 — v0.137.0 — Wave 13: """ heredoc + adapter billing-mode disclosure (F102)
 
 ### New
