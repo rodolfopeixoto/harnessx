@@ -3,3 +3,6 @@ uvicorn[standard]
 pytest
 ruff
 httpx
+bandit
+mypy
+pip-audit

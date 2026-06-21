@@ -156,18 +156,15 @@ func TestDriveExpectRedTestsFalseWhenChildPasses(t *testing.T) {
 	}
 }
 
-func TestDriveImplLoopGreenWithSkipCommit(t *testing.T) {
+func TestDriveImplLoopAbortsOnNoChanges(t *testing.T) {
 	out := &bytes.Buffer{}
 	err := driveImplLoop(context.Background(), out, driveOpts{
 		root: t.TempDir(), bin: "/usr/bin/true",
 		prompt: "x", slug: "x", autonomy: "safe_execute",
 		maxAttempts: 1, skipCommit: true,
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(out.String(), "drive: ✓ green") {
-		t.Errorf("missing green marker: %s", out.String())
+	if err == nil || !strings.Contains(err.Error(), "no changes") {
+		t.Fatalf("expected no-changes abort, got %v", err)
 	}
 }
 
