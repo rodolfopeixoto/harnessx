@@ -3,6 +3,39 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-21 — v0.139.0 — Wave 15: slash typo suggest + session recap + adapter quick-pick (F104)
+
+### New
+
+- **Unknown slash → did-you-mean suggestion**. Typing `/drv` no
+  longer silently routes to the implementation chain; instead the
+  REPL prints `⚠ unknown slash "/drv" — did you mean /drive?`.
+  Score combines Levenshtein distance with a common-prefix bonus
+  (`dist*2 - prefix`) so `/drv` reliably resolves to `/drive`
+  rather than the cheaper-looking `/do`. Falls back to a generic
+  `try / for the menu` line when nothing scores well enough.
+- **Session recap on `/exit`**. Before printing `bye` the REPL
+  prints a 5-line summary: id, label, goal, turn count + chat
+  turn count, cumulative tokens, total cost. Lets users see what
+  they just spent before the terminal scrolls away. The cost
+  cell is styled in success colour.
+- **Adapter quick-pick on first-time chat**. When no pin exists
+  the chat prelude lists every registered adapter id with an
+  index and reminds the user how to make a pin permanent
+  (`harness use <id>`), then proceeds with the first-available
+  auto-pick as before. No more "what happened, why claude?"
+
+### Tests
+
+- `TestSuggestSlashPicksClosestMatch`,
+  `TestSuggestSlashEmptyDoesNothing`,
+  `TestSuggestSlashFarAttemptFallsBack`,
+  `TestFirstToken`,
+  `TestSummariseSessionPrintsRecap`,
+  `TestSummariseSessionEmpty`,
+  `TestRunUnknownSlashSuggests`,
+  `TestRunExitPrintsRecap`.
+
 ## 2026-06-21 — v0.138.0 — Wave 14: bracketed paste + ci --install-missing (F103)
 
 ### New
