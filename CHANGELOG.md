@@ -3,6 +3,23 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-21 — v0.141.0 — Wave 16: Todoist tutorial end-to-end (F106)
+
+### Docs
+
+- New `docs/TUTORIAL-TODOIST.md`: ~600-line walk that scaffolds two
+  projects (`todoist-api`, `todoist-web`), drives five backend
+  features (JWT auth, list CRUD, tasks with due/priority, tags
+  many-to-many, recurring rules) and three frontend features (lists
+  + tasks UI, task row, auth gate) entirely through `harness drive`.
+  Documents the heredoc + bracketed-paste flow for the multi-line
+  prompts every feature uses, shows the expected per-step output,
+  ends with a backup snapshot and the cheat sheet covering every
+  slash + readline behaviour shipped in waves 11–15.
+- Tutorial doubles as the manual acceptance walk for v0.140's real
+  cheap-chain test-emit: every `/drive` block ships through the
+  cheap_review → red bar → implementation → ci → commit pipeline.
+
 ## 2026-06-21 — v0.140.0 — Wave 16: real cheap-chain test-emit + SIGWINCH refresh (F105)
 
 ### Changed
