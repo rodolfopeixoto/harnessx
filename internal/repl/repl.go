@@ -80,6 +80,11 @@ type Options struct {
 	// deterministic-planner harness do loop, which routinely takes
 	// minutes against a fresh scratch project.
 	NoAdapter bool
+	// Pipe is true for non-interactive runs (`harness chat --pipe`):
+	// suppresses the greeting + session recap and bypasses the
+	// readline TTY path, so stdin is consumed line-by-line and the
+	// process exits cleanly on EOF.
+	Pipe bool
 }
 
 type SessionSummary struct {
@@ -374,7 +379,9 @@ func Run(ctx context.Context, opts Options) error {
 	if opts.AutoGate {
 		sess.AutoGate = true
 	}
-	greet(opts.Out, sess)
+	if !opts.Pipe {
+		greet(opts.Out, sess)
+	}
 	labels := []string{}
 	for _, s := range opts.AdaptersList {
 		labels = append(labels, s)
@@ -387,7 +394,12 @@ func Run(ctx context.Context, opts Options) error {
 		}
 	}
 	historyPath := filepath.Join(opts.Root, ".harness", "sessions", sess.ID+".history")
-	prompter := newPromptReader(opts.In, opts.Out, historyPath, chatCompleter(opts.AdaptersList, labels))
+	var prompter promptReader
+	if opts.Pipe {
+		prompter = &bufioPromptReader{r: bufio.NewReader(opts.In), w: io.Discard}
+	} else {
+		prompter = newPromptReader(opts.In, opts.Out, historyPath, chatCompleter(opts.AdaptersList, labels))
+	}
 	defer prompter.Close()
 	for {
 		badge := ""
@@ -407,8 +419,10 @@ func Run(ctx context.Context, opts Options) error {
 			continue
 		}
 		if shouldExit(input) {
-			summariseSession(opts.Out, &sess)
-			fmt.Fprintln(opts.Out, "bye")
+			if !opts.Pipe {
+				summariseSession(opts.Out, &sess)
+				fmt.Fprintln(opts.Out, "bye")
+			}
 			break
 		}
 		turnCtx, cancel := signalAwareCtx(ctx, opts.Out)

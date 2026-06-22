@@ -30,6 +30,7 @@ func newChatCmd() *cobra.Command {
 		resumeID    string
 		replayID    string
 		autoGate    bool
+		pipeMode    bool
 	)
 	c := &cobra.Command{
 		Use:   "chat [<session-id|label>]",
@@ -74,6 +75,10 @@ the deterministic planner.`,
 				StepTimeout: stepTimeout,
 				AutoGate:    autoGate,
 				NoAdapter:   noAdapter,
+				Pipe:        pipeMode,
+			}
+			if pipeMode {
+				opts.Plain = true
 			}
 			if resumeID != "" && replayID != "" {
 				return fmt.Errorf("chat: --resume and --replay are mutually exclusive")
@@ -177,6 +182,7 @@ the deterministic planner.`,
 	c.Flags().StringVar(&resumeID, "resume", "", "resume a prior session id from .harness/sessions/")
 	c.Flags().StringVar(&replayID, "replay", "", "open a prior session in read-only mode (inspection slashes only)")
 	c.Flags().BoolVar(&autoGate, "auto-gate", false, "run harness ci after every agent turn (toggle in-chat with /auto-gate)")
+	c.Flags().BoolVar(&pipeMode, "pipe", false, "non-interactive mode for scripts/CI: plain output, no greet/recap, exit on stdin EOF")
 	c.AddCommand(newChatListCmd())
 	return c
 }
