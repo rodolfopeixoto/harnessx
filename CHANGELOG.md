@@ -3,6 +3,32 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-22 — v0.149.0 — Wave 23: mobile/desktop tutorial + MCP & docker wizard (F114)
+
+### New
+
+- **`docs/TUTORIAL-MOBILE-DESKTOP.md`** — full walk wiring Tauri (iOS /
+  Android / desktop) and Electron-Forge desktop variants into the
+  spec-driven `/drive` loop, both pointing at the FastAPI todoist
+  backend. Includes shared OpenAPI client regen recipe and cross-root
+  `harness analytics` example.
+- **Onboarding wizard — MCP server installer:** if any
+  `internal/mcppkg` template ships (filesystem, github, fetch, postgres,
+  sqlite, brave-search, memory), prompts the user and shells out to
+  `harness mcp install <name> --yes` so `.harness/mcp/<name>.json`
+  lands without manually editing JSON.
+- **Onboarding wizard — Docker scaffold:** detects go / python / node
+  via `go.mod` / `pyproject.toml`/`requirements.txt` / `package.json`,
+  writes a `Dockerfile` (distroless go, python:3.12-slim, node:20-alpine)
+  + `docker-compose.yml` with the mandatory `mem_limit: 2g`,
+  `memswap_limit: 2g`, `cpus: '2.0'` triple from the resource-management
+  rule. Existing files are never overwritten.
+
+### Verified
+
+- `go test -race ./cmd/harness -run "Docker|Routes|installedAdapter"`
+  green (6 cases).
+
 ## 2026-06-21 — v0.148.0 — Wave 22: analytics + chat --output-json + wizard ext (F113)
 
 ### New
