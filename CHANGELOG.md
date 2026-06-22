@@ -3,6 +3,23 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-21 — v0.144.0 — Wave 18: multi-stack Todoist tutorial (F109)
+
+### Docs
+
+- New `docs/TUTORIAL-MULTI-STACK.md` ships the **same Todoist
+  domain** (JWT auth, lists, tasks, tags, recurring rules) across
+  every backend stack HarnessX scaffolds today — `python-ecommerce`
+  (FastAPI), `rails` (Rails 7 API), `go` (net/http), `rust` (Axum),
+  `ruby` (Sinatra) — plus a `react` frontend that talks to all five
+  via `VITE_API_BASE`. One shared backlog at
+  `/tmp/todoist-features.md` is fed to `harness drive --features
+  --continue-on-fail` per repo so the same prompts produce the
+  same surface across stacks. Ends with a cross-stack
+  `/tmp/todoist-smoke.sh` that hits the contract on every base
+  URL and a jq one-liner that aggregates per-stack spend from
+  `.harness/sessions/*.jsonl`.
+
 ## 2026-06-21 — v0.143.0 — Wave 17: inline / popup + drive --features + onboarding + VCR adapter (F108)
 
 ### New
