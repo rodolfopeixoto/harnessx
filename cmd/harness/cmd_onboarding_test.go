@@ -124,6 +124,66 @@ func TestAskYesNoExplicit(t *testing.T) {
 	if askYesNo(strings.NewReader("n\n"), out, "?", true) {
 		t.Error("explicit n should be false")
 	}
+	if !askYesNo(strings.NewReader("1\n"), out, "?", false) {
+		t.Error("1 should be true")
+	}
+	if askYesNo(strings.NewReader("0\n"), out, "?", true) {
+		t.Error("0 should be false")
+	}
+	if !askYesNo(strings.NewReader("ok\n"), out, "?", false) {
+		t.Error("ok should be true")
+	}
+}
+
+func TestAskChoiceParsesNumber(t *testing.T) {
+	out := &bytes.Buffer{}
+	idx, err := askChoice(strings.NewReader("2\n"), out, "pick:", []string{"a", "b", "c"}, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if idx != 1 {
+		t.Errorf("want index 1 (b), got %d", idx)
+	}
+}
+
+func TestAskChoiceEmptyUsesDefault(t *testing.T) {
+	out := &bytes.Buffer{}
+	idx, _ := askChoice(strings.NewReader("\n"), out, "pick:", []string{"a", "b", "c"}, 2)
+	if idx != 2 {
+		t.Errorf("want default 2, got %d", idx)
+	}
+}
+
+func TestAskChoiceInvalidFallsBackToDefault(t *testing.T) {
+	out := &bytes.Buffer{}
+	idx, _ := askChoice(strings.NewReader("99\n"), out, "pick:", []string{"a", "b"}, 0)
+	if idx != 0 {
+		t.Errorf("want default 0, got %d", idx)
+	}
+	if !strings.Contains(out.String(), "invalid choice") {
+		t.Errorf("missing invalid-choice warn: %s", out.String())
+	}
+}
+
+func TestAskChoiceEmptyOptionsErrors(t *testing.T) {
+	_, err := askChoice(strings.NewReader("1\n"), &bytes.Buffer{}, "x", nil, 0)
+	if err == nil {
+		t.Fatal("want error for empty options")
+	}
+}
+
+func TestAskLineDefaultWhenBlank(t *testing.T) {
+	got, ok := askLine(strings.NewReader("\n"), &bytes.Buffer{}, "dir", "./default")
+	if !ok || got != "./default" {
+		t.Errorf("default not used: %q ok=%v", got, ok)
+	}
+}
+
+func TestAskLineUsesAnswer(t *testing.T) {
+	got, _ := askLine(strings.NewReader("./custom\n"), &bytes.Buffer{}, "dir", "./default")
+	if got != "./custom" {
+		t.Errorf("want ./custom, got %q", got)
+	}
 }
 
 func TestPickSuggestedAdapterEmptyWhenNoneFound(t *testing.T) {

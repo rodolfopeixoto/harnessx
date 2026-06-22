@@ -3,11 +3,14 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
+	"strconv"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -39,20 +42,111 @@ func newOnboardingCmd() *cobra.Command {
 func runOnboardingInteractive(ctx context.Context, in io.Reader, out io.Writer, root string) error {
 	r := gatherOnboarding(ctx, root)
 	renderOnboarding(out, r)
-	if r.Suggested == "" {
-		fmt.Fprintln(out, "\n"+ui.MarkWarn()+" no agent CLI detected — install one and rerun `harness onboarding --interactive`")
-		return nil
+	reader := bufio.NewReader(in)
+
+	offerMissingToolInstalls(ctx, reader, out, r.Tools)
+	if pinErr := offerAdapterPin(ctx, reader, out, root, r.Adapters); pinErr != nil {
+		return pinErr
 	}
-	fmt.Fprintln(out, "")
-	if !askYesNo(in, out, fmt.Sprintf("pin %s as default adapter?", r.Suggested), true) {
-		fmt.Fprintln(out, "skipped pin — use `harness use <id>` later")
-		return nil
-	}
-	if err := runHarnessSubcommand(ctx, out, root, "use", r.Suggested); err != nil {
-		return fmt.Errorf("onboarding: pin failed: %w", err)
-	}
-	fmt.Fprintln(out, ui.MarkSuccess()+" pinned "+ui.Accent.Render(r.Suggested))
+	offerScaffold(ctx, reader, out)
+	fmt.Fprintln(out, "\n"+ui.Heading.Render("setup done")+" — open a chat with "+ui.Accent.Render("harness chat --auto-gate"))
 	return nil
+}
+
+func offerMissingToolInstalls(ctx context.Context, in *bufio.Reader, out io.Writer, tools []checkedTool) {
+	missing := []checkedTool{}
+	for _, t := range tools {
+		if !t.found && strings.HasPrefix(t.installHint, "brew install ") {
+			missing = append(missing, t)
+		}
+	}
+	if len(missing) == 0 {
+		return
+	}
+	fmt.Fprintln(out, "\n"+ui.Heading.Render("missing system tools"))
+	for _, t := range missing {
+		fmt.Fprintf(out, "  %s missing — install via %s ?\n", ui.Accent.Render(t.name), ui.Muted.Render(t.installHint))
+		if !askYesNo(in, out, "  install now?", true) {
+			fmt.Fprintln(out, "  skipped "+t.name)
+			continue
+		}
+		args := strings.Fields(strings.TrimPrefix(t.installHint, "brew install "))
+		bargs := append([]string{"install"}, args...)
+		fmt.Fprintln(out, "  → brew "+strings.Join(bargs, " "))
+		c := exec.CommandContext(ctx, "brew", bargs...)
+		c.Stdout = out
+		c.Stderr = out
+		if err := c.Run(); err != nil {
+			fmt.Fprintf(out, "  %s brew install %s failed: %v\n", ui.MarkFail(), t.name, err)
+			continue
+		}
+		fmt.Fprintln(out, "  "+ui.MarkSuccess()+" installed "+t.name)
+	}
+}
+
+func offerAdapterPin(ctx context.Context, in *bufio.Reader, out io.Writer, root string, adapters []checkedTool) error {
+	installed := []string{}
+	for _, a := range adapters {
+		if a.found {
+			installed = append(installed, a.name)
+		}
+	}
+	fmt.Fprintln(out, "\n"+ui.Heading.Render("adapter pin"))
+	if len(installed) == 0 {
+		fmt.Fprintln(out, "  "+ui.MarkWarn()+" no agent CLI on PATH; install one of: claude / codex / gemini / kimi / ollama")
+		return nil
+	}
+	choice, err := askChoice(in, out, "  pick the default adapter:", append(installed, "skip"), 0)
+	if err != nil {
+		return err
+	}
+	if choice == len(installed) {
+		fmt.Fprintln(out, "  skipped pin — use `harness use <id>` later")
+		return nil
+	}
+	pick := installed[choice]
+	if err := runHarnessSubcommand(ctx, out, root, "use", pick); err != nil {
+		return fmt.Errorf("onboarding: pin %s: %w", pick, err)
+	}
+	fmt.Fprintln(out, "  "+ui.MarkSuccess()+" pinned "+ui.Accent.Render(pick))
+	return nil
+}
+
+func offerScaffold(ctx context.Context, in *bufio.Reader, out io.Writer) {
+	fmt.Fprintln(out, "\n"+ui.Heading.Render("scaffold a starter project?"))
+	stacks := []string{
+		"python-ecommerce (FastAPI todo skeleton)",
+		"rails (Rails 7 API skeleton)",
+		"go (net/http server)",
+		"rust (Axum web server)",
+		"ruby (Sinatra app)",
+		"react (Vite + Vitest)",
+		"skip",
+	}
+	idx, err := askChoice(in, out, "  pick a stack:", stacks, len(stacks)-1)
+	if err != nil {
+		return
+	}
+	if idx == len(stacks)-1 {
+		fmt.Fprintln(out, "  skipped scaffold — run `harness new <stack> ./dir --yes --with-deps` later")
+		return
+	}
+	stackID := strings.Fields(stacks[idx])[0]
+	target, ok := askLine(in, out, "  target directory", "./my-"+stackID)
+	if !ok {
+		return
+	}
+	withDeps := askYesNo(in, out, "  install dependencies (--with-deps)?", true)
+	args := []string{"new", stackID, target, "--yes"}
+	if withDeps {
+		args = append(args, "--with-deps")
+	}
+	if err := runHarnessSubcommand(ctx, out, ".", args...); err != nil {
+		fmt.Fprintf(out, "  %s scaffold failed: %v\n", ui.MarkFail(), err)
+		return
+	}
+	fmt.Fprintf(out, "  %s scaffold ready at %s\n", ui.MarkSuccess(), ui.Accent.Render(target))
+	fmt.Fprintf(out, "  next: %s\n", ui.Muted.Render("cd "+target+" && harness chat --auto-gate"))
 }
 
 func askYesNo(in io.Reader, out io.Writer, prompt string, defaultYes bool) bool {
@@ -61,7 +155,59 @@ func askYesNo(in io.Reader, out io.Writer, prompt string, defaultYes bool) bool 
 		def = "y/N"
 	}
 	fmt.Fprintf(out, "  %s [%s]: ", prompt, def)
-	buf := make([]byte, 64)
+	answer := trimAndLower(readPromptLine(in))
+	if answer == "" {
+		return defaultYes
+	}
+	switch answer {
+	case "y", "yes", "1", "true", "ok":
+		return true
+	case "n", "no", "0", "false":
+		return false
+	}
+	return defaultYes
+}
+
+func askChoice(in io.Reader, out io.Writer, prompt string, options []string, defaultIdx int) (int, error) {
+	if len(options) == 0 {
+		return 0, fmt.Errorf("askChoice: no options")
+	}
+	fmt.Fprintln(out, prompt)
+	for i, o := range options {
+		marker := "  "
+		if i == defaultIdx {
+			marker = "→ "
+		}
+		fmt.Fprintf(out, "  %s%d) %s\n", marker, i+1, o)
+	}
+	fmt.Fprintf(out, "  pick [1-%d, default %d]: ", len(options), defaultIdx+1)
+	answer := trimAndLower(readPromptLine(in))
+	if answer == "" {
+		return defaultIdx, nil
+	}
+	n, err := strconv.Atoi(answer)
+	if err != nil || n < 1 || n > len(options) {
+		fmt.Fprintf(out, "  %s invalid choice %q — using default %d\n", ui.MarkWarn(), answer, defaultIdx+1)
+		return defaultIdx, nil
+	}
+	return n - 1, nil
+}
+
+func askLine(in io.Reader, out io.Writer, prompt, defaultVal string) (string, bool) {
+	fmt.Fprintf(out, "  %s [%s]: ", prompt, defaultVal)
+	answer := strings.TrimSpace(readPromptLine(in))
+	if answer == "" {
+		return defaultVal, true
+	}
+	return answer, true
+}
+
+func readPromptLine(in io.Reader) string {
+	if br, ok := in.(*bufio.Reader); ok {
+		line, _ := br.ReadString('\n')
+		return strings.TrimRight(line, "\r\n")
+	}
+	buf := make([]byte, 256)
 	n, _ := in.Read(buf)
 	answer := ""
 	for i := 0; i < n; i++ {
@@ -70,11 +216,7 @@ func askYesNo(in io.Reader, out io.Writer, prompt string, defaultYes bool) bool 
 		}
 		answer += string(buf[i])
 	}
-	answer = trimAndLower(answer)
-	if answer == "" {
-		return defaultYes
-	}
-	return answer == "y" || answer == "yes"
+	return answer
 }
 
 func trimAndLower(s string) string {

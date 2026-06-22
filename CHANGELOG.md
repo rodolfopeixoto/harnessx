@@ -3,6 +3,44 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-21 — v0.147.0 — Wave 21: onboarding wizard upgrade (F112)
+
+### Fixed
+
+- **`askYesNo` now accepts `1`/`0`/`true`/`false`/`ok`** alongside
+  `y`/`yes`/`n`/`no`. The v0.146 walk surfaced that typing `1` was
+  silently treated as no, contradicting common keyboard reflexes.
+
+### New
+
+- **`harness onboarding --interactive` is a real wizard now**, not
+  a single yes/no. Reorders into three offers:
+  1. **Missing system tools** — for every `brew install …` hint
+     that detection found absent, prompts `install now? [Y/n]` and
+     runs `brew install <pkg>` straight from the wizard. Lets you
+     fill in `rg`, `jq`, `rclone`, etc. without leaving the
+     terminal.
+  2. **Adapter pin** — numbered choice across every installed
+     adapter CLI plus a `skip` row (default = first available).
+     Picks `claude` / `codex` / `kimi` / `gemini` / `ollama` per
+     user's keystroke, shells out to `harness use <id>`.
+  3. **Scaffold a starter project** — numbered stack picker
+     (python-ecommerce / rails / go / rust / ruby / react / skip),
+     then prompts for the target directory and `--with-deps`,
+     runs `harness new <stack> <dir> --yes [--with-deps]`.
+- New helpers wire the wizard: `askChoice(in, out, prompt,
+  options, defaultIdx)`, `askLine(in, out, prompt, default)`,
+  `readPromptLine(in)`. Uses one shared `bufio.Reader` so multiple
+  prompts in a row do not race on stdin buffering.
+
+### Tests
+
+- `TestAskYesNoExplicit` extended to cover `1`/`0`/`ok`.
+- `TestAskChoiceParsesNumber`, `TestAskChoiceEmptyUsesDefault`,
+  `TestAskChoiceInvalidFallsBackToDefault`,
+  `TestAskChoiceEmptyOptionsErrors`.
+- `TestAskLineDefaultWhenBlank`, `TestAskLineUsesAnswer`.
+
 ## 2026-06-21 — v0.146.0 — Wave 20: chat --pipe + onboarding --interactive (F111)
 
 ### New
