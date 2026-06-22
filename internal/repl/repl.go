@@ -85,6 +85,10 @@ type Options struct {
 	// readline TTY path, so stdin is consumed line-by-line and the
 	// process exits cleanly on EOF.
 	Pipe bool
+	// OutputJSON emits one JSON envelope per completed turn on opts.Out
+	// after the human-readable output, so wrapping tools (CI scripts,
+	// IDE plugins) can parse the result without scraping ANSI text.
+	OutputJSON bool
 }
 
 type SessionSummary struct {
@@ -431,6 +435,9 @@ func Run(ctx context.Context, opts Options) error {
 		sess.Turns = append(sess.Turns, turn)
 		if err := persist(opts.Root, sess); err != nil {
 			fmt.Fprintf(opts.Out, "warn: persist: %v\n", err)
+		}
+		if opts.OutputJSON {
+			emitTurnJSON(opts.Out, sess.ID, turn)
 		}
 	}
 	return persist(opts.Root, sess)
@@ -1509,6 +1516,40 @@ type sessionMeta struct {
 	ContextMark int     `json:"context_mark,omitempty"`
 	AutoGate    bool    `json:"auto_gate,omitempty"`
 	BudgetUSD   float64 `json:"budget_usd,omitempty"`
+}
+
+func emitTurnJSON(w io.Writer, sessionID string, t Turn) {
+	envelope := struct {
+		Session   string    `json:"session"`
+		Time      time.Time `json:"time"`
+		Input     string    `json:"input"`
+		Action    string    `json:"action"`
+		Adapter   string    `json:"adapter_id,omitempty"`
+		TaskTag   string    `json:"task_tag,omitempty"`
+		InTokens  int       `json:"in_tokens,omitempty"`
+		OutTokens int       `json:"out_tokens,omitempty"`
+		CostUSD   float64   `json:"cost_usd,omitempty"`
+		Ok        *bool     `json:"ok,omitempty"`
+	}{
+		Session:   sessionID,
+		Time:      t.Time,
+		Input:     t.Input,
+		Action:    t.Action,
+		Adapter:   t.AdapterID,
+		TaskTag:   t.TaskTag,
+		InTokens:  t.InTokens,
+		OutTokens: t.OutTokens,
+		CostUSD:   t.CostUSD,
+	}
+	if t.Result != nil {
+		ok := t.Result.OK
+		envelope.Ok = &ok
+	}
+	b, err := json.Marshal(envelope)
+	if err != nil {
+		return
+	}
+	_, _ = w.Write(append(b, '\n'))
 }
 
 func persist(root string, s Session) error {

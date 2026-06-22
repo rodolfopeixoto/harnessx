@@ -3,6 +3,7 @@ package repl
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -1030,6 +1031,37 @@ func TestRunPipeModeSuppressesGreetAndRecap(t *testing.T) {
 	}
 	if !strings.Contains(buf.String(), "/exec") {
 		t.Errorf("pipe mode should still print /help output: %s", buf.String())
+	}
+}
+
+func TestRunOutputJSONEmitsTurnEnvelope(t *testing.T) {
+	bin := writeFakeBin(t, "#!/bin/sh\nexit 0\n")
+	var buf bytes.Buffer
+	_ = Run(context.Background(), Options{
+		Root: t.TempDir(), HarnessBin: bin, Goal: intentplan.GoalDev,
+		In:         strings.NewReader("/help\n/exit\n"),
+		Out:        &buf,
+		Pipe:       true,
+		Plain:      true,
+		OutputJSON: true,
+	})
+	found := false
+	for _, line := range strings.Split(buf.String(), "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, "{") {
+			continue
+		}
+		var env map[string]any
+		if err := json.Unmarshal([]byte(line), &env); err != nil {
+			continue
+		}
+		if env["input"] == "/help" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("OutputJSON did not emit /help envelope\n%s", buf.String())
 	}
 }
 
