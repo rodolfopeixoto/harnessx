@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ropeixoto/harnessx/internal/agents"
 	"github.com/ropeixoto/harnessx/internal/platform/constants"
 )
 
@@ -303,6 +304,70 @@ func TestRunDriveBatchAbortsByDefault(t *testing.T) {
 	if !strings.Contains(err.Error(), "aborted on feature 1/2") {
 		t.Errorf("want first-feature abort, got %v", err)
 	}
+}
+
+func TestParseVCRModeKnownValues(t *testing.T) {
+	cases := map[string]bool{
+		"":       false,
+		"auto":   false,
+		"replay": false,
+		"record": false,
+		"RECORD": false,
+		"weird":  true,
+	}
+	for in, wantErr := range cases {
+		_, err := parseVCRMode(in)
+		if (err != nil) != wantErr {
+			t.Errorf("parseVCRMode(%q) err=%v wantErr=%v", in, err, wantErr)
+		}
+	}
+}
+
+func TestWrapWithVCRNoDirReturnsInner(t *testing.T) {
+	inner := &noopAdapter{id: "x"}
+	got, err := wrapWithVCR(inner, "", "auto")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != inner {
+		t.Errorf("expected inner returned when dir empty")
+	}
+}
+
+func TestWrapWithVCRBadModeErrors(t *testing.T) {
+	if _, err := wrapWithVCR(&noopAdapter{}, t.TempDir(), "bogus"); err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestWrapWithVCRWrapsWhenDirSet(t *testing.T) {
+	inner := &noopAdapter{id: "kim"}
+	got, err := wrapWithVCR(inner, t.TempDir(), "auto")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got == inner {
+		t.Errorf("expected wrapped adapter")
+	}
+	if got.Name() != "vcr(kim)" {
+		t.Errorf("expected vcr wrap, got %q", got.Name())
+	}
+}
+
+type noopAdapter struct{ id string }
+
+func (n *noopAdapter) ID() string                        { return n.id }
+func (n *noopAdapter) Name() string                      { return n.id }
+func (n *noopAdapter) Capabilities() agents.Capabilities { return agents.Capabilities{} }
+func (n *noopAdapter) Healthcheck(context.Context) agents.HealthcheckResult {
+	return agents.HealthcheckResult{}
+}
+func (n *noopAdapter) Run(context.Context, agents.AgentRequest) agents.AgentResult {
+	return agents.AgentResult{}
+}
+func (n *noopAdapter) ParseUsage(agents.AgentOutput) agents.Usage { return agents.Usage{} }
+func (n *noopAdapter) ClassifyFailure(agents.AgentOutput, int, error) agents.FailureType {
+	return agents.FailureNone
 }
 
 func TestDriveCommitWritesCommit(t *testing.T) {
