@@ -17,6 +17,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/ropeixoto/harnessx/internal/agents"
+	"github.com/ropeixoto/harnessx/internal/agents/vcr"
 	"github.com/ropeixoto/harnessx/internal/app/agentcmd"
 	"github.com/ropeixoto/harnessx/internal/platform/constants"
 	"github.com/ropeixoto/harnessx/internal/router"
@@ -31,6 +32,8 @@ func newDriveCmd() *cobra.Command {
 		skipCommit     bool
 		featuresPath   string
 		continueOnFail bool
+		vcrDir         string
+		vcrModeStr     string
 	)
 	c := &cobra.Command{
 		Use:   "drive [<prompt>]",
@@ -67,6 +70,7 @@ non-empty, non-comment line (bullet "- " prefix optional).`,
 				return runDriveBatch(cmd.Context(), cmd.OutOrStdout(), driveOpts{
 					root: dir, bin: bin, autonomy: autonomy,
 					maxAttempts: maxAttempts, skipCommit: skipCommit,
+					vcrDir: vcrDir, vcrMode: vcrModeStr,
 				}, prompts, continueOnFail)
 			}
 			if len(args) == 0 {
@@ -79,6 +83,7 @@ non-empty, non-comment line (bullet "- " prefix optional).`,
 			return runDrive(cmd.Context(), cmd.OutOrStdout(), driveOpts{
 				root: dir, bin: bin, prompt: prompt, slug: slug,
 				autonomy: autonomy, maxAttempts: maxAttempts, skipCommit: skipCommit,
+				vcrDir: vcrDir, vcrMode: vcrModeStr,
 			})
 		},
 	}
@@ -88,7 +93,35 @@ non-empty, non-comment line (bullet "- " prefix optional).`,
 	c.Flags().BoolVar(&skipCommit, "skip-commit", false, "do not commit on green")
 	c.Flags().StringVar(&featuresPath, "features", "", "path to a markdown file; one prompt per line")
 	c.Flags().BoolVar(&continueOnFail, "continue-on-fail", false, "with --features: keep going after a failed feature")
+	c.Flags().StringVar(&vcrDir, "vcr", "", "wrap the test-emit adapter with VCR (record/replay) at <dir>")
+	c.Flags().StringVar(&vcrModeStr, "vcr-mode", "auto", "vcr mode: auto|replay|record (only with --vcr)")
 	return c
+}
+
+func parseVCRMode(s string) (vcr.Mode, error) {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "", "auto":
+		return vcr.ModeAuto, nil
+	case "replay":
+		return vcr.ModeReplay, nil
+	case "record":
+		return vcr.ModeRecord, nil
+	}
+	return vcr.ModeAuto, fmt.Errorf("drive: unknown --vcr-mode %q (auto|replay|record)", s)
+}
+
+func wrapWithVCR(inner agents.AgentAdapter, dir, modeStr string) (agents.AgentAdapter, error) {
+	if dir == "" {
+		return inner, nil
+	}
+	mode, err := parseVCRMode(modeStr)
+	if err != nil {
+		return nil, err
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return nil, err
+	}
+	return vcr.New(vcr.Options{Inner: inner, Dir: dir, Mode: mode}), nil
 }
 
 func runDriveBatch(ctx context.Context, out io.Writer, base driveOpts, prompts []string, continueOnFail bool) error {
@@ -143,6 +176,8 @@ type driveOpts struct {
 	autonomy    string
 	maxAttempts int
 	skipCommit  bool
+	vcrDir      string
+	vcrMode     string
 }
 
 func runDrive(ctx context.Context, out io.Writer, opts driveOpts) error {
@@ -194,6 +229,11 @@ func driveTestEmit(ctx context.Context, out io.Writer, opts driveOpts) (string, 
 		return writePlaceholderTest(opts)
 	}
 	adapter := dec.Chain[0]
+	if wrapped, werr := wrapWithVCR(adapter, opts.vcrDir, opts.vcrMode); werr != nil {
+		fmt.Fprintln(out, "  "+ui.MarkWarn()+" "+ui.Warn.Render("vcr disabled: "+werr.Error()))
+	} else {
+		adapter = wrapped
+	}
 	fmt.Fprintln(out, "  "+ui.Info.Render("routing through "+adapter.ID())+
 		ui.Muted.Render(" ("+constants.DriveTaskTestEmit+")"))
 	path, body, err := emitTestsViaAdapter(ctx, adapter, opts)

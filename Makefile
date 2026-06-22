@@ -107,6 +107,13 @@ tutorial-replay: build
 tutorial-smoke: build
 	HARNESS_BIN=$(BIN) bash scripts/tutorial-smoke.sh
 
+# multi-stack-smoke: scaffolds every bundled stack into a temp dir
+# and runs harness ci against each so a regression in any scaffold
+# (go/python/python-ecommerce/react/ruby/rust/rails) fails this
+# target. Also verifies drive --vcr / --features flags exist.
+multi-stack-smoke: build
+	HARNESS_BIN=$(BIN) bash scripts/multi-stack-smoke.sh
+
 # scaffold-fmt: run ruff format against every bundled python scaffold so
 # fresh `harness new python*` projects stay green under
 # `harness ci` (which includes the py_ruff_format sensor with --check).
