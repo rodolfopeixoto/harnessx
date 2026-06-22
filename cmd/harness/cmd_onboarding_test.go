@@ -89,6 +89,41 @@ func TestPickSuggestedAdapterFallsBackToFirstFound(t *testing.T) {
 	}
 }
 
+func TestRenderRoutesYAMLEmitsTaskMapping(t *testing.T) {
+	picks := map[string]string{
+		"planning":       "gemini",
+		"implementation": "claude",
+		"cheap_review":   "kimi",
+	}
+	got := renderRoutesYAML(picks, []string{"claude", "gemini", "kimi"})
+	for _, want := range []string{
+		"routes:",
+		"planning:",
+		"primary: gemini",
+		"implementation:",
+		"primary: claude",
+		"cheap_review:",
+		"primary: kimi",
+		"fallback: [gemini, kimi]",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %q in routes yaml:\n%s", want, got)
+		}
+	}
+}
+
+func TestInstalledAdapterIDsFiltersFound(t *testing.T) {
+	in := []checkedTool{
+		{toolCheck: toolCheck{name: "claude"}, found: true},
+		{toolCheck: toolCheck{name: "codex"}, found: false},
+		{toolCheck: toolCheck{name: "kimi"}, found: true},
+	}
+	got := installedAdapterIDs(in)
+	if len(got) != 2 || got[0] != "claude" || got[1] != "kimi" {
+		t.Errorf("filter wrong: %v", got)
+	}
+}
+
 func TestTrimAndLowerStripsSpaceAndCase(t *testing.T) {
 	cases := map[string]string{
 		"  Y  ":  "y",

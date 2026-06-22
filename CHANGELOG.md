@@ -3,6 +3,36 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-21 — v0.148.0 — Wave 22: analytics + chat --output-json + wizard ext (F113)
+
+### New
+
+- **`harness analytics`** walks one or more project roots and aggregates
+  chat-session spend per stack / adapter+task / day. Detects stack via
+  marker files (go.mod, Cargo.toml, Gemfile+config/application.rb→rails,
+  pyproject.toml, package.json, requirements.txt). Flags `--root`,
+  `--json`, `--since <duration>` for rolling windows. Lets cross-project
+  budgets surface where Claude opus turns vs cheap kimi review turns
+  actually land.
+- **`harness chat --output-json`** emits one JSON envelope per persisted
+  turn on stdout after each turn — session id, input, action, adapter,
+  task tag, in/out tokens, cost, ok flag. Forces `--pipe` mode so the
+  envelope is the only structured byte stream. CI scripts and IDE
+  plugins consume the chat session without scraping ANSI.
+- **`harness onboarding --interactive` extensions:**
+  - prompts to configure `.harness/config/routes.yaml` per task tag
+    (planning / implementation / cheap_review) when more than one
+    adapter is on PATH;
+  - prompts to print `harness backup quickstart` recipe when `rclone`
+    is installed;
+  - prompts to run `harness ci --install-missing` so optional bandit /
+    mypy / pip-audit land before the first sensor run.
+
+### Verified
+
+- `go test -race ./internal/analytics ./internal/repl ./cmd/harness`
+  green (214 cases).
+
 ## 2026-06-21 — v0.147.0 — Wave 21: onboarding wizard upgrade (F112)
 
 ### Fixed
