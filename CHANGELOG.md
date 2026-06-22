@@ -3,6 +3,29 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-21 — v0.146.0 — Wave 20: chat --pipe + onboarding --interactive (F111)
+
+### New
+
+- **`harness chat --pipe`** is the non-interactive mode for scripts
+  and CI. Forces `Plain`, skips the greeting + session recap +
+  `bye` line, bypasses the chzyer/readline TTY path, and consumes
+  stdin line-by-line so a piped backlog runs cleanly:
+  `printf '/agents\n/exit\n' | harness chat --pipe`.
+- **`harness onboarding --interactive`** runs the detection pass,
+  then prompts to pin the suggested adapter (`Y/n`) and shells out
+  to `harness use <id>` when accepted. New `askYesNo` /
+  `trimAndLower` / `runHarnessSubcommand` helpers + 3 unit tests
+  cover defaults, explicit yes/no, and case insensitivity.
+
+### Tests
+
+- `TestRunPipeModeSuppressesGreetAndRecap`,
+  `TestRunNonPipePrintsGreetAndRecap` — confirm pipe vs interactive
+  branching of the REPL session header + footer.
+- `TestTrimAndLowerStripsSpaceAndCase`, `TestAskYesNoDefaults`,
+  `TestAskYesNoExplicit` — interactive prompt helpers.
+
 ## 2026-06-21 — v0.145.0 — Wave 19: drive --vcr + multi-stack smoke (F110)
 
 ### New

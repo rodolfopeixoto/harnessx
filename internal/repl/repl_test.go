@@ -1009,6 +1009,46 @@ func TestRunExitPrintsRecap(t *testing.T) {
 	}
 }
 
+func TestRunPipeModeSuppressesGreetAndRecap(t *testing.T) {
+	bin := writeFakeBin(t, "#!/bin/sh\nexit 0\n")
+	var buf bytes.Buffer
+	_ = Run(context.Background(), Options{
+		Root: t.TempDir(), HarnessBin: bin, Goal: intentplan.GoalDev,
+		In:    strings.NewReader("/help\n/exit\n"),
+		Out:   &buf,
+		Pipe:  true,
+		Plain: true,
+	})
+	for _, banned := range []string{
+		"harness chat — session",
+		"session recap",
+		"bye",
+	} {
+		if strings.Contains(buf.String(), banned) {
+			t.Errorf("pipe mode should not print %q\n%s", banned, buf.String())
+		}
+	}
+	if !strings.Contains(buf.String(), "/exec") {
+		t.Errorf("pipe mode should still print /help output: %s", buf.String())
+	}
+}
+
+func TestRunNonPipePrintsGreetAndRecap(t *testing.T) {
+	bin := writeFakeBin(t, "#!/bin/sh\nexit 0\n")
+	var buf bytes.Buffer
+	_ = Run(context.Background(), Options{
+		Root: t.TempDir(), HarnessBin: bin, Goal: intentplan.GoalDev,
+		In:  strings.NewReader("/exit\n"),
+		Out: &buf,
+	})
+	if !strings.Contains(buf.String(), "harness chat — session") {
+		t.Errorf("non-pipe greet missing: %s", buf.String())
+	}
+	if !strings.Contains(buf.String(), "bye") {
+		t.Errorf("non-pipe bye missing: %s", buf.String())
+	}
+}
+
 func TestRunIgnoresBlankLines(t *testing.T) {
 	bin := writeFakeBin(t, "#!/bin/sh\nexit 0\n")
 	var out bytes.Buffer
