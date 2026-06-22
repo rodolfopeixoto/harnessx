@@ -89,6 +89,43 @@ func TestPickSuggestedAdapterFallsBackToFirstFound(t *testing.T) {
 	}
 }
 
+func TestTrimAndLowerStripsSpaceAndCase(t *testing.T) {
+	cases := map[string]string{
+		"  Y  ":  "y",
+		"NO":     "no",
+		"":       "",
+		"  yes ": "yes",
+	}
+	for in, want := range cases {
+		if got := trimAndLower(in); got != want {
+			t.Errorf("trimAndLower(%q)=%q want %q", in, got, want)
+		}
+	}
+}
+
+func TestAskYesNoDefaults(t *testing.T) {
+	out := &bytes.Buffer{}
+	if !askYesNo(strings.NewReader("\n"), out, "yes default?", true) {
+		t.Error("empty answer should accept default true")
+	}
+	if askYesNo(strings.NewReader("\n"), out, "no default?", false) {
+		t.Error("empty answer should accept default false")
+	}
+}
+
+func TestAskYesNoExplicit(t *testing.T) {
+	out := &bytes.Buffer{}
+	if !askYesNo(strings.NewReader("y\n"), out, "?", false) {
+		t.Error("explicit y should be true")
+	}
+	if !askYesNo(strings.NewReader("YES\n"), out, "?", false) {
+		t.Error("YES should be true")
+	}
+	if askYesNo(strings.NewReader("n\n"), out, "?", true) {
+		t.Error("explicit n should be false")
+	}
+}
+
 func TestPickSuggestedAdapterEmptyWhenNoneFound(t *testing.T) {
 	a := []checkedTool{
 		{toolCheck: toolCheck{name: "claude"}, found: false},

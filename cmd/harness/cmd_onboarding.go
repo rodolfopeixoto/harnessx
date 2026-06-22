@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 
 	"github.com/spf13/cobra"
@@ -16,7 +17,8 @@ import (
 )
 
 func newOnboardingCmd() *cobra.Command {
-	return &cobra.Command{
+	var interactive bool
+	c := &cobra.Command{
 		Use:   "onboarding",
 		Short: "Detect installed agent CLIs + dev tools and print next-step recipe",
 		RunE: func(cmd *cobra.Command, _ []string) error {
@@ -24,9 +26,82 @@ func newOnboardingCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			if interactive {
+				return runOnboardingInteractive(cmd.Context(), cmd.InOrStdin(), cmd.OutOrStdout(), dir)
+			}
 			return runOnboarding(cmd.Context(), cmd.OutOrStdout(), dir)
 		},
 	}
+	c.Flags().BoolVar(&interactive, "interactive", false, "prompt to pin a suggested adapter and run setup actions")
+	return c
+}
+
+func runOnboardingInteractive(ctx context.Context, in io.Reader, out io.Writer, root string) error {
+	r := gatherOnboarding(ctx, root)
+	renderOnboarding(out, r)
+	if r.Suggested == "" {
+		fmt.Fprintln(out, "\n"+ui.MarkWarn()+" no agent CLI detected — install one and rerun `harness onboarding --interactive`")
+		return nil
+	}
+	fmt.Fprintln(out, "")
+	if !askYesNo(in, out, fmt.Sprintf("pin %s as default adapter?", r.Suggested), true) {
+		fmt.Fprintln(out, "skipped pin — use `harness use <id>` later")
+		return nil
+	}
+	if err := runHarnessSubcommand(ctx, out, root, "use", r.Suggested); err != nil {
+		return fmt.Errorf("onboarding: pin failed: %w", err)
+	}
+	fmt.Fprintln(out, ui.MarkSuccess()+" pinned "+ui.Accent.Render(r.Suggested))
+	return nil
+}
+
+func askYesNo(in io.Reader, out io.Writer, prompt string, defaultYes bool) bool {
+	def := "Y/n"
+	if !defaultYes {
+		def = "y/N"
+	}
+	fmt.Fprintf(out, "  %s [%s]: ", prompt, def)
+	buf := make([]byte, 64)
+	n, _ := in.Read(buf)
+	answer := ""
+	for i := 0; i < n; i++ {
+		if buf[i] == '\n' || buf[i] == '\r' {
+			break
+		}
+		answer += string(buf[i])
+	}
+	answer = trimAndLower(answer)
+	if answer == "" {
+		return defaultYes
+	}
+	return answer == "y" || answer == "yes"
+}
+
+func trimAndLower(s string) string {
+	out := make([]byte, 0, len(s))
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if c == ' ' || c == '\t' {
+			continue
+		}
+		if c >= 'A' && c <= 'Z' {
+			c += 32
+		}
+		out = append(out, c)
+	}
+	return string(out)
+}
+
+func runHarnessSubcommand(ctx context.Context, out io.Writer, dir string, args ...string) error {
+	bin, err := os.Executable()
+	if err != nil {
+		return err
+	}
+	cmd := exec.CommandContext(ctx, bin, args...)
+	cmd.Dir = dir
+	cmd.Stdout = out
+	cmd.Stderr = out
+	return cmd.Run()
 }
 
 type toolCheck struct {
