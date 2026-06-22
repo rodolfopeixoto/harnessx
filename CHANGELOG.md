@@ -3,6 +3,27 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-21 — v0.145.0 — Wave 19: drive --vcr + multi-stack smoke (F110)
+
+### New
+
+- **`harness drive --vcr <dir> [--vcr-mode auto|replay|record]`**
+  wraps the cheap_review test-emit adapter with the recorder/player
+  from `internal/agents/vcr`. Lets a real cheap-chain call land
+  once at `<dir>/<sha1>.json` and replay on every subsequent run
+  without burning tokens. `--vcr-mode replay` is the harness for
+  CI: missing cassette → loud error instead of a silent live call.
+- **`scripts/multi-stack-smoke.sh`** scaffolds every bundled stack
+  (`go`, `python`, `python-ecommerce`, `react`, `ruby`, `rust`,
+  `rails`) into a temp dir, runs `harness ci` against each,
+  asserts the summary line, then verifies `harness drive --help`
+  exposes `--vcr` / `--features` / `--continue-on-fail`, and
+  finally re-runs `harness onboarding`. Catches a regression in
+  any scaffold the moment it ships.
+- New `wrapWithVCR(inner, dir, modeStr)` + `parseVCRMode(s)`
+  helpers + 4 unit tests covering empty-dir passthrough, bad-mode
+  rejection, real-wrap, and known-mode parsing.
+
 ## 2026-06-21 — v0.144.0 — Wave 18: multi-stack Todoist tutorial (F109)
 
 ### Docs
