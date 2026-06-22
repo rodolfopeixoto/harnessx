@@ -4,7 +4,7 @@ package version
 
 var (
 	// Set via -ldflags "-X github.com/ropeixoto/harnessx/internal/version.Version=..."
-	Version = "v0.148.0"
+	Version = "v0.149.0"
 	Commit  = "unknown"
 	Date    = "unknown"
 )

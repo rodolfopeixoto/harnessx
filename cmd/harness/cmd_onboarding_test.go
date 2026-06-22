@@ -4,6 +4,8 @@ package main
 
 import (
 	"bytes"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -121,6 +123,59 @@ func TestInstalledAdapterIDsFiltersFound(t *testing.T) {
 	got := installedAdapterIDs(in)
 	if len(got) != 2 || got[0] != "claude" || got[1] != "kimi" {
 		t.Errorf("filter wrong: %v", got)
+	}
+}
+
+func TestDetectDockerStackProbes(t *testing.T) {
+	dir := t.TempDir()
+	if got := detectDockerStack(dir); got != "" {
+		t.Errorf("empty dir should return '', got %q", got)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte(""), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := detectDockerStack(dir); got != "go" {
+		t.Errorf("want go, got %q", got)
+	}
+}
+
+func TestRenderDockerScaffoldGo(t *testing.T) {
+	df, compose := renderDockerScaffold("go")
+	if !strings.Contains(df, "FROM golang") {
+		t.Errorf("go dockerfile missing FROM golang: %s", df)
+	}
+	if !strings.Contains(compose, "mem_limit: 2g") {
+		t.Errorf("compose missing mem_limit: %s", compose)
+	}
+	if !strings.Contains(compose, "8080:8080") {
+		t.Errorf("go compose port wrong: %s", compose)
+	}
+}
+
+func TestRenderDockerScaffoldPython(t *testing.T) {
+	df, compose := renderDockerScaffold("python")
+	if !strings.Contains(df, "python:3.12") {
+		t.Errorf("python dockerfile wrong: %s", df)
+	}
+	if !strings.Contains(compose, "8000:8000") {
+		t.Errorf("python port wrong: %s", compose)
+	}
+}
+
+func TestRenderDockerScaffoldNode(t *testing.T) {
+	df, compose := renderDockerScaffold("node")
+	if !strings.Contains(df, "node:20-alpine") {
+		t.Errorf("node dockerfile wrong: %s", df)
+	}
+	if !strings.Contains(compose, "3000:3000") {
+		t.Errorf("node port wrong: %s", compose)
+	}
+}
+
+func TestRenderDockerScaffoldUnknownReturnsEmpty(t *testing.T) {
+	df, compose := renderDockerScaffold("rust")
+	if df != "" || compose != "" {
+		t.Errorf("unknown stack should return empty pair, got df=%q compose=%q", df, compose)
 	}
 }
 
