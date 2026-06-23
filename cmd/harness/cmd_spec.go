@@ -34,6 +34,6 @@ func newSpecCmd() *cobra.Command {
 	initC.Flags().StringVar(&mode, "mode", string(domain.ModeFeature),
 		"mode (feature|bugfix|design_to_product|optimization|audit|review|setup)")
 
-	c.AddCommand(initC)
+	c.AddCommand(initC, newSpecAuthorCmd())
 	return c
 }

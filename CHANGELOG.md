@@ -3,6 +3,31 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-23 — v0.150.0 — Wave 24: interactive spec authoring loop (F115)
+
+### New
+
+- **`internal/specflow`** — pure-logic + filesystem package that drives
+  a human-in-the-loop spec authoring session: baseline + LLM-derived
+  clarifying questions, draft via the planning chain, refine/expand/
+  shrink one section through the LLM, `$EDITOR` integration, revision
+  history with `/undo`, line-level diff between revisions, and final
+  persist to `.harness/artifacts/specs/<id>.md` plus
+  `<id>.history.jsonl`.
+- **`harness spec author "<prompt>"`** — REPL wrapping the package.
+  Commands: `/show /sections /edit /refine [sec:] <instr> /expand
+  [sec] /shrink [sec] /diff /undo /save /cancel`. Flags
+  `--no-interactive`, `--skip-questions`, `--accept-draft`,
+  `--adapter`. Runs offline (baseline-only spec) when no adapter is
+  pinned, so the wizard never hard-fails without an LLM.
+- **`/spec <prompt>` slash in chat** — same flow available from inside
+  `harness chat`, listed in `/help` and slash completion.
+
+### Verified
+
+- `go test -race -cover ./internal/specflow` (30 cases, 92.1% coverage).
+- `go test -race ./cmd/harness` green (Spec\* + existing wizard suites).
+
 ## 2026-06-22 — v0.149.0 — Wave 23: mobile/desktop tutorial + MCP & docker wizard (F114)
 
 ### New
