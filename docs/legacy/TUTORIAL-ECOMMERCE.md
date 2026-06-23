@@ -1,3 +1,5 @@
+> **Legado.** Substituído por [docs/TUTORIAL.md](../TUTORIAL.md). Mantido aqui só para referência histórica.
+
 # Tutorial — Build a real e-commerce backend with HarnessX
 
 A complete, file-by-file walk that takes a fresh laptop to a green

@@ -110,7 +110,7 @@ harness ship "implement GET /products with pytest" --plan ${PLAN_ID}
 harness chat --goal dev --adapter ollama
 ```
 
-Full end-to-end walk-through: [docs/TUTORIAL-ECOMMERCE.md](docs/TUTORIAL-ECOMMERCE.md).
+Full end-to-end walk-through: [docs/TUTORIAL.md](docs/TUTORIAL.md).
 
 ---
 
@@ -205,7 +205,7 @@ specific command and a specific test path. The full table lives in
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Runtime architecture, layered explanation, disk layout, data flow for every entry point |
 | [docs/COMMANDS.md](docs/COMMANDS.md) | Every `harness` command on one page (flags, env vars, exit codes, output paths) |
 | [docs/PAPER-MAPPING.md](docs/PAPER-MAPPING.md) | Paper § → command → package → test |
-| [docs/TUTORIAL-ECOMMERCE.md](docs/TUTORIAL-ECOMMERCE.md) | End-to-end tutorial: small FastAPI e-commerce backend exercising every layer |
+| [docs/TUTORIAL.md](docs/TUTORIAL.md) | Canonical end-to-end tutorial: onboarding → spec → drive → multi-agent → analytics → ship |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | GitFlow, conventional commits, pre-push gate, coverage floor |
 | [SECURITY.md](SECURITY.md) | Coordinated disclosure policy |
 | [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) | Contributor Covenant |

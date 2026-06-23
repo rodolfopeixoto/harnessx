@@ -1,3 +1,5 @@
+> **Legado.** Substituído por [docs/TUTORIAL.md](../TUTORIAL.md). Mantido aqui só para referência histórica.
+
 # Tutorial — Build the same Todoist across Python, Rails, Go, Rust, Ruby + React
 
 A single hands-on walk that ships the **same Todoist domain** through
