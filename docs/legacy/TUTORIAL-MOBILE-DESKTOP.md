@@ -1,3 +1,5 @@
+> **Legado.** Substituído por [docs/TUTORIAL.md](../TUTORIAL.md). Mantido aqui só para referência histórica.
+
 # Tutorial — Mobile (Tauri) + Desktop (Electron) with HarnessX
 
 Goal: drive a Todoist-style task client from one chat session, shipping

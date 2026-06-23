@@ -1,3 +1,5 @@
+> **Legado.** Substituído por [docs/TUTORIAL.md](../TUTORIAL.md). Mantido aqui só para referência histórica.
+
 # Tutorial — Ship a real Todoist clone with HarnessX
 
 End-to-end build of a productivity SaaS: FastAPI backend, React +

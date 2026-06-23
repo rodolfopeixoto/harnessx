@@ -3,6 +3,26 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-23 — v0.151.0 — Wave 25: unified canonical tutorial (F116)
+
+### New
+
+- **`docs/TUTORIAL.md`** — single canonical end-to-end tutorial that
+  unifies the previous four (`TUTORIAL-ECOMMERCE`, `TUTORIAL-TODOIST`,
+  `TUTORIAL-MULTI-STACK`, `TUTORIAL-MOBILE-DESKTOP`). Covers the full
+  flow with explanations of *why* every command exists: onboarding
+  wizard prompts table, multi-adapter routing, spec author edit loop,
+  TDD via `harness drive`, sensor catalogue, deterministic vs LLM
+  decision rule, cost analytics, MCP servers, docker scaffold, backup,
+  paper § parallels (PEV / plan-as-contract / sensor catalogue /
+  context engineering / VCR), adoption checklist.
+
+### Changed
+
+- Old per-stack tutorials moved to `docs/legacy/` with a banner
+  pointing at the new canonical doc. README + ARCHITECTURE references
+  updated.
+
 ## 2026-06-23 — v0.150.0 — Wave 24: interactive spec authoring loop (F115)
 
 ### New
