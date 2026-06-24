@@ -109,11 +109,30 @@ func resolveNewInputs(opts *newOptions, langs []string, out io.Writer) error {
 			opts.stack = s
 		}
 		if opts.target == "" {
-			s, err := promptString(opts.stdin, out, "target dir", "./"+opts.stack+"-app")
-			if err != nil {
-				return err
+			cwd, _ := os.Getwd()
+			fallback := "./" + opts.stack + "-app"
+			fmt.Fprintf(out, "\ncurrent dir: %s\n", cwd)
+			fmt.Fprintln(out, "tip: use an absolute path (/Users/...) or relative (./, ../) — the project will land at <resolved> below.")
+			for attempt := 0; attempt < 3; attempt++ {
+				s, err := promptString(opts.stdin, out, "target dir", fallback)
+				if err != nil {
+					return err
+				}
+				abs, _ := filepath.Abs(s)
+				fmt.Fprintf(out, "  → resolves to %s\n", abs)
+				confirm, err := promptString(opts.stdin, out, "ok? (yes / new path)", "yes")
+				if err != nil {
+					return err
+				}
+				if strings.EqualFold(strings.TrimSpace(confirm), "yes") || confirm == "" {
+					opts.target = s
+					break
+				}
+				fallback = strings.TrimSpace(confirm)
 			}
-			opts.target = s
+			if opts.target == "" {
+				return fmt.Errorf("new: target dir not confirmed after 3 attempts")
+			}
 		}
 	}
 	if opts.stack == "" || opts.target == "" {
@@ -136,10 +155,10 @@ func prepareNewTarget(ctx context.Context, opts *newOptions, out io.Writer) (str
 	if err := guardNewTarget(abs); err != nil {
 		return "", err
 	}
+	fmt.Fprintf(out, "new: creating at %s (stack %s)\n", abs, opts.stack)
 	if err := os.MkdirAll(abs, 0o755); err != nil {
 		return "", err
 	}
-	fmt.Fprintf(out, "new: target %s, stack %s\n", abs, opts.stack)
 	if !scm.HasRepo(abs) {
 		if err := scm.Init(ctx, abs, opts.gitBranch); err != nil {
 			return "", fmt.Errorf("git init: %w", err)

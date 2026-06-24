@@ -1034,6 +1034,24 @@ func TestRunPipeModeSuppressesGreetAndRecap(t *testing.T) {
 	}
 }
 
+func TestLooksLikeShellOrSlash(t *testing.T) {
+	cases := map[string]bool{
+		"harness use 4":                  true,
+		"use kimi":                       true,
+		"exec add /readyz":               true,
+		"hello agent":                    false,
+		"please add a /healthz endpoint": false,
+		"":                               false,
+		"!ls":                            false,
+	}
+	for in, wantHint := range cases {
+		got := looksLikeShellOrSlash(in)
+		if (got != "") != wantHint {
+			t.Errorf("looksLikeShellOrSlash(%q)=%q want hint=%v", in, got, wantHint)
+		}
+	}
+}
+
 func TestRunOutputJSONEmitsTurnEnvelope(t *testing.T) {
 	bin := writeFakeBin(t, "#!/bin/sh\nexit 0\n")
 	var buf bytes.Buffer

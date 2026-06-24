@@ -64,8 +64,14 @@ Use --no-interactive to write a baseline-only spec without prompting.`,
 
 			reader := bufio.NewReader(in)
 			if !skipAsk {
-				sess.Questions = append(sess.Questions, specflow.BaselineQuestions...)
-				sess.Questions = append(sess.Questions, specflow.ContextQuestions(cmd.Context(), adapter, prompt)...)
+				sess.Mode = askSpecMode(reader, out)
+				sess.Template = askSpecTemplate(reader, out)
+				sess.Questions = append(sess.Questions, specflow.QuestionsFor(sess.Template)...)
+				ctxQs, ctxErr := specflow.ContextQuestionsFor(cmd.Context(), adapter, prompt, sess.Mode, sess.Template)
+				if ctxErr != nil {
+					fmt.Fprintf(out, "  %s spec: skipping context questions (adapter err: %v)\n", ui.MarkWarn(), ctxErr)
+				}
+				sess.Questions = append(sess.Questions, ctxQs...)
 				if err := collectSpecAnswers(reader, out, sess); err != nil {
 					return err
 				}
@@ -111,6 +117,28 @@ func resolveSpecAuthorAdapter(root, override string, out io.Writer) agents.Agent
 		return nil
 	}
 	return a
+}
+
+func askSpecMode(r *bufio.Reader, out io.Writer) string {
+	fmt.Fprintln(out, "\n"+ui.Heading.Render("spec mode")+" — what kind of work is this?")
+	idx, err := askChoice(r, out, "  mode:", specflow.Modes, 0)
+	if err != nil {
+		return specflow.Modes[0]
+	}
+	return specflow.Modes[idx]
+}
+
+func askSpecTemplate(r *bufio.Reader, out io.Writer) string {
+	fmt.Fprintln(out, "\n"+ui.Heading.Render("recurring pattern")+" — pick a template if one matches; templates inject extra questions + skeleton")
+	options := make([]string, len(specflow.Templates))
+	for i, t := range specflow.Templates {
+		options[i] = t.ID + "  — " + t.Description
+	}
+	idx, err := askChoice(r, out, "  template:", options, 0)
+	if err != nil {
+		return "none"
+	}
+	return specflow.Templates[idx].ID
 }
 
 func collectSpecAnswers(r *bufio.Reader, out io.Writer, sess *specflow.Session) error {

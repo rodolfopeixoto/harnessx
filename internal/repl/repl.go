@@ -410,7 +410,7 @@ func Run(ctx context.Context, opts Options) error {
 		if opts.HealthProbe != nil {
 			badge = agenthealth.Badge(opts.HealthProbe.Snapshot(), opts.Plain)
 		}
-		prompt := fmt.Sprintf("\n[%s%s]> ", sess.Goal, badge)
+		prompt := fmt.Sprintf("[%s%s]> ", sess.Goal, badge)
 		continuation := fmt.Sprintf("[%s]… ", sess.Goal)
 		input, err := prompter.ReadInput(prompt, continuation)
 		if err != nil {
@@ -523,6 +523,12 @@ func handleInput(ctx context.Context, sess *Session, opts *Options, input string
 	case input == "/recap":
 		turn.Action = "recap"
 		recapSession(ctx, sess, *opts, &turn)
+	case strings.HasPrefix(input, "/btw "):
+		turn.Action = "btw"
+		quickAnswer(ctx, sess, *opts, strings.TrimSpace(strings.TrimPrefix(input, "/btw ")), &turn)
+	case input == "/cycle":
+		turn.Action = "cycle"
+		cycleAdapter(opts)
 	case input == "/clear":
 		turn.Action = "clear-context"
 		sess.ContextMark = len(sess.Turns)
@@ -582,6 +588,11 @@ func handleInput(ctx context.Context, sess *Session, opts *Options, input string
 			return turn
 		}
 		if opts.Adapter != nil {
+			if hint := looksLikeShellOrSlash(input); hint != "" {
+				fmt.Fprintln(opts.Out, hint)
+				turn.Action = "guard-shell-like"
+				return turn
+			}
 			if !checkBudget(sess, opts.Out) {
 				turn.Action = "budget-exceeded"
 				return turn
@@ -602,6 +613,73 @@ func handleInput(ctx context.Context, sess *Session, opts *Options, input string
 		executePlan(ctx, sess, *opts, input, &turn)
 	}
 	return turn
+}
+
+// quickAnswer routes a `/btw <question>` through the cheapest
+// adapter chain (task tag cheap_review) so users can fire a side
+// question without burning opus tokens. Costs are recorded on the
+// turn so /cost + analytics aggregate them under the btw tag.
+func quickAnswer(ctx context.Context, sess *Session, opts Options, question string, turn *Turn) {
+	if question == "" {
+		fmt.Fprintln(opts.Out, "  /btw needs a question")
+		return
+	}
+	if !checkBudget(sess, opts.Out) {
+		return
+	}
+	prompt := "Answer this side question briefly (<=3 sentences). Do not propose code or actions; just a direct answer.\n\nQuestion: " + question
+	chatTurnFor(ctx, sess, opts, prompt, "cheap_review", turn)
+}
+
+// cycleAdapter rotates opts.Adapter to the next registered adapter,
+// printing the new pick + cost label. Used by `/cycle` and (when the
+// readline Listener intercepts Shift+Tab) by the popup.
+func cycleAdapter(opts *Options) {
+	if len(opts.AdaptersList) == 0 {
+		fmt.Fprintln(opts.Out, "  ✗ no other adapters registered")
+		return
+	}
+	idx := -1
+	for i, id := range opts.AdaptersList {
+		if id == opts.AdapterID {
+			idx = i
+			break
+		}
+	}
+	next := opts.AdaptersList[(idx+1)%len(opts.AdaptersList)]
+	if opts.SwitchTo == nil {
+		fmt.Fprintln(opts.Out, "  ✗ adapter switching not wired in this session")
+		return
+	}
+	a, id, err := opts.SwitchTo(next)
+	if err != nil {
+		fmt.Fprintf(opts.Out, "  ✗ cycle: %v\n", err)
+		return
+	}
+	opts.Adapter = a
+	opts.AdapterID = id
+	fmt.Fprintf(opts.Out, "  [swap] now using %s (%s)\n", id, adapterBillingMode(id))
+}
+
+// looksLikeShellOrSlash detects inputs that look like CLI commands
+// being typed into the chat by mistake — the user expected the REPL
+// to parse `harness use 4` or `exec do thing` as a command but the
+// REPL would otherwise bill them for a full agent turn. Returns the
+// warning message when triggered, empty when input is legit chat.
+func looksLikeShellOrSlash(input string) string {
+	first := firstToken(input)
+	if first == "" {
+		return ""
+	}
+	if first == "harness" {
+		return "  [guard] looks like a shell command. To run a shell command from chat prefix with '!' (e.g. !" + input + "). Slash equivalents: /use <id>, /ci, /test, /lint. Skipping the agent call to save tokens."
+	}
+	for _, slashish := range []string{"use", "exec", "do", "ship", "drive", "spec", "plan", "ci", "test", "lint", "agents", "cost", "diff", "save", "branch", "recap", "auto-gate", "budget", "goal", "help", "exit"} {
+		if first == slashish {
+			return "  [guard] '" + input + "' looks like a slash command — did you mean '/" + input + "'? Skipping the agent call. Prefix with '/' or '!' to run."
+		}
+	}
+	return ""
 }
 
 // switchAdapter performs /use mid-session. Delegates to the SwitchTo
@@ -682,7 +760,7 @@ func isMutatingInput(input string) bool {
 	mutating := []string{
 		"/exec ", "/do ", "/ship ", "/drive ", "/spec ", "/ci", "/test", "/lint",
 		"/use ", "/budget ", "/auto-gate", "/autogate",
-		"/clear", "/save ", "/recap", "/plan ", "/goal ",
+		"/clear", "/save ", "/recap", "/btw ", "/cycle", "/plan ", "/goal ",
 		"/last", "/branch ", "/save-prompt ", "/prompt ",
 	}
 	for _, p := range mutating {
@@ -1154,6 +1232,7 @@ func greet(out io.Writer, s Session) {
 	fmt.Fprintf(out, "harness chat — session %s, goal=%s\n", s.ID, s.Goal)
 	fmt.Fprintln(out, `plain text → talk to agent · /exec → plan+run · !<cmd> → shell · /help · /exit`)
 	fmt.Fprintln(out, ui.Muted.Render(`multi-line: end line with \  ·  or wrap with """ … """  ·  / lists slashes`))
+	fmt.Fprintln(out)
 }
 
 func printHelp(out io.Writer) {
@@ -1320,6 +1399,8 @@ func printSlashMenu(out io.Writer) {
 			{"/drive <p>", "spec → failing tests → impl → ci"},
 			{"/spec <p>", "interactive editable spec author (Q&A + edit)"},
 			{"/recap", "cheap chain summary of session so far"},
+			{"/btw <q>", "side question on the cheapest chain (no impact on current thread)"},
+			{"/cycle", "rotate to the next registered adapter (cheap → expensive)"},
 		}},
 		{"gate", []slashEntry{
 			{"/ci", "harness ci"},

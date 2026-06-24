@@ -21,7 +21,7 @@ import (
 
 func newMCPCmd() *cobra.Command {
 	c := &cobra.Command{Use: "mcp", Short: "MCP server discovery, listing, install"}
-	c.AddCommand(mcpListCmd(), mcpScanCmd(), mcpInstallCmd(), mcpTemplatesCmd())
+	c.AddCommand(mcpListCmd(), mcpScanCmd(), mcpInstallCmd(), mcpTemplatesCmd(), mcpSearchCmd())
 	return c
 }
 

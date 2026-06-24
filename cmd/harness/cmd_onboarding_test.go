@@ -72,13 +72,17 @@ func TestRenderOnboardingFlagsNoAgentInstalled(t *testing.T) {
 	}
 }
 
-func TestPickSuggestedAdapterPrefersClaude(t *testing.T) {
+func TestPickSuggestedAdapterPrefersCheapest(t *testing.T) {
+	// Wave 26 reversed the preference: when several adapters are
+	// installed, suggest the cheapest available (ollama → kimi →
+	// gemini → codex → claude). User explicitly promotes via
+	// `harness use <id>` when they want the stronger model.
 	a := []checkedTool{
-		{toolCheck: toolCheck{name: "gemini"}, found: true},
 		{toolCheck: toolCheck{name: "claude"}, found: true},
+		{toolCheck: toolCheck{name: "gemini"}, found: true},
 	}
-	if got := pickSuggestedAdapter(a, t.TempDir()); got != "claude" {
-		t.Errorf("want claude, got %q", got)
+	if got := pickSuggestedAdapter(a, t.TempDir()); got != "gemini" {
+		t.Errorf("want gemini (cheaper), got %q", got)
 	}
 }
 
