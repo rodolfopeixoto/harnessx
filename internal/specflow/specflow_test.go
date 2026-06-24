@@ -266,15 +266,33 @@ func TestParseQuestionsRejectsGarbage(t *testing.T) {
 
 func TestContextQuestionsParsesAdapter(t *testing.T) {
 	a := newFakeReturning(`[{"key":"db","prompt":"Which DB?"}]`)
-	got := ContextQuestions(context.Background(), a, "x")
+	got, err := ContextQuestions(context.Background(), a, "x")
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(got) != 1 || got[0].Key != "db" {
 		t.Errorf("want 1 question 'db', got %v", got)
 	}
 }
 
 func TestContextQuestionsNilAdapter(t *testing.T) {
-	if got := ContextQuestions(context.Background(), nil, "x"); got != nil {
+	got, err := ContextQuestions(context.Background(), nil, "x")
+	if err != nil {
+		t.Error("nil adapter must not error")
+	}
+	if got != nil {
 		t.Error("nil adapter must return nil")
+	}
+}
+
+func TestContextQuestionsForIncludesModeAndTemplate(t *testing.T) {
+	a := newFakeReturning(`[{"key":"refresh","prompt":"Refresh token TTL?"}]`)
+	got, err := ContextQuestionsFor(context.Background(), a, "JWT for /tasks", "feature", "auth")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0].Key != "refresh" {
+		t.Errorf("want refresh question, got %v", got)
 	}
 }
 
@@ -389,11 +407,15 @@ func TestRefineEmptyResponseErrors(t *testing.T) {
 	}
 }
 
-func TestContextQuestionsErrorReturnsNil(t *testing.T) {
+func TestContextQuestionsErrorReturnsError(t *testing.T) {
 	a := fake.New("bad")
 	a.RunErr = errors.New("nope")
-	if got := ContextQuestions(context.Background(), a, "x"); got != nil {
-		t.Errorf("error path must return nil, got %v", got)
+	got, err := ContextQuestions(context.Background(), a, "x")
+	if err == nil {
+		t.Error("error path must surface error")
+	}
+	if got != nil {
+		t.Errorf("error path must return nil questions, got %v", got)
 	}
 }
 

@@ -56,6 +56,8 @@ type Session struct {
 	ID        string
 	Root      string
 	Prompt    string
+	Mode      string
+	Template  string
 	Questions []Question
 	Answers   []Answer
 	Body      string
@@ -84,20 +86,37 @@ var BaselineQuestions = []Question{
 }
 
 // ContextQuestions asks the planning adapter for 1-3 prompt-specific
-// follow-up questions on top of the baseline. Errors degrade to the
-// baseline alone so the wizard never blocks on a flaky network call.
-func ContextQuestions(ctx context.Context, adapter agents.AgentAdapter, prompt string) []Question {
+// follow-up questions on top of the baseline. The caller decides what
+// to do when the adapter errors — earlier we swallowed the error and
+// returned nil, which left users wondering why the contextual question
+// never showed up. Now we surface the error so the wizard can warn.
+func ContextQuestions(ctx context.Context, adapter agents.AgentAdapter, prompt string) ([]Question, error) {
+	return ContextQuestionsFor(ctx, adapter, prompt, "", "")
+}
+
+// ContextQuestionsFor enriches the planning-adapter prompt with the
+// spec mode + template id so the model can pick category-specific
+// questions instead of generic ones. Mode/template empty falls back to
+// the original generic behaviour.
+func ContextQuestionsFor(ctx context.Context, adapter agents.AgentAdapter, prompt, mode, template string) ([]Question, error) {
 	if adapter == nil {
-		return nil
+		return nil, nil
+	}
+	hint := ""
+	if mode != "" {
+		hint = fmt.Sprintf("Spec mode: %s.\n", mode)
+	}
+	if template != "" && template != "none" {
+		hint += fmt.Sprintf("Recurring pattern: %s. Focus the questions on edge cases for this pattern specifically.\n", template)
 	}
 	body := fmt.Sprintf(`You are HarnessX's spec planner.
-Read the feature prompt and emit a JSON array of 1-3 SHORT clarifying
+%sRead the feature prompt and emit a JSON array of 1-3 SHORT clarifying
 questions a senior engineer would ask before implementing. Do not repeat
 the baseline questions (users, acceptance, out-of-scope, risks, tests).
 Output JSON only, schema: [{"key":"snake_case","prompt":"...?"}].
 
 Feature prompt:
-%s`, prompt)
+%s`, hint, prompt)
 	req := agents.AgentRequest{
 		Prompt:  body,
 		Timeout: 60 * time.Second,
@@ -105,13 +124,13 @@ Feature prompt:
 	}
 	res := adapter.Run(ctx, req)
 	if res.Err != nil {
-		return nil
+		return nil, fmt.Errorf("specflow: context questions failed: %w", res.Err)
 	}
 	raw := strings.TrimSpace(res.Output.FinalMessage)
 	if raw == "" {
 		raw = string(res.Output.Stdout)
 	}
-	return parseQuestions(raw)
+	return parseQuestions(raw), nil
 }
 
 func parseQuestions(raw string) []Question {
@@ -150,7 +169,16 @@ func (s *Session) Draft(ctx context.Context, adapter agents.AgentAdapter) (strin
 		s.Revisions = append(s.Revisions, Revision{Time: now(), Source: "baseline", Body: s.Body})
 		return s.Body, nil
 	}
-	body := fmt.Sprintf(`You are HarnessX's spec writer.
+	skeleton := SkeletonFor(s.Template)
+	skeletonHint := ""
+	if skeleton != "" {
+		skeletonHint = fmt.Sprintf("\n\nWhen the recurring pattern fits, also include this template skeleton verbatim as an additional H2 section:\n%s", skeleton)
+	}
+	modeHint := ""
+	if s.Mode != "" {
+		modeHint = fmt.Sprintf("\nSpec mode: %s.", s.Mode)
+	}
+	body := fmt.Sprintf(`You are HarnessX's spec writer.%s
 Given a feature prompt and clarifying answers, produce a single
 markdown spec with these sections (use these exact H2 headings):
 
@@ -162,13 +190,13 @@ markdown spec with these sections (use these exact H2 headings):
 ## Test Plan
 ## Implementation Notes
 
-Be specific. Use bullet lists. No preamble, no trailing chatter.
+Be specific. Use bullet lists. No preamble, no trailing chatter.%s
 
 Prompt:
 %s
 
 Clarifying answers:
-%s`, s.Prompt, formatAnswers(s.Answers))
+%s`, modeHint, skeletonHint, s.Prompt, formatAnswers(s.Answers))
 	req := agents.AgentRequest{
 		Prompt:  body,
 		Timeout: 90 * time.Second,
@@ -306,6 +334,12 @@ func (s *Session) metadataHeader() string {
 	var b strings.Builder
 	b.WriteString("<!--\n")
 	b.WriteString("harness-spec-id: " + s.ID + "\n")
+	if s.Mode != "" {
+		b.WriteString("mode: " + s.Mode + "\n")
+	}
+	if s.Template != "" {
+		b.WriteString("template: " + s.Template + "\n")
+	}
 	b.WriteString("prompt: " + strings.ReplaceAll(s.Prompt, "\n", " ") + "\n")
 	if len(s.Answers) > 0 {
 		b.WriteString("answers:\n")

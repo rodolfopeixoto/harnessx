@@ -42,7 +42,9 @@ func runStreamed(ctx context.Context, name string, args []string, stdin, working
 	}
 	var out, errb bytes.Buffer
 	cmd.Stdout = io.MultiWriter(&out, live)
-	cmd.Stderr = io.MultiWriter(&errb, live)
+	// Drop known noisy upstream-CLI stderr lines from the live UI but
+	// still capture them in errb for `harness logs` debugging.
+	cmd.Stderr = io.MultiWriter(&errb, newFilteringWriter(live))
 	err := cmd.Run()
 	exitCode := 0
 	if err != nil {

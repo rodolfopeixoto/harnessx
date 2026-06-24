@@ -283,6 +283,16 @@ by adapter / task
 exatamente onde precisa de força. Se você não tivesse routing, todas
 as 12 turns seriam claude/$0.45+.
 
+#### Onde aparece o custo
+
+| Lugar | Quando |
+|---|---|
+| **inline em cada turn** do `harness chat`: `✓ claude done in 38.4s · in=101124 out=1158 · ~$0.2644` | sempre, após cada chamada de adapter |
+| **`/cost`** dentro do chat | soma da sessão atual por adapter/task |
+| **`harness analytics --since <d>`** | cross-sessão, cross-projeto |
+| **`.harness/sessions/<id>.jsonl`** | persistência crua (cada turn é um JSON) |
+| **`/btw <pergunta>`** | resposta na chain mais barata, ~$0.0001 por turn |
+
 ---
 
 ## 5. `harness chat` — para quando não dá pra escrever spec antes
@@ -311,6 +321,8 @@ Slashes essenciais (`/help` lista todos):
 | `/ci`, `/test`, `/lint` | gates manuais | nenhum (determ) |
 | `/cost` | gasto cumulativo da sessão | nenhum |
 | `/recap` | resumo da sessão | cheap_review |
+| `/btw <q>` | pergunta lateral curta sem mexer no fluxo | cheap_review |
+| `/cycle` | rotaciona para o próximo adapter registrado | — |
 | `/auto-gate` | liga/desliga gate automático | nenhum |
 | `/use <id>` | troca adapter ad-hoc | — |
 | `/budget <usd>` | corta sessão ao estourar | nenhum |

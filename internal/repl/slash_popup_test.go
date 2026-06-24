@@ -76,15 +76,42 @@ func TestSlashSuggesterRendersAndClears(t *testing.T) {
 func TestSlashSuggesterClearIsIdempotent(t *testing.T) {
 	var buf bytes.Buffer
 	s := newSlashSuggester(&buf)
-	s.clear()
+	s.eraseLast()
 	if buf.Len() != 0 {
-		t.Errorf("clear with nothing shown should be no-op")
+		t.Errorf("eraseLast with nothing shown should be no-op")
 	}
 }
 
 func TestSlashSuggesterNilWriterSafe(t *testing.T) {
 	s := newSlashSuggester(nil)
 	s.render("/dr")
+}
+
+func TestSlashSuggesterNeverEmitsRawNewline(t *testing.T) {
+	// regression: earlier versions wrote '\n' between rows which forced
+	// the terminal to scroll when the cursor sat near the bottom of
+	// the viewport, leaving ghost "← TAB to complete" rows on every
+	// keystroke. We now use \x1b[1B (cursor down) instead so no '\n'
+	// must appear in the rendered bytes.
+	var buf bytes.Buffer
+	s := newSlashSuggester(&buf)
+	for _, line := range []string{"/", "/e", "/ex", "/exi", "/exit", "/", "/dr", "/drive", "hello"} {
+		s.render(line)
+	}
+	if strings.Contains(buf.String(), "\n") {
+		t.Errorf("render must not emit raw '\\n' (causes terminal scroll). bytes=%q", buf.String())
+	}
+}
+
+func TestSlashSuggesterSkipsRedrawWhenMatchesUnchanged(t *testing.T) {
+	var buf bytes.Buffer
+	s := newSlashSuggester(&buf)
+	s.render("/dr")
+	first := buf.Len()
+	s.render("/dr")
+	if buf.Len() != first {
+		t.Errorf("identical matches must not redraw; first=%d second=%d", first, buf.Len())
+	}
 }
 
 func TestSlashSuggesterMatchesCapped(t *testing.T) {
