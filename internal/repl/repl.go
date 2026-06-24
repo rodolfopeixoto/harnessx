@@ -529,6 +529,9 @@ func handleInput(ctx context.Context, sess *Session, opts *Options, input string
 	case input == "/cycle":
 		turn.Action = "cycle"
 		cycleAdapter(opts)
+	case input == "/login":
+		turn.Action = "login"
+		runAdapterLogin(ctx, opts)
 	case input == "/clear":
 		turn.Action = "clear-context"
 		sess.ContextMark = len(sess.Turns)
@@ -613,6 +616,36 @@ func handleInput(ctx context.Context, sess *Session, opts *Options, input string
 		executePlan(ctx, sess, *opts, input, &turn)
 	}
 	return turn
+}
+
+// runAdapterLogin prints the pinned adapter's LoginCommand and runs
+// it inline when the user confirms. Lets the user re-auth without
+// quitting the chat session.
+func runAdapterLogin(ctx context.Context, opts *Options) {
+	if opts.Adapter == nil {
+		fmt.Fprintln(opts.Out, "  ✗ no adapter wired")
+		return
+	}
+	caps := opts.Adapter.Capabilities()
+	if caps.LoginCommand == "" {
+		fmt.Fprintf(opts.Out, "  ✗ %s does not declare a login command. Docs: %s\n", opts.AdapterID, caps.AuthDocURL)
+		return
+	}
+	fmt.Fprintf(opts.Out, "  about to run: %s\n", caps.LoginCommand)
+	parts := strings.Fields(caps.LoginCommand)
+	cmd := exec.CommandContext(ctx, parts[0], parts[1:]...)
+	cmd.Stdin = opts.In
+	cmd.Stdout = opts.Out
+	cmd.Stderr = opts.Out
+	if err := cmd.Run(); err != nil {
+		fmt.Fprintf(opts.Out, "  ✗ login: %v\n", err)
+		return
+	}
+	if h := opts.Adapter.Healthcheck(ctx); !h.OK {
+		fmt.Fprintf(opts.Out, "  ✗ still failing after login: %s\n", h.Err)
+		return
+	}
+	fmt.Fprintf(opts.Out, "  ✓ %s authenticated\n", opts.AdapterID)
 }
 
 // quickAnswer routes a `/btw <question>` through the cheapest
@@ -760,7 +793,7 @@ func isMutatingInput(input string) bool {
 	mutating := []string{
 		"/exec ", "/do ", "/ship ", "/drive ", "/spec ", "/ci", "/test", "/lint",
 		"/use ", "/budget ", "/auto-gate", "/autogate",
-		"/clear", "/save ", "/recap", "/btw ", "/cycle", "/plan ", "/goal ",
+		"/clear", "/save ", "/recap", "/btw ", "/cycle", "/login", "/plan ", "/goal ",
 		"/last", "/branch ", "/save-prompt ", "/prompt ",
 	}
 	for _, p := range mutating {
@@ -1401,6 +1434,7 @@ func printSlashMenu(out io.Writer) {
 			{"/recap", "cheap chain summary of session so far"},
 			{"/btw <q>", "side question on the cheapest chain (no impact on current thread)"},
 			{"/cycle", "rotate to the next registered adapter (cheap → expensive)"},
+			{"/login", "run the pinned adapter's auth/login command"},
 		}},
 		{"gate", []slashEntry{
 			{"/ci", "harness ci"},
