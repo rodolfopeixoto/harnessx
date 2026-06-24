@@ -1,8 +1,8 @@
 # HarnessX — Tutorial Canônico (End-to-End)
 
-> Este é **o único** tutorial. Substitui `TUTORIAL-ECOMMERCE.md`,
-> `TUTORIAL-TODOIST.md`, `TUTORIAL-MULTI-STACK.md`,
-> `TUTORIAL-MOBILE-DESKTOP.md` (arquivados em `docs/legacy/`). Aqui você
+> Este é **o único** tutorial. Substitui as versões por stack
+> (ecommerce, todoist, multi-stack, mobile-desktop), agora removidas
+> — git log preserva o histórico se você precisar reler. Aqui você
 > sai do zero até uma aplicação **completa em produção** usando todo o
 > potencial da ferramenta: spec-driven, TDD, multi-agente, gate
 > determinístico, observabilidade de custo, backup.
