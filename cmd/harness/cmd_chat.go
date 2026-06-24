@@ -131,7 +131,7 @@ the deterministic planner.`,
 					}
 				}
 				if h := adapter.Healthcheck(cmd.Context()); !h.OK {
-					fmt.Fprintf(cmd.OutOrStdout(), "chat: %s healthcheck warn: %s\n", adapterID, h.Err)
+					handleAuthFailure(cmd.Context(), cmd.OutOrStdout(), cmd.InOrStdin(), adapter, adapterID, h)
 				}
 				planner, err := repl.NewLLMPlanner(repl.LLMPlannerOptions{
 					Adapter:    adapter,
