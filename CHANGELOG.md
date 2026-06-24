@@ -3,6 +3,27 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-24 — v0.153.0 — Wave 27: auto-login + /login slash (F119)
+
+### New
+
+- **Auto-login prompt on adapter auth failure.** When `harness chat`
+  starts and the pinned adapter's healthcheck reports an auth-shaped
+  error (401, unauthorized, "please log in", etc), HarnessX now
+  prints the adapter's bundled `LoginCommand` and offers to run it
+  inline. Skipping leaves the user with a clear next step instead of
+  a cryptic CLI dump.
+- **`/login` slash in chat.** Triggers the pinned adapter's
+  `LoginCommand` mid-session and re-runs the healthcheck afterwards.
+  Listed in slash completion + help.
+
+### Verified
+
+- `go test -race ./cmd/harness -run Auth` — 7 cases green covering
+  authy-pattern detection, oneLine truncation, no-login-cmd branch,
+  non-auth-error pass-through, user-says-no skip path.
+- Full suite green.
+
 ## 2026-06-23 — v0.152.0 — Wave 26: UX fixes from v0.151 walkthrough (F118)
 
 ### Fixed

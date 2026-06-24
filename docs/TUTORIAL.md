@@ -323,6 +323,7 @@ Slashes essenciais (`/help` lista todos):
 | `/recap` | resumo da sessão | cheap_review |
 | `/btw <q>` | pergunta lateral curta sem mexer no fluxo | cheap_review |
 | `/cycle` | rotaciona para o próximo adapter registrado | — |
+| `/login` | dispara o comando de login do adapter pinado | — |
 | `/auto-gate` | liga/desliga gate automático | nenhum |
 | `/use <id>` | troca adapter ad-hoc | — |
 | `/budget <usd>` | corta sessão ao estourar | nenhum |

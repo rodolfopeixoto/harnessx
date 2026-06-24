@@ -23,7 +23,7 @@ var staticSlashCommands = []string{
 	"/help", "/exit", "/quit", "/history", "/last",
 	"/agents", "/cost", "/diff", "/clear", "/timeline",
 	"/auto-gate on", "/auto-gate off",
-	"/save", "/branch", "/recap", "/btw", "/cycle", "/spec",
+	"/save", "/branch", "/recap", "/btw", "/cycle", "/login", "/spec",
 	"/save-prompt", "/prompt", "/prompts",
 	"/exec", "/do", "/ship", "/drive", "/ci", "/test", "/lint",
 	"/budget", "/goal", "/plan",
