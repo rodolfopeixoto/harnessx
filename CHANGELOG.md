@@ -3,6 +3,15 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-23 — v0.151.1 — chore: prune docs/legacy/ (F117)
+
+### Removed
+
+- `docs/legacy/TUTORIAL-ECOMMERCE.md`, `TUTORIAL-TODOIST.md`,
+  `TUTORIAL-MULTI-STACK.md`, `TUTORIAL-MOBILE-DESKTOP.md` — the four
+  archived tutorials are gone. `docs/TUTORIAL.md` is the only walk
+  through now; git history preserves prior copies.
+
 ## 2026-06-23 — v0.151.0 — Wave 25: unified canonical tutorial (F116)
 
 ### New
