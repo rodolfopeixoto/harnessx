@@ -3,6 +3,73 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-23 — v0.152.0 — Wave 26: UX fixes from v0.151 walkthrough (F118)
+
+### Fixed
+
+- **Slash popup no longer leaves ghost rows.** `internal/repl/
+  slash_popup.go` now uses `\x1b[1B` (cursor down) instead of `\n`
+  (newline) so the popup never forces the terminal to scroll, and
+  skips redrawing when the matches set is unchanged. Regression test
+  asserts zero raw newlines in the rendered bytes.
+- **Codex stderr no longer leaks `failed to load skill SKILL.md`
+  noise** into the chat UI. New `internal/agents/yaml/stderr_filter.go`
+  drops known upstream-CLI noise patterns on the live writer while
+  preserving them in the captured stderr buffer for `harness logs`.
+- **Chat REPL guard against typing CLI commands as chat.** Plain text
+  like `harness use 4` or `use kimi` now triggers a one-line warning
+  pointing at the correct slash or `!shell` form, instead of silently
+  billing a full agent turn.
+- **Greeter scroll-bury fixed.** Dropped the leading `\n` in the
+  prompt marker, added a single trailing blank line after `greet`.
+- **`ContextQuestions` surfaces errors** instead of silently returning
+  nil. Spec author warns `spec: skipping context questions (adapter
+  err: ...)` when the planning chain fails. Signature changed to
+  `([]Question, error)`.
+
+### Changed
+
+- **Default adapter is now the cheapest available** (`ollama → kimi →
+  gemini → codex → claude`) when no `active.yaml` pin exists. Both
+  `cmd_chat.go` and `cmd_onboarding.go` use the reversed chain; the
+  log line explicitly mentions the user can promote with `harness use
+  <id>`.
+- **`harness new` prompts for path with absolute resolution preview**
+  and explicit `yes / new path` confirmation loop (3 attempts), so
+  the user sees where the project will land before mkdir runs.
+
+### New
+
+- **`harness mcp search [term]`** queries the modelcontextprotocol
+  registry (cached 24h under `.harness/cache/mcp-registry.md`),
+  printing bundled hits + external registry hits with install hints.
+- **Onboarding MCP picker UX:** "install all defaults (recommended)"
+  / "search by substring" / "skip" — replaces the numeric one-by-one
+  loop. Substring filter narrows the bundled list before each pick.
+- **Guided spec author:** `harness spec author` now asks `mode` +
+  `recurring pattern` first. New `internal/specflow/templates.go`
+  bundles 8 templates (none, auth, authz, pagination, rate-limit,
+  caching, audit-log, algorithm-custom) — each injects extra
+  required questions and a markdown skeleton into the draft so the
+  spec starts from a category-aware shape rather than a blank page.
+- **`/btw <question>`** slash in chat: side-question on the cheapest
+  chain (task tag `cheap_review`), no impact on the current thread.
+  Cost recorded under `btw` tag for analytics.
+- **`/cycle`** slash: rotates `opts.Adapter` to the next registered
+  adapter in cost order. Use when you want to swap cheap → expensive
+  without typing the full id.
+
+### Verified
+
+- `go vet ./...` clean.
+- `go test -race ./...` green (full suite).
+- New tests: `internal/repl/slash_popup_test.go` (ghost-line +
+  unchanged-redraw), `internal/repl/repl_test.go` (LooksLikeShell),
+  `internal/agents/yaml/stderr_filter_test.go`,
+  `internal/specflow/templates_test.go`, `internal/specflow/
+  specflow_test.go` (ContextQuestionsFor signature),
+  `cmd/harness/cmd_mcp_search_test.go`.
+
 ## 2026-06-23 — v0.151.1 — chore: prune docs/legacy/ (F117)
 
 ### Removed

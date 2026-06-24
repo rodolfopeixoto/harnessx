@@ -20,6 +20,7 @@ type slashSuggester struct {
 	out       io.Writer
 	allSlash  []string
 	lastShown int
+	lastLine  string
 }
 
 func newSlashSuggester(out io.Writer) *slashSuggester {
@@ -36,19 +37,32 @@ func (s *slashSuggester) Listener() readline.Listener {
 	})
 }
 
+// render keeps the popup correctly drawn without ever emitting a raw
+// '\n'. Earlier versions used \n + \x1b[s/\x1b[u to draw rows below
+// the prompt; when the cursor sat near the bottom of the terminal the
+// newlines forced the buffer to scroll, breaking the saved cursor and
+// leaving ghost "← TAB to complete" rows on every keystroke. We now
+// use \x1b[B (cursor down — never scrolls) + \x1b[2K (erase entire
+// line) + \x1b[1G (column 1), and only redraw when the matches set
+// actually changed.
 func (s *slashSuggester) render(line string) {
 	if s.out == nil {
 		return
 	}
 	matches := s.matches(line)
-	s.clear()
+	key := joinKey(matches)
+	if key == s.lastLine {
+		return
+	}
+	s.eraseLast()
+	s.lastLine = key
 	if len(matches) == 0 {
 		return
 	}
 	s.lastShown = len(matches)
 	fmt.Fprint(s.out, "\x1b[s")
 	for i, m := range matches {
-		fmt.Fprintf(s.out, "\n\x1b[2K  %s", padRight(m, slashPopupColWidth))
+		fmt.Fprintf(s.out, "\x1b[1B\x1b[2K\x1b[1G  %s", padRight(m, slashPopupColWidth))
 		if i == 0 {
 			fmt.Fprint(s.out, "  ← TAB to complete")
 		}
@@ -56,16 +70,20 @@ func (s *slashSuggester) render(line string) {
 	fmt.Fprint(s.out, "\x1b[u")
 }
 
-func (s *slashSuggester) clear() {
+func (s *slashSuggester) eraseLast() {
 	if s.lastShown == 0 {
 		return
 	}
 	fmt.Fprint(s.out, "\x1b[s")
 	for i := 0; i < s.lastShown; i++ {
-		fmt.Fprint(s.out, "\n\x1b[2K")
+		fmt.Fprint(s.out, "\x1b[1B\x1b[2K\x1b[1G")
 	}
 	fmt.Fprint(s.out, "\x1b[u")
 	s.lastShown = 0
+}
+
+func joinKey(matches []string) string {
+	return strings.Join(matches, "|")
 }
 
 func (s *slashSuggester) matches(line string) []string {

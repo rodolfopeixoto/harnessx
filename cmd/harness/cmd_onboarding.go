@@ -264,18 +264,56 @@ func offerMCPSetup(ctx context.Context, in *bufio.Reader, out io.Writer, root st
 		return
 	}
 	fmt.Fprintln(out, "\n"+ui.Heading.Render("MCP servers"))
-	fmt.Fprintln(out, "  install bundled MCP server templates into .harness/mcp/")
-	if !askYesNo(in, out, "configure now?", false) {
-		fmt.Fprintln(out, "  skipped — run `harness mcp install <name>` later")
+	fmt.Fprintf(out, "  bundled templates: %s\n", strings.Join(names, ", "))
+	fmt.Fprintln(out, "  external search:   harness mcp search <term>  (modelcontextprotocol registry)")
+	choice, err := askChoice(in, out, "  setup:", []string{
+		"install all defaults (recommended)",
+		"search bundled by substring (then pick a few)",
+		"skip — configure later",
+	}, 0)
+	if err != nil {
 		return
 	}
-	options := append(append([]string{}, names...), "done")
+	switch choice {
+	case 0:
+		for _, name := range names {
+			if err := runHarnessSubcommand(ctx, out, root, "mcp", "install", name, "--yes"); err != nil {
+				fmt.Fprintf(out, "  %s install %s: %v\n", ui.MarkFail(), name, err)
+				continue
+			}
+			fmt.Fprintf(out, "  %s installed %s\n", ui.MarkSuccess(), ui.Accent.Render(name))
+		}
+	case 1:
+		offerMCPSubstringPick(ctx, in, out, root, names)
+	default:
+		fmt.Fprintln(out, "  skipped — run `harness mcp install <name>` later")
+	}
+}
+
+func offerMCPSubstringPick(ctx context.Context, in *bufio.Reader, out io.Writer, root string, names []string) {
 	for {
-		idx, err := askChoice(in, out, "  pick a server (or 'done'):", options, len(options)-1)
-		if err != nil || idx == len(options)-1 {
+		fmt.Fprint(out, "  filter (substring, empty to list all, 'done' to finish): ")
+		line, _ := in.ReadString('\n')
+		q := strings.TrimSpace(line)
+		if q == "done" {
 			return
 		}
-		name := options[idx]
+		filtered := []string{}
+		for _, n := range names {
+			if q == "" || strings.Contains(n, q) {
+				filtered = append(filtered, n)
+			}
+		}
+		if len(filtered) == 0 {
+			fmt.Fprintf(out, "  %s no matches for %q\n", ui.MarkWarn(), q)
+			continue
+		}
+		filtered = append(filtered, "done")
+		idx, err := askChoice(in, out, "  pick:", filtered, len(filtered)-1)
+		if err != nil || idx == len(filtered)-1 {
+			return
+		}
+		name := filtered[idx]
 		if err := runHarnessSubcommand(ctx, out, root, "mcp", "install", name, "--yes"); err != nil {
 			fmt.Fprintf(out, "  %s install %s: %v\n", ui.MarkFail(), name, err)
 			continue
@@ -590,7 +628,7 @@ func pickSuggestedAdapter(adapters []checkedTool, root string) string {
 	reg, _, err := agentcmd.LoadAll(root)
 	if err == nil {
 		ids := reg.IDs()
-		for _, preferred := range []string{"claude", "codex", "kimi", "gemini", "ollama"} {
+		for _, preferred := range []string{"ollama", "kimi", "gemini", "codex", "claude"} {
 			for _, id := range ids {
 				if id == preferred {
 					for _, a := range adapters {

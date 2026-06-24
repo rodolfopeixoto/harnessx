@@ -211,7 +211,7 @@ func resolveChatAdapter(dir, override string, out io.Writer) string {
 		return ""
 	}
 	available := []string{}
-	for _, fid := range []string{"claude", "codex", "gemini", "kimi", "ollama"} {
+	for _, fid := range []string{"ollama", "kimi", "gemini", "codex", "claude"} {
 		if _, ok := reg.Get(fid); ok {
 			available = append(available, fid)
 		}
@@ -223,9 +223,9 @@ func resolveChatAdapter(dir, override string, out io.Writer) string {
 		}
 		fmt.Fprintln(out, "  tip: run 'harness use <id>' to make a pin permanent")
 	}
-	for _, fid := range []string{"claude", "codex", "gemini", "kimi", "ollama"} {
+	for _, fid := range []string{"ollama", "kimi", "gemini", "codex", "claude"} {
 		if _, ok := reg.Get(fid); ok {
-			fmt.Fprintf(out, "chat: no active pin — auto-selected %s (run 'harness use <id>' to set a default)\n", fid)
+			fmt.Fprintf(out, "chat: no active pin — auto-selected %s (cheapest available; run 'harness use <id>' to pin a stronger model)\n", fid)
 			return fid
 		}
 	}
