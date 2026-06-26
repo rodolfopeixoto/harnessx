@@ -1034,6 +1034,29 @@ func TestRunPipeModeSuppressesGreetAndRecap(t *testing.T) {
 	}
 }
 
+func TestDetectAdapterSwitchExtractsID(t *testing.T) {
+	cases := map[string]string{
+		"use kimi":                 "kimi",
+		"USE Kimi":                 "kimi",
+		"harness use kimi":         "kimi",
+		"switch to codex":          "codex",
+		"switch codex":             "codex",
+		"change adapter to gemini": "gemini",
+		"change adapter gemini":    "gemini",
+		"model claude-3-opus":      "claude-3-opus",
+		"  use kimi  ":             "kimi",
+		"hello agent":              "",
+		"use the new feature":      "",
+		"please change something":  "",
+		"":                         "",
+	}
+	for in, want := range cases {
+		if got := detectAdapterSwitch(in); got != want {
+			t.Errorf("detectAdapterSwitch(%q)=%q want %q", in, got, want)
+		}
+	}
+}
+
 func TestLooksLikeShellOrSlash(t *testing.T) {
 	cases := map[string]bool{
 		"harness use 4":                  true,

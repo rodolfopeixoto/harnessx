@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -591,9 +592,13 @@ func handleInput(ctx context.Context, sess *Session, opts *Options, input string
 			return turn
 		}
 		if opts.Adapter != nil {
+			if id := detectAdapterSwitch(input); id != "" {
+				return handleInput(ctx, sess, opts, "/use "+id)
+			}
 			if hint := looksLikeShellOrSlash(input); hint != "" {
 				fmt.Fprintln(opts.Out, hint)
-				turn.Action = "guard-shell-like"
+				turn.Action = "intent_redirect"
+				turn.CostUSD = 0
 				return turn
 			}
 			if !checkBudget(sess, opts.Out) {
@@ -692,6 +697,24 @@ func cycleAdapter(opts *Options) {
 	opts.Adapter = a
 	opts.AdapterID = id
 	fmt.Fprintf(opts.Out, "  [swap] now using %s (%s)\n", id, adapterBillingMode(id))
+}
+
+// adapterSwitchPattern matches natural-language adapter-switch
+// intents the user is likely to type without remembering the slash
+// form. Examples: "use kimi", "harness use kimi", "switch to codex",
+// "switch codex", "change adapter to gemini", "model kimi". On
+// match we route through /use <id> so the user does not get billed
+// for a paid agent turn just to swap models.
+var adapterSwitchPattern = regexp.MustCompile(`(?i)^(?:harness\s+)?(?:use|switch(?:\s+to)?|change\s+adapter(?:\s+to)?|model)\s+([a-z0-9][a-z0-9_-]*)\s*$`)
+
+// detectAdapterSwitch returns the adapter id captured from an
+// English-y switch intent, or "" when the input is not a switch.
+func detectAdapterSwitch(input string) string {
+	m := adapterSwitchPattern.FindStringSubmatch(strings.TrimSpace(input))
+	if len(m) != 2 {
+		return ""
+	}
+	return strings.ToLower(m[1])
 }
 
 // looksLikeShellOrSlash detects inputs that look like CLI commands
