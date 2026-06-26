@@ -64,7 +64,19 @@ func RenderDoctor(w io.Writer, r doctor.Report) {
 		for _, h := range hints {
 			fmt.Fprintln(w, "  "+Muted.Render("→ harness install "+h))
 		}
+		if anyLSPMissing(r) {
+			fmt.Fprintln(w, "  "+Muted.Render("→ harness install lsp --all   # every LSP at once"))
+		}
 	}
+}
+
+func anyLSPMissing(r doctor.Report) bool {
+	for _, e := range r.LSPs {
+		if !e.Result.Present || e.Result.Err != nil {
+			return true
+		}
+	}
+	return false
 }
 
 func collectInstallHints(r doctor.Report) []string {
