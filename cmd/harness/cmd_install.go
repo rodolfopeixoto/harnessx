@@ -51,8 +51,109 @@ cargo install, pip --user). Examples:
 	}
 	c.Flags().BoolVar(&dryRun, "dry-run", false, "print command without executing")
 	c.Flags().BoolVar(&upgrade, "upgrade", false, "reinstall even when probe already passes")
-	c.AddCommand(newInstallListCmd(), newInstallShowCmd())
+	c.AddCommand(newInstallListCmd(), newInstallShowCmd(), newInstallLSPCmd())
 	return c
+}
+
+// newInstallLSPCmd narrows install down to LSP servers. Without an arg
+// it prints the table of every bundled LSP (installed marker + install
+// hint). With an arg, it forwards to the regular install pipeline.
+func newInstallLSPCmd() *cobra.Command {
+	var (
+		all     bool
+		dryRun  bool
+		upgrade bool
+	)
+	c := &cobra.Command{
+		Use:   "lsp [name]",
+		Short: "List or install Language Server Protocol servers",
+		Long: `Examples:
+  harness install lsp                # show every LSP and its install state
+  harness install lsp gopls          # install one
+  harness install lsp --all          # install everything missing
+  harness install lsp --all --dry-run`,
+		Args: cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if all {
+				return installAllMissingLSPs(cmd, dryRun, upgrade)
+			}
+			if len(args) == 0 {
+				return printLSPTable(cmd)
+			}
+			return runInstall(cmd, args[0], dryRun, upgrade)
+		},
+	}
+	c.Flags().BoolVar(&all, "all", false, "install every LSP that is not present yet")
+	c.Flags().BoolVar(&dryRun, "dry-run", false, "print commands without executing")
+	c.Flags().BoolVar(&upgrade, "upgrade", false, "reinstall even when probe already passes")
+	return c
+}
+
+func lspManifests() ([]install.Manifest, error) {
+	names, err := install.ListBundled()
+	if err != nil {
+		return nil, err
+	}
+	var out []install.Manifest
+	for _, n := range names {
+		m, err := install.LoadBundled(n)
+		if err != nil || m.Category != "lsp" {
+			continue
+		}
+		out = append(out, m)
+	}
+	return out, nil
+}
+
+func printLSPTable(cmd *cobra.Command) error {
+	manifests, err := lspManifests()
+	if err != nil {
+		return err
+	}
+	w := tabwriter.NewWriter(cmd.OutOrStdout(), 0, 0, 2, ' ', 0)
+	fmt.Fprintln(w, "NAME\tINSTALLED\tINSTALL\tDESCRIPTION")
+	for _, m := range manifests {
+		state := "—"
+		if isInstalled(m.Probe.Binary) {
+			state = "✓"
+		}
+		fmt.Fprintf(w, "%s\t%s\tharness install %s\t%s\n", m.Name, state, m.Name, m.Description)
+	}
+	return w.Flush()
+}
+
+func installAllMissingLSPs(cmd *cobra.Command, dryRun, upgrade bool) error {
+	manifests, err := lspManifests()
+	if err != nil {
+		return err
+	}
+	for _, m := range manifests {
+		if !upgrade && isInstalled(m.Probe.Binary) {
+			fmt.Fprintf(cmd.OutOrStdout(), "[skip] %s already installed\n", m.Name)
+			continue
+		}
+		if err := runInstall(cmd, m.Name, dryRun, upgrade); err != nil {
+			fmt.Fprintf(cmd.ErrOrStderr(), "[fail] %s: %v\n", m.Name, err)
+		}
+	}
+	return nil
+}
+
+func runInstall(cmd *cobra.Command, name string, dryRun, upgrade bool) error {
+	out := cmd.OutOrStdout()
+	m, err := install.LoadBundled(name)
+	if err != nil {
+		return err
+	}
+	if !upgrade && isInstalled(m.Probe.Binary) {
+		fmt.Fprintf(out, "%s already installed (pass --upgrade to reinstall)\n", name)
+		return nil
+	}
+	plan, err := install.NewRegistry().Pick(m)
+	if err != nil {
+		return err
+	}
+	return install.Execute(cmd.Context(), plan, dryRun, out, out)
 }
 
 func newInstallListCmd() *cobra.Command {
