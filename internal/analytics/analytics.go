@@ -80,10 +80,6 @@ func Walk(roots []string, since time.Time) (Report, error) {
 		}
 	}
 
-	// Audit BUG-19: `harness analytics` previously only walked chat sessions
-	// and reported $0 when all spend lived in workflow runs (`harness do`,
-	// `feature`, `ship`). Aggregate the per-run meta.json now that every
-	// executor writes it.
 	for _, root := range roots {
 		if err := walkRuns(root, since, func(stack string, m runMeta) {
 			collectStackFromRun(byStack, stack, m)
@@ -102,9 +98,8 @@ func Walk(roots []string, since time.Time) (Report, error) {
 	return r, nil
 }
 
-// runMeta is the minimal subset of internal/execution.Result we care about
-// for analytics. We deliberately decouple from the executor package to keep
-// this aggregator dependency-free.
+// runMeta decouples analytics from internal/execution.Result so this
+// package stays dependency-free of the executor.
 type runMeta struct {
 	RunID       string
 	AgentID     string
@@ -222,6 +217,7 @@ func collectDayFromRun(by map[string]*DayRow, m runMeta) {
 	row.CostUSD += m.CostUSD
 }
 
+//nolint:gocognit // filepath.WalkDir callback fans out across dir filters
 func walkSessions(root string, since time.Time, hit func(stack string, sess *repl.Session)) error {
 	return filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
 		if err != nil {

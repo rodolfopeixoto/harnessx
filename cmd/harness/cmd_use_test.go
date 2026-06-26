@@ -8,10 +8,6 @@ import (
 	"testing"
 )
 
-// TestResolveTierModel_BUG_FALTA_MOD_2 covers the new `harness use --tier`
-// behaviour. The bundled claude adapter ships with cheap/default/deep model
-// tiers — selecting `cheap` must resolve to the haiku id documented in
-// templates/agents/claude.yaml.
 func TestResolveTierModel_BUG_FALTA_MOD_2(t *testing.T) {
 	root, err := filepath.Abs("../../")
 	if err != nil {

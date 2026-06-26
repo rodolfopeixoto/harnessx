@@ -37,7 +37,7 @@ func newAskCmd() *cobra.Command {
 		},
 	}
 	c.Flags().StringVar(&agentID, "agent", "", "agent id to synthesise a textual answer from the evidence")
-	c.Flags().Float64Var(&budgetUSD, "budget-usd", 0.05, "max USD spent on the answer step (audit BUG-7)")
+	c.Flags().Float64Var(&budgetUSD, "budget-usd", 0.05, "max USD spent on the answer step")
 	c.Flags().BoolVar(&evidence, "evidence-only", false, "skip LLM call; emit raw evidence list only")
 	return c
 }

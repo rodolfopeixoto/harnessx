@@ -43,7 +43,6 @@ func TestRun_CreatesLayoutAndRecordsBootstrap(t *testing.T) {
 func TestRun_AddsWorktreeIgnoreToRootGitignore_BUG16(t *testing.T) {
 	root := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(root, "go.mod"), []byte("module x"), 0o644))
-	// Pre-existing .gitignore with unrelated entry must be preserved.
 	require.NoError(t, os.WriteFile(filepath.Join(root, ".gitignore"), []byte("dist/\n"), 0o644))
 
 	var out bytes.Buffer
@@ -55,7 +54,6 @@ func TestRun_AddsWorktreeIgnoreToRootGitignore_BUG16(t *testing.T) {
 	require.Contains(t, string(contents), ".harness/worktrees/")
 	require.Contains(t, string(contents), "dist/")
 
-	// Idempotent: second init must not duplicate the line.
 	_, err = Run(context.Background(), Options{StartDir: root, Force: true}, &out)
 	require.NoError(t, err)
 	contents2, err := os.ReadFile(filepath.Join(root, ".gitignore"))

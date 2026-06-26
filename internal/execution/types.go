@@ -47,11 +47,8 @@ const (
 	StatusSensorFailed    Status = "sensor_failed"
 	StatusAgentFailed     Status = "agent_failed"
 	StatusAutonomyDenied  Status = "autonomy_denied"
-	// StatusConflict marks runs whose diff failed `git apply --check` —
-	// the working tree was NOT modified. Audit BUG-13/14: previously such
-	// runs falsely reported `applied` and dropped conflict markers in the
-	// source files. The run dir keeps the original patch under
-	// rejects/diff.patch so the user can review or apply manually.
+	// StatusConflict: diff failed `git apply --check`; working tree
+	// untouched, original patch preserved under rejects/diff.patch.
 	StatusConflict Status = "conflict"
 )
 
@@ -82,10 +79,8 @@ type Request struct {
 	// bind-mounted into /work.
 	Sandbox      string
 	SandboxImage string
-	// PromisedFiles (audit BUG-18) is the optional list of files the
-	// caller has reason to believe should change. The executor sets
-	// Result.Verification.PromisedFilesUntouched to any of these that
-	// don't appear in ChangedFiles after apply.
+	// PromisedFiles are paths the caller asserts should change. Any
+	// missing entries land in Verification.PromisedFilesUntouched.
 	PromisedFiles []string
 }
 
@@ -110,11 +105,8 @@ type Verification struct {
 	SensorsRun    int `json:"sensors_run"`
 	SensorsPassed int `json:"sensors_passed"`
 	OracleCount   int `json:"oracle_count"`
-	// PromisedFilesUntouched (audit BUG-18) lists files the prompt or
-	// plan said would change but that don't appear in ChangedFiles.
-	// Non-empty means the run was billed as `applied` but its scope
-	// was narrower than the user asked for — callers should re-prompt
-	// or treat the status as `incomplete`.
+	// PromisedFilesUntouched: non-empty means the run was billed
+	// `applied` but its scope was narrower than the user asked for.
 	PromisedFilesUntouched []string `json:"promised_files_untouched,omitempty"`
 }
 

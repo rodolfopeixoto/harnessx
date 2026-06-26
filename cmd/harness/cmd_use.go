@@ -94,10 +94,6 @@ func printActivePin(dir string, out io.Writer) error {
 	return nil
 }
 
-// resolveTierModel maps a tier label (cheap|default|deep|...) to a concrete
-// model id declared in the adapter's YAML (capabilities.models). The empty
-// string is returned when the tier is absent — callers should surface the
-// available tiers in the error message.
 func resolveTierModel(root, adapterID, tier string) (string, error) {
 	reg, _, err := agentcmd.LoadAll(root)
 	if err != nil {

@@ -11,21 +11,14 @@ import (
 	"github.com/ropeixoto/harnessx/internal/agents"
 )
 
-// Filler runs a single adapter call to populate Spec fields the
-// deterministic `NewFromPrompt` left as `_TODO:` placeholders. Audit
-// BUG-26: previously the spec emitted by `harness feature` was a TODO
-// shell, so spec-driven development could not start without a manual
-// rewrite. The adapter is asked for a strict JSON object so the parsing
-// is unambiguous and budget-bounded.
+// Filler asks an adapter to populate Spec fields left empty by
+// NewFromPrompt. The adapter is constrained to a strict JSON object so
+// parsing stays unambiguous.
 type Filler struct {
-	Adapter agents.AgentAdapter
-	// BudgetUSD caps the cost. 0 means no cap from this helper (caller
-	// should usually pass 0.05 — same default as `harness ask`).
+	Adapter   agents.AgentAdapter
 	BudgetUSD float64
 }
 
-// fillResponse is the JSON contract we coerce the adapter into. Every
-// field maps to the matching Spec field; unknown keys are ignored.
 type fillResponse struct {
 	UserProblem     string   `json:"user_problem"`
 	ExpectedOutcome string   `json:"expected_outcome"`
@@ -56,9 +49,6 @@ Rules:
   3. Keep each list element under 120 characters.
   4. Be concrete: cite endpoints, table names, file paths when present.`
 
-// Fill enriches s with adapter-generated content. Returns the new Spec
-// and the adapter cost (0 on no-op). Errors from the adapter are
-// returned untouched so the caller can decide whether to surface or log.
 func (f Filler) Fill(ctx context.Context, s Spec) (Spec, float64, error) {
 	if f.Adapter == nil {
 		return s, 0, nil
@@ -120,8 +110,7 @@ func appendIfEmpty(dst, src []string) []string {
 	return out
 }
 
-// extractJSONObject pulls the first balanced {...} block from raw,
-// tolerating adapters that wrap JSON in markdown fences (```json ... ```).
+// extractJSONObject tolerates adapters that wrap JSON in markdown fences.
 func extractJSONObject(raw string) string {
 	raw = strings.TrimSpace(raw)
 	start := strings.IndexByte(raw, '{')

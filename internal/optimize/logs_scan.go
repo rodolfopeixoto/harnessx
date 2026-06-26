@@ -29,9 +29,6 @@ var scanLogExts = map[string]bool{
 	".rb": true, ".go": true, ".rs": true, ".py": true,
 }
 
-// scanLogIgnoredDirs lists directory base-names we never descend into.
-// Audit BUG-23 expanded the set to cover Python virtualenv layouts and
-// language-tool caches that otherwise mint hundreds of false positives.
 var scanLogIgnoredDirs = map[string]bool{
 	".git": true, ".harness": true, "node_modules": true, "vendor": true,
 	"target": true, "dist": true, "build": true, "bin": true,

@@ -161,6 +161,7 @@ func collectSpecAnswers(r *bufio.Reader, out io.Writer, sess *specflow.Session) 
 	return nil
 }
 
+//nolint:gocognit,gocyclo // REPL dispatch over slash commands stays clearer in one place
 func runSpecAuthorREPL(ctx context.Context, r *bufio.Reader, out io.Writer, sess *specflow.Session, adapter agents.AgentAdapter) error {
 	fmt.Fprintln(out, "\n"+ui.Heading.Render("spec edit loop")+" — /help for commands")
 	for {

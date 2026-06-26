@@ -93,11 +93,6 @@ func Ask(ctx stdctx.Context, opts Options, out io.Writer) (Result, error) {
 		fmt.Fprintln(out, "No deterministic evidence located. Use `harness context build` to inspect, then re-ask with a more specific prompt.")
 	}
 
-	// Audit BUG-7: previously `harness ask` only listed evidence files and
-	// never produced a textual answer, breaking the "question mode" UX.
-	// When --agent is set (and --evidence-only is not), route the evidence
-	// through the executor with a strict cite-only system prompt and the
-	// caller's budget cap (default 0.05 USD).
 	if opts.AgentID != "" && !opts.EvidenceOnly {
 		answer, askErr := answerFromEvidence(ctx, rc, opts, pack, out)
 		if askErr != nil {
@@ -118,10 +113,6 @@ func Ask(ctx stdctx.Context, opts Options, out io.Writer) (Result, error) {
 	return res, err
 }
 
-// answerFromEvidence enriches the user's question with the deterministic
-// evidence pack and asks the chosen adapter to respond using ONLY that
-// evidence, citing each claim with `[path:line]`. Cost is capped by
-// opts.BudgetUSD which `harness ask` exposes as --budget-usd.
 func answerFromEvidence(ctx stdctx.Context, rc runtimeCtx, opts Options, pack *hxcontext.Pack, out io.Writer) (string, error) {
 	reg, _, err := agentcmd.LoadAll(rc.root)
 	if err != nil {
@@ -217,11 +208,6 @@ func planThenMaybeExecute(ctx stdctx.Context, opts Options, execute bool, out io
 	}
 
 	sp := spec.NewFromPrompt(opts.Prompt, mode)
-	// Audit BUG-26: when the user passed --agent and execution is not
-	// gated by --plan-only-without-agent, ask the adapter to fill the
-	// spec TODO sections so spec-driven dev can actually start. Budget
-	// capped low; failures are downgraded to a warning — the
-	// deterministic TODO spec still writes.
 	if opts.AgentID != "" && !opts.PlanOnly {
 		reg, _, regErr := agentcmd.LoadAll(rc.root)
 		if regErr == nil {
@@ -311,11 +297,8 @@ func planThenMaybeExecute(ctx stdctx.Context, opts Options, execute bool, out io
 			res.ExecutionDiffPath = exRes.DiffPath
 			res.ExecutionCostUSD = exRes.EstimatedCostUSD
 		default:
-			// Audit BUG-5: when --plan-only is set the user expects no LLM
-			// invocation. Skip the legacy agent chain (the --agent path
-			// already honours PlanOnly inside the executor).
 			if opts.PlanOnly {
-				fmt.Fprintln(out, "Execute: --plan-only set; skipping agent chain (no LLM cost)")
+				fmt.Fprintln(out, "Execute: --plan-only set; skipping agent chain")
 				break
 			}
 			_ = executeAgents(ctx, rc, mode, opts.Prompt, opts.BudgetUSD, pack, out)

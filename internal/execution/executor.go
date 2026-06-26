@@ -158,11 +158,8 @@ func (e *DefaultExecutor) Execute(ctx context.Context, req Request) (Result, err
 	return res, nil
 }
 
-// untouchedPromisedFiles returns the subset of promised that does NOT
-// appear in changed. Used by audit BUG-18 to surface runs that claim
-// `applied` but only touched a narrower file set than the user
-// requested. Matching is exact-path; the caller normalises before
-// passing the list in.
+// untouchedPromisedFiles returns promised entries absent from changed.
+// Matching is exact-path; callers normalise before passing.
 func untouchedPromisedFiles(promised, changed []string) []string {
 	if len(promised) == 0 {
 		return nil

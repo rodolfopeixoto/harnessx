@@ -243,6 +243,8 @@ func min3(a, b, c int) int {
 
 // ListSessions returns one summary per .harness/sessions/*.jsonl file,
 // sorted newest first by file mtime.
+//
+//nolint:gocognit // single WalkDir pass with several inline filters
 func ListSessions(root string) ([]SessionSummary, error) {
 	dir := filepath.Join(root, ".harness", "sessions")
 	entries, err := os.ReadDir(dir)
@@ -347,6 +349,7 @@ func DefaultPlan(goal intentplan.Goal, prompt string) intentplan.Plan {
 	return intentplan.Plan{Goal: goal, Intent: prompt, Generated: now}
 }
 
+//nolint:gocognit,gocyclo // REPL main loop: setup → prompt → dispatch lives here intentionally
 func Run(ctx context.Context, opts Options) error {
 	if !inKnownGoals(opts.Goal) {
 		return fmt.Errorf("repl: unknown goal %q", opts.Goal)
@@ -389,10 +392,7 @@ func Run(ctx context.Context, opts Options) error {
 	if !opts.Pipe {
 		greet(opts.Out, sess)
 	}
-	labels := []string{}
-	for _, s := range opts.AdaptersList {
-		labels = append(labels, s)
-	}
+	labels := append([]string{}, opts.AdaptersList...)
 	if rows, err := ListSessions(opts.Root); err == nil {
 		for _, r := range rows {
 			if r.Label != "" {
@@ -407,7 +407,7 @@ func Run(ctx context.Context, opts Options) error {
 	} else {
 		prompter = newPromptReader(opts.In, opts.Out, historyPath, chatCompleter(opts.AdaptersList, labels))
 	}
-	defer prompter.Close()
+	defer func() { _ = prompter.Close() }()
 	for {
 		badge := ""
 		if opts.HealthProbe != nil {
@@ -446,6 +446,7 @@ func Run(ctx context.Context, opts Options) error {
 	return persist(opts.Root, sess)
 }
 
+//nolint:gocognit,gocyclo // one slash-command dispatch table; splitting fragments break audit
 func handleInput(ctx context.Context, sess *Session, opts *Options, input string) Turn {
 	turn := Turn{Time: time.Now().UTC(), Input: input}
 	if sess.ReadOnly && isMutatingInput(input) {
@@ -1264,25 +1265,6 @@ func (p *prefixWriter) flush() {
 		_, _ = p.w.Write([]byte{'\n'})
 		p.buf = p.buf[:0]
 	}
-}
-
-func readMultilineInput(rd *bufio.Reader, out io.Writer, goal intentplan.Goal) (string, error) {
-	var parts []string
-	for {
-		line, err := rd.ReadString('\n')
-		if err != nil && line == "" {
-			return "", err
-		}
-		trimmed := strings.TrimRight(line, "\n")
-		if strings.HasSuffix(trimmed, "\\") {
-			parts = append(parts, strings.TrimSuffix(trimmed, "\\"))
-			fmt.Fprintf(out, "[%s]… ", goal)
-			continue
-		}
-		parts = append(parts, trimmed)
-		break
-	}
-	return strings.TrimSpace(strings.Join(parts, "\n")), nil
 }
 
 func shouldExit(line string) bool {

@@ -148,10 +148,6 @@ func TestWalkSinceFiltersOldTurns(t *testing.T) {
 	}
 }
 
-// TestWalkAggregatesRunMeta_BUG19 regression: previously analytics walked
-// only chat sessions and returned $0.00 when all spend lived in workflow
-// runs (audit BUG-19). After the fix every .harness/runs/run_*/meta.json
-// contributes to TotalUSD / Adapters / Days.
 func TestWalkAggregatesRunMeta_BUG19(t *testing.T) {
 	work := t.TempDir()
 	_ = os.WriteFile(filepath.Join(work, "go.mod"), []byte(""), 0o644)

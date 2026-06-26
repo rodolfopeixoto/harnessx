@@ -12,11 +12,6 @@ import (
 	"testing"
 )
 
-// TestApplyWorktreeDiff_ConflictRejectsPatch is the BUG-13/14 regression
-// guard: when an agent emits a diff that touches the same lines the user
-// has already modified, the apply step must REFUSE to write to disk,
-// surface ErrApplyConflict, and dump the original patch under
-// <runDir>/rejects/ so the user can resolve manually.
 func TestApplyWorktreeDiff_ConflictRejectsPatch_BUG13(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not available")
@@ -108,9 +103,6 @@ func writeFile(t *testing.T, root, rel, body string) {
 	}
 }
 
-// TestUntouchedPromisedFiles_BUG18 covers the regression where a run
-// claimed `applied` after editing only ancillary files (e.g. tests) and
-// left the requested source file unchanged. Audit BUG-18.
 func TestUntouchedPromisedFiles_BUG18(t *testing.T) {
 	cases := []struct {
 		name     string
