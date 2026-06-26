@@ -13,11 +13,14 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"golang.org/x/term"
 
 	"github.com/ropeixoto/harnessx/internal/agenthealth"
 	"github.com/ropeixoto/harnessx/internal/agents"
@@ -591,9 +594,13 @@ func handleInput(ctx context.Context, sess *Session, opts *Options, input string
 			return turn
 		}
 		if opts.Adapter != nil {
+			if id := detectAdapterSwitch(input); id != "" {
+				return handleInput(ctx, sess, opts, "/use "+id)
+			}
 			if hint := looksLikeShellOrSlash(input); hint != "" {
 				fmt.Fprintln(opts.Out, hint)
-				turn.Action = "guard-shell-like"
+				turn.Action = "intent_redirect"
+				turn.CostUSD = 0
 				return turn
 			}
 			if !checkBudget(sess, opts.Out) {
@@ -692,6 +699,36 @@ func cycleAdapter(opts *Options) {
 	opts.Adapter = a
 	opts.AdapterID = id
 	fmt.Fprintf(opts.Out, "  [swap] now using %s (%s)\n", id, adapterBillingMode(id))
+}
+
+// adapterSwitchPattern matches natural-language adapter-switch
+// intents the user is likely to type without remembering the slash
+// form. Examples: "use kimi", "harness use kimi", "switch to codex",
+// "switch codex", "change adapter to gemini", "model kimi". On
+// match we route through /use <id> so the user does not get billed
+// for a paid agent turn just to swap models.
+var adapterSwitchPattern = regexp.MustCompile(`(?i)^(?:harness\s+)?(?:use|switch(?:\s+to)?|change\s+adapter(?:\s+to)?|model)\s+([a-z0-9][a-z0-9_-]*)\s*$`)
+
+// detectAdapterSwitch returns the adapter id captured from an
+// English-y switch intent, or "" when the input is not a switch.
+func detectAdapterSwitch(input string) string {
+	m := adapterSwitchPattern.FindStringSubmatch(strings.TrimSpace(input))
+	if len(m) != 2 {
+		return ""
+	}
+	return strings.ToLower(m[1])
+}
+
+// writerIsTerminal answers true only when out is an *os.File pointing
+// at a real TTY. Buffers, pipes, and tee'd log writers all return
+// false so the spinner falls back to the static "agent: working…"
+// line.
+func writerIsTerminal(out io.Writer) bool {
+	f, ok := out.(*os.File)
+	if !ok {
+		return false
+	}
+	return term.IsTerminal(int(f.Fd()))
 }
 
 // looksLikeShellOrSlash detects inputs that look like CLI commands
@@ -1073,7 +1110,11 @@ func chatTurnFor(ctx context.Context, sess *Session, opts Options, prompt, task 
 // and codex CLIs hold their JSON output until the call completes,
 // which used to make `harness chat` look frozen for tens of seconds.
 func startSpinner(out io.Writer, plain bool) func() {
-	if plain {
+	if plain || !writerIsTerminal(out) {
+		// Pipe / log file / non-TTY: emit a single "agent: working…"
+		// line so the consumer still sees liveness without getting
+		// CR-clobbered braille glyphs in the log file.
+		fmt.Fprintln(out, "agent: working…")
 		return func() {}
 	}
 	frames := []rune{'⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'}

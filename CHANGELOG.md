@@ -3,6 +3,62 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-26 — v0.154.0 — Wave 28: chat adapter-switch heuristic + intent_redirect + default-agent (F120 + F121)
+
+### Fixed (continued)
+
+- **BUG 2 — default-agent literals no longer override the
+  active.yaml pin.** `harness loop` shipped with `--agent "claude"`
+  and `harness execute` shipped with `--agent "fake-real"`,
+  silently overriding the user's `harness use <id>` pin. Both
+  commands now default to empty and resolve through the same chain:
+  (a) explicit flag → (b) `.harness/config/active.yaml` →
+  (c) `HARNESS_DEFAULT_AGENT` env → (d) interactive picker when TTY
+  → (e) hard error mentioning `harness use <id>`. Help text updated.
+- **BUG 3 — codex 1024-char skill description guard.**
+  `internal/agents/limits` exposes the per-adapter capability matrix
+  (codex: 1024, claude: 8192) and `PrepareSkills` scans
+  `~/.agents/skills/*/SKILL.md` + `.harness/skills/*` and copies a
+  sanitised version (truncated description + trailing `…`) into a
+  per-session directory under `.harness/runs/<id>/skills/`. Single
+  WARN per (session, path) via `WriteReport`. Paths that cannot be
+  rewritten are emitted as a `CODEX_SKIP_SKILLS` comma list so the
+  upstream CLI skips them entirely. The wave-26 stderr filter
+  already drops the cryptic `ERROR codex_core::session: failed to
+  load skill` line from the live UI so the failure never propagates
+  as a chat turn error.
+- **BUG 5 — `harness auto "<prompt>"` end-to-end agentic
+  workflow** (alias `agent-run`). Drives one prompt through
+  plan → spec → tests (failing) → impl (`harness do --autonomy
+  safe_execute`) → ci (with canonicalised error fed back to step 4
+  up to `--max-attempts=5`) → conventional commit. Resumable via
+  `--resume <run-id>`; state persists at
+  `.harness/runs/_agent/<run-id>/state.json` after each phase so a
+  crash never loses progress. Flags `--max-attempts`,
+  `--budget-usd`, `--agent`, `--watch`, `--dry-run`, `--resume`.
+- **BUG 4 — spinner pollution in `--pipe` / non-TTY.** `startSpinner`
+  now detects `!term.IsTerminal(out.Fd())` (or `Plain`) and emits a
+  single `agent: working…` line instead of streaming braille glyphs
+  with `\r` clobbers, so log files captured from
+  `harness chat --pipe < input.txt` no longer carry junk frames.
+
+### Fixed
+
+### Fixed
+
+- **BUG 1 — chat REPL adapter-switch heuristic.** Typing `use kimi`,
+  `harness use kimi`, `switch to codex`, `change adapter to gemini`,
+  or `model claude-3-opus` inside `harness chat` no longer bills a
+  paid agent turn. New `detectAdapterSwitch` regex prefilter routes
+  the intent through the existing `/use <id>` slash so `active.yaml`
+  is updated, the user sees the swap confirmation, and the session
+  ledger records nothing as `action=chat`.
+- **BUG 6 — intent-misclassified turns no longer billed as chat.**
+  When the shell-or-slash guard fires (`harness use 4`, `exec foo`,
+  etc) the turn is now persisted with `action: "intent_redirect"`
+  and `cost_usd: 0`, so `/cost` and `harness analytics` correctly
+  attribute it as a routing hint instead of a paid call.
+
 ## 2026-06-24 — v0.153.0 — Wave 27: auto-login + /login slash (F119)
 
 ### New

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ropeixoto/harnessx/internal/agents"
 	"github.com/ropeixoto/harnessx/internal/intentplan"
 )
 
@@ -244,12 +245,27 @@ func TestRunResumeReplaysTurnsBeforeNewInput(t *testing.T) {
 	}
 }
 
-func TestStartSpinnerPlainNoop(t *testing.T) {
+func TestStartSpinnerPlainPrintsStaticLine(t *testing.T) {
 	var buf bytes.Buffer
 	stop := startSpinner(&buf, true)
 	stop()
-	if buf.Len() != 0 {
-		t.Errorf("plain spinner wrote %d bytes; want 0", buf.Len())
+	if !strings.Contains(buf.String(), "agent: working…") {
+		t.Errorf("plain spinner must print static fallback line, got %q", buf.String())
+	}
+	if strings.Contains(buf.String(), "⠋") {
+		t.Errorf("plain spinner must NOT print braille glyphs")
+	}
+}
+
+func TestStartSpinnerNonTTYDoesNotEmitGlyphs(t *testing.T) {
+	var buf bytes.Buffer
+	stop := startSpinner(&buf, false)
+	stop()
+	if strings.Contains(buf.String(), "⠋") || strings.Contains(buf.String(), "\r") {
+		t.Errorf("non-TTY writer must not receive CR-clobbered glyphs, got %q", buf.String())
+	}
+	if !strings.Contains(buf.String(), "agent: working…") {
+		t.Errorf("non-TTY writer must get static fallback, got %q", buf.String())
 	}
 }
 
@@ -1031,6 +1047,71 @@ func TestRunPipeModeSuppressesGreetAndRecap(t *testing.T) {
 	}
 	if !strings.Contains(buf.String(), "/exec") {
 		t.Errorf("pipe mode should still print /help output: %s", buf.String())
+	}
+}
+
+func TestIntentRedirectTurnRecordedAsZeroCost(t *testing.T) {
+	// BUG 6: an input that fires the shell-or-slash guard must be
+	// persisted as action=intent_redirect with cost_usd=0 so /cost
+	// and harness analytics never count it as a paid agent turn.
+	fakeAdapter := &noopAdapter{}
+	sess := &Session{Goal: intentplan.GoalDev}
+	opts := &Options{
+		Adapter:   fakeAdapter,
+		AdapterID: "fake",
+		Out:       &bytes.Buffer{},
+	}
+	turn := handleInput(context.Background(), sess, opts, "exec something")
+	if turn.Action != "intent_redirect" {
+		t.Errorf("guard turn must be action=intent_redirect, got %q", turn.Action)
+	}
+	if turn.CostUSD != 0 {
+		t.Errorf("intent_redirect cost must be 0, got %f", turn.CostUSD)
+	}
+	if fakeAdapter.runs != 0 {
+		t.Errorf("adapter must NOT be billed for guard hint, got %d Run calls", fakeAdapter.runs)
+	}
+}
+
+type noopAdapter struct {
+	runs int
+}
+
+func (n *noopAdapter) ID() string                        { return "fake" }
+func (n *noopAdapter) Name() string                      { return "fake" }
+func (n *noopAdapter) Capabilities() agents.Capabilities { return agents.Capabilities{} }
+func (n *noopAdapter) Healthcheck(_ context.Context) agents.HealthcheckResult {
+	return agents.HealthcheckResult{OK: true}
+}
+func (n *noopAdapter) Run(_ context.Context, _ agents.AgentRequest) agents.AgentResult {
+	n.runs++
+	return agents.AgentResult{}
+}
+func (n *noopAdapter) ParseUsage(_ agents.AgentOutput) agents.Usage { return agents.Usage{} }
+func (n *noopAdapter) ClassifyFailure(_ agents.AgentOutput, _ int, _ error) agents.FailureType {
+	return agents.FailureNone
+}
+
+func TestDetectAdapterSwitchExtractsID(t *testing.T) {
+	cases := map[string]string{
+		"use kimi":                 "kimi",
+		"USE Kimi":                 "kimi",
+		"harness use kimi":         "kimi",
+		"switch to codex":          "codex",
+		"switch codex":             "codex",
+		"change adapter to gemini": "gemini",
+		"change adapter gemini":    "gemini",
+		"model claude-3-opus":      "claude-3-opus",
+		"  use kimi  ":             "kimi",
+		"hello agent":              "",
+		"use the new feature":      "",
+		"please change something":  "",
+		"":                         "",
+	}
+	for in, want := range cases {
+		if got := detectAdapterSwitch(in); got != want {
+			t.Errorf("detectAdapterSwitch(%q)=%q want %q", in, got, want)
+		}
 	}
 }
 
