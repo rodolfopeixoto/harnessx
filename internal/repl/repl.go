@@ -527,6 +527,9 @@ func handleInput(ctx context.Context, sess *Session, opts *Options, input string
 	case input == "/recap":
 		turn.Action = "recap"
 		recapSession(ctx, sess, *opts, &turn)
+	case input == "/btw":
+		turn.Action = "btw-help"
+		fmt.Fprintln(opts.Out, "  /btw needs a question (e.g. /btw is gofmt enabled in this repo?)")
 	case strings.HasPrefix(input, "/btw "):
 		turn.Action = "btw"
 		quickAnswer(ctx, sess, *opts, strings.TrimSpace(strings.TrimPrefix(input, "/btw ")), &turn)
