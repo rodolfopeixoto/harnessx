@@ -35,7 +35,7 @@ check() {
 }
 
 echo "── harness scaffold list ──"
-check "lists 5 langs" bash -c "$HARNESS scaffold list | tail -n +2 | wc -l | grep -qE '^[[:space:]]*5'"
+check "lists 7 langs" bash -c "$HARNESS scaffold list | tail -n +2 | wc -l | grep -qE '^[[:space:]]*7'"
 
 echo "── harness scaffold show python ──"
 check "shows scaffold.yaml" bash -c "$HARNESS scaffold show python | grep -q 'language: python'"
