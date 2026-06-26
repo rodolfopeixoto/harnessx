@@ -25,7 +25,7 @@ echo "→ ask"
 "$BIN" ask "What does main do?" > /tmp/hx-ask.txt
 cat /tmp/hx-ask.txt
 grep -q "Question Mode" /tmp/hx-ask.txt
-test -s .harness/artifacts/reports/*.md
+test -s .harness/runs/*/report.md
 
 echo "→ feature"
 "$BIN" feature "add greet function with tests" --yes --budget 0.5 > /tmp/hx-feat.txt
