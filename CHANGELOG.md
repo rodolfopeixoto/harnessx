@@ -27,6 +27,15 @@ Newest milestones at the top. Dates are when the milestone landed in repo.
   already drops the cryptic `ERROR codex_core::session: failed to
   load skill` line from the live UI so the failure never propagates
   as a chat turn error.
+- **BUG 5 — `harness auto "<prompt>"` end-to-end agentic
+  workflow** (alias `agent-run`). Drives one prompt through
+  plan → spec → tests (failing) → impl (`harness do --autonomy
+  safe_execute`) → ci (with canonicalised error fed back to step 4
+  up to `--max-attempts=5`) → conventional commit. Resumable via
+  `--resume <run-id>`; state persists at
+  `.harness/runs/_agent/<run-id>/state.json` after each phase so a
+  crash never loses progress. Flags `--max-attempts`,
+  `--budget-usd`, `--agent`, `--watch`, `--dry-run`, `--resume`.
 - **BUG 4 — spinner pollution in `--pipe` / non-TTY.** `startSpinner`
   now detects `!term.IsTerminal(out.Fd())` (or `Plain`) and emits a
   single `agent: working…` line instead of streaming braille glyphs
