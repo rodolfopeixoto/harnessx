@@ -3,7 +3,20 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
-## 2026-06-26 — v0.154.0 — Wave 28: chat adapter-switch heuristic + intent_redirect (F120)
+## 2026-06-26 — v0.154.0 — Wave 28: chat adapter-switch heuristic + intent_redirect + default-agent (F120 + F121)
+
+### Fixed (continued)
+
+- **BUG 2 — default-agent literals no longer override the
+  active.yaml pin.** `harness loop` shipped with `--agent "claude"`
+  and `harness execute` shipped with `--agent "fake-real"`,
+  silently overriding the user's `harness use <id>` pin. Both
+  commands now default to empty and resolve through the same chain:
+  (a) explicit flag → (b) `.harness/config/active.yaml` →
+  (c) `HARNESS_DEFAULT_AGENT` env → (d) interactive picker when TTY
+  → (e) hard error mentioning `harness use <id>`. Help text updated.
+
+### Fixed
 
 ### Fixed
 
