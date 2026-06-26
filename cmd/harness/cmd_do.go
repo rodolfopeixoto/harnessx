@@ -370,7 +370,10 @@ func runWorkflowFeature(ctx context.Context, out io.Writer, dir, prompt, agentID
 		fmt.Fprintf(out, "  ✗ %v\n", err)
 		return "error: " + err.Error()
 	}
-	return "workflow-status:" + res.ExecutionStatus
+	// Audit BUG-15: include the per-step cost in the result string so the
+	// `do` report can sum it. Format kept terse so the existing
+	// `workflow-status:<x>` parser in tests keeps matching the prefix.
+	return fmt.Sprintf("workflow-status:%s cost=$%.4f", res.ExecutionStatus, res.ExecutionCostUSD)
 }
 
 func writeDoReport(dir, prompt string, steps []plannedStep, results []string) (string, error) {
@@ -383,6 +386,17 @@ func writeDoReport(dir, prompt string, steps []plannedStep, results []string) (s
 	var b strings.Builder
 	b.WriteString("# harness do report\n\n")
 	fmt.Fprintf(&b, "prompt: %s\n\n", prompt)
+	totalCost := 0.0
+	for _, r := range results {
+		if idx := strings.Index(r, "cost=$"); idx >= 0 {
+			var c float64
+			fmt.Sscanf(r[idx+6:], "%f", &c)
+			totalCost += c
+		}
+	}
+	// Audit BUG-15: surface aggregate cost at the top of the report so
+	// users can compare with `harness analytics` without parsing each step.
+	fmt.Fprintf(&b, "cost_usd: $%.4f\n\n", totalCost)
 	for i, s := range steps {
 		fmt.Fprintf(&b, "## task %d — %s\n\n", i+1, s.task.Kind)
 		fmt.Fprintf(&b, "- routing: %s\n- tags: %s\n- prompt: %s\n- result: %s\n\n",

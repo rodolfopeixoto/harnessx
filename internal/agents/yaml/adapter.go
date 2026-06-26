@@ -7,12 +7,16 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/ropeixoto/harnessx/internal/agents"
+	"github.com/ropeixoto/harnessx/internal/agents/limits"
 )
 
 // Adapter wraps a YAML spec, executing the configured CLI binary on Run.
@@ -86,6 +90,40 @@ func New(s Spec) *Adapter {
 	return &Adapter{Spec: s, Lookup: exec.LookPath, Runner: defaultRunner{}}
 }
 
+// maybeSanitiseSkills runs the limits.PrepareSkills pre-flight for adapter
+// ids that declare a non-zero MaxSkillDescriptionChars. The sanitised copy
+// is written under <workingDir>/.harness/runs/_skills/<adapter>/ and the
+// caller can forward HARNESS_SKILLS_PATH to the upstream CLI through the
+// adapter YAML when/if the CLI grows that env var. The function is a
+// no-op for adapters that have no skill bundle (claude/gemini/kimi).
+func maybeSanitiseSkills(adapterID string, req agents.AgentRequest) {
+	cap := limits.ForAdapter(adapterID).MaxSkillDescriptionChars
+	if cap <= 0 {
+		return
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return
+	}
+	roots := []string{filepath.Join(home, ".agents", "skills")}
+	wd := req.WorkingDir
+	if wd == "" {
+		wd, _ = os.Getwd()
+	}
+	if wd == "" {
+		return
+	}
+	outDir := filepath.Join(wd, ".harness", "runs", "_skills", adapterID)
+	_, reports, _, prepErr := limits.PrepareSkills(adapterID, roots, outDir)
+	if prepErr != nil {
+		return
+	}
+	if req.LiveOut != nil && len(reports) > 0 {
+		limits.WriteReport(req.LiveOut, adapterID, reports)
+	}
+	_ = fmt.Sprintf // keep fmt import alive
+}
+
 func (a *Adapter) ID() string                        { return a.Spec.ID }
 func (a *Adapter) Name() string                      { return a.Spec.Name }
 func (a *Adapter) Capabilities() agents.Capabilities { return a.Spec.Capabilities }
@@ -116,6 +154,13 @@ func (a *Adapter) Run(ctx context.Context, req agents.AgentRequest) agents.Agent
 	}
 	rctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
+
+	// Audit BUG-3: codex_core rejects SKILL.md files whose YAML
+	// `description:` field exceeds 1024 characters. Sanitise the user's
+	// ~/.agents/skills bundle into a per-run scratch dir and surface a
+	// WARN for each truncated file. The stderr filter still drops the raw
+	// codex_core error so the user only sees the actionable WARN.
+	maybeSanitiseSkills(a.Spec.ID, req)
 
 	args := substituteArgs(a.Spec.Run.Args, req)
 	args = append(args, req.ExtraArgs...)

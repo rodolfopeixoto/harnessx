@@ -1,6 +1,8 @@
 fastapi
 uvicorn[standard]
 pytest
+pytest-cov
+pytest-benchmark
 ruff
 httpx
 bandit

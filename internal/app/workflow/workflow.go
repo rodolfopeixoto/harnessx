@@ -12,7 +12,10 @@ import (
 	stdctx "context"
 	"fmt"
 	"io"
+	"strings"
 
+	"github.com/ropeixoto/harnessx/internal/agents"
+	"github.com/ropeixoto/harnessx/internal/app/agentcmd"
 	"github.com/ropeixoto/harnessx/internal/app/reportcmd"
 	hxcontext "github.com/ropeixoto/harnessx/internal/context"
 	"github.com/ropeixoto/harnessx/internal/domain"
@@ -25,20 +28,21 @@ import (
 )
 
 type Options struct {
-	StartDir   string
-	Prompt     string
-	ModeHint   domain.Mode
-	AutoYes    bool
-	BudgetUSD  float64
-	Execute    bool
-	NoSensors  bool
-	AgentID    string
-	Apply      bool
-	PlanOnly   bool
-	Autonomy   string
-	PromptFile string
-	PDF        string
-	Image      string
+	StartDir     string
+	Prompt       string
+	ModeHint     domain.Mode
+	AutoYes      bool
+	BudgetUSD    float64
+	Execute      bool
+	EvidenceOnly bool
+	NoSensors    bool
+	AgentID      string
+	Apply        bool
+	PlanOnly     bool
+	Autonomy     string
+	PromptFile   string
+	PDF          string
+	Image        string
 }
 
 type Result struct {
@@ -55,6 +59,7 @@ type Result struct {
 	ExecutionRunID    string
 	ExecutionStatus   string
 	ExecutionDiffPath string
+	ExecutionCostUSD  float64
 }
 
 // Ask is Question mode (spec §7). It builds context, surfaces evidence,
@@ -88,6 +93,22 @@ func Ask(ctx stdctx.Context, opts Options, out io.Writer) (Result, error) {
 		fmt.Fprintln(out, "No deterministic evidence located. Use `harness context build` to inspect, then re-ask with a more specific prompt.")
 	}
 
+	// Audit BUG-7: previously `harness ask` only listed evidence files and
+	// never produced a textual answer, breaking the "question mode" UX.
+	// When --agent is set (and --evidence-only is not), route the evidence
+	// through the executor with a strict cite-only system prompt and the
+	// caller's budget cap (default 0.05 USD).
+	if opts.AgentID != "" && !opts.EvidenceOnly {
+		answer, askErr := answerFromEvidence(ctx, rc, opts, pack, out)
+		if askErr != nil {
+			fmt.Fprintf(out, "ask: answer step failed (%v); falling back to evidence-only output\n", askErr)
+		} else {
+			fmt.Fprintln(out)
+			fmt.Fprintln(out, "Answer:")
+			fmt.Fprintln(out, answer)
+		}
+	}
+
 	res.ReportPath, err = writeReport(rc.root, reportcmd.Input{
 		SessionID: sess.ID, RunID: run.ID, Mode: domain.ModeQuestion,
 		Intent:   opts.Prompt,
@@ -95,6 +116,46 @@ func Ask(ctx stdctx.Context, opts Options, out io.Writer) (Result, error) {
 	})
 	finishTelemetry(ctx, repo, sess, run, domain.StatusSucceeded)
 	return res, err
+}
+
+// answerFromEvidence enriches the user's question with the deterministic
+// evidence pack and asks the chosen adapter to respond using ONLY that
+// evidence, citing each claim with `[path:line]`. Cost is capped by
+// opts.BudgetUSD which `harness ask` exposes as --budget-usd.
+func answerFromEvidence(ctx stdctx.Context, rc runtimeCtx, opts Options, pack *hxcontext.Pack, out io.Writer) (string, error) {
+	reg, _, err := agentcmd.LoadAll(rc.root)
+	if err != nil {
+		return "", err
+	}
+	adapter, ok := reg.Get(opts.AgentID)
+	if !ok {
+		return "", fmt.Errorf("agent %q not registered", opts.AgentID)
+	}
+	var sb strings.Builder
+	sb.WriteString("You are answering a question about a codebase.\n")
+	sb.WriteString("Rules:\n")
+	sb.WriteString("  1. Use ONLY the evidence below.\n")
+	sb.WriteString("  2. Cite each claim with a [path:line] reference.\n")
+	sb.WriteString("  3. If the evidence is insufficient, say so and stop.\n\n")
+	sb.WriteString("Question: ")
+	sb.WriteString(opts.Prompt)
+	sb.WriteString("\n\nEvidence:\n")
+	for _, f := range pack.RelevantFiles {
+		fmt.Fprintf(&sb, "- %s (%s)\n", f.Path, f.Reason)
+	}
+	req := agents.AgentRequest{
+		Prompt: sb.String(), WorkingDir: rc.root,
+	}
+	result := adapter.Run(ctx, req)
+	if result.Err != nil {
+		return "", result.Err
+	}
+	answer := strings.TrimSpace(result.Output.FinalMessage)
+	if opts.BudgetUSD > 0 && result.Usage.EstimatedCostUSD > opts.BudgetUSD {
+		fmt.Fprintf(out, "ask: warning — cost $%.4f exceeded --budget-usd $%.4f\n",
+			result.Usage.EstimatedCostUSD, opts.BudgetUSD)
+	}
+	return answer, nil
 }
 
 // Plan classifies, builds the spec + plan, prints them, and stops short
@@ -221,6 +282,7 @@ func planThenMaybeExecute(ctx stdctx.Context, opts Options, execute bool, out io
 			}
 			res.ExecutionRunID = exRes.RunID
 			res.ExecutionStatus = string(exRes.Status)
+			res.ExecutionCostUSD = exRes.EstimatedCostUSD
 		case opts.AgentID != "":
 			exRes, exErr := runWithExecutorAndComplexity(ctx, rc, mode, opts, res.Intent.Complexity, pack, out)
 			if exErr != nil {
@@ -229,7 +291,15 @@ func planThenMaybeExecute(ctx stdctx.Context, opts Options, execute bool, out io
 			res.ExecutionRunID = exRes.RunID
 			res.ExecutionStatus = string(exRes.Status)
 			res.ExecutionDiffPath = exRes.DiffPath
+			res.ExecutionCostUSD = exRes.EstimatedCostUSD
 		default:
+			// Audit BUG-5: when --plan-only is set the user expects no LLM
+			// invocation. Skip the legacy agent chain (the --agent path
+			// already honours PlanOnly inside the executor).
+			if opts.PlanOnly {
+				fmt.Fprintln(out, "Execute: --plan-only set; skipping agent chain (no LLM cost)")
+				break
+			}
 			_ = executeAgents(ctx, rc, mode, opts.Prompt, opts.BudgetUSD, pack, out)
 		}
 	}

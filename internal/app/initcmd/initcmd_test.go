@@ -40,6 +40,52 @@ func TestRun_CreatesLayoutAndRecordsBootstrap(t *testing.T) {
 	require.Equal(t, root, sessions[0].ProjectPath)
 }
 
+func TestRun_AddsWorktreeIgnoreToRootGitignore_BUG16(t *testing.T) {
+	root := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(root, "go.mod"), []byte("module x"), 0o644))
+	// Pre-existing .gitignore with unrelated entry must be preserved.
+	require.NoError(t, os.WriteFile(filepath.Join(root, ".gitignore"), []byte("dist/\n"), 0o644))
+
+	var out bytes.Buffer
+	_, err := Run(context.Background(), Options{StartDir: root}, &out)
+	require.NoError(t, err)
+
+	contents, err := os.ReadFile(filepath.Join(root, ".gitignore"))
+	require.NoError(t, err)
+	require.Contains(t, string(contents), ".harness/worktrees/")
+	require.Contains(t, string(contents), "dist/")
+
+	// Idempotent: second init must not duplicate the line.
+	_, err = Run(context.Background(), Options{StartDir: root, Force: true}, &out)
+	require.NoError(t, err)
+	contents2, err := os.ReadFile(filepath.Join(root, ".gitignore"))
+	require.NoError(t, err)
+	count := 0
+	for _, line := range bytesSplitLines(contents2) {
+		if line == ".harness/worktrees/" {
+			count++
+		}
+	}
+	require.Equal(t, 1, count, "worktree ignore should appear exactly once")
+}
+
+func bytesSplitLines(b []byte) []string {
+	var out []string
+	cur := ""
+	for _, ch := range string(b) {
+		if ch == '\n' {
+			out = append(out, cur)
+			cur = ""
+			continue
+		}
+		cur += string(ch)
+	}
+	if cur != "" {
+		out = append(out, cur)
+	}
+	return out
+}
+
 func TestRun_IdempotentWithoutForce(t *testing.T) {
 	root := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(root, "go.mod"), []byte("module x"), 0o644))

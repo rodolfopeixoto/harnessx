@@ -83,3 +83,23 @@ func TestCompare_DetectsRegression(t *testing.T) {
 	require.Equal(t, "regressed", status["deps_total"])
 	require.Equal(t, "regressed", status["noisy_log_call_sites"])
 }
+
+// TestScanLogCallSites_ExcludesVenv_BUG23 ensures the noisy-logs scanner
+// skips Python virtualenv directories (audit BUG-23). Previously the
+// scanner walked .venv/lib/python3.x/site-packages/* and surfaced hundreds
+// of false positives that broke `harness log-audit` on freshly scaffolded
+// projects.
+func TestScanLogCallSites_ExcludesVenv_BUG23(t *testing.T) {
+	root := t.TempDir()
+	noisy := filepath.Join(root, ".venv", "lib", "python3.12", "site-packages", "noisy")
+	if err := os.MkdirAll(noisy, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(noisy, "verbose.py"), []byte("print(\"oh\")\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	hits := scanLogCallSites(root)
+	if len(hits) != 0 {
+		t.Fatalf("scanner should ignore .venv, got %d hits: %+v", len(hits), hits)
+	}
+}

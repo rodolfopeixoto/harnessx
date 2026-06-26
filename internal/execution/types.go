@@ -47,6 +47,12 @@ const (
 	StatusSensorFailed    Status = "sensor_failed"
 	StatusAgentFailed     Status = "agent_failed"
 	StatusAutonomyDenied  Status = "autonomy_denied"
+	// StatusConflict marks runs whose diff failed `git apply --check` —
+	// the working tree was NOT modified. Audit BUG-13/14: previously such
+	// runs falsely reported `applied` and dropped conflict markers in the
+	// source files. The run dir keeps the original patch under
+	// rejects/diff.patch so the user can review or apply manually.
+	StatusConflict Status = "conflict"
 )
 
 type Request struct {

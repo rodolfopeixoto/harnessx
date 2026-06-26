@@ -205,9 +205,17 @@ func (e *DefaultExecutor) applyGate(ctx context.Context, req Request, wt Worktre
 		res.Status = StatusWaitingApproval
 	case req.Apply:
 		if err := ApplyWorktreeDiff(ctx, e.ProjectRoot, wt, runDir); err != nil {
-			res.Status = StatusAgentFailed
-			res.ErrorType = "apply_failed"
-			res.ErrorMessage = err.Error()
+			if errors.Is(err, ErrApplyConflict) {
+				res.Status = StatusConflict
+				res.ErrorType = "apply_conflict"
+				res.ErrorMessage = err.Error()
+				// Keep worktree on disk so the user can rerun apply or
+				// pull the rejected hunks manually.
+			} else {
+				res.Status = StatusAgentFailed
+				res.ErrorType = "apply_failed"
+				res.ErrorMessage = err.Error()
+			}
 		} else {
 			res.Status = StatusApplied
 			_ = e.Manager.Cleanup(ctx, wt)

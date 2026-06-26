@@ -147,3 +147,36 @@ func TestWalkSinceFiltersOldTurns(t *testing.T) {
 		t.Errorf("expected old turns filtered, got %d", rep.TotalTurns)
 	}
 }
+
+// TestWalkAggregatesRunMeta_BUG19 regression: previously analytics walked
+// only chat sessions and returned $0.00 when all spend lived in workflow
+// runs (audit BUG-19). After the fix every .harness/runs/run_*/meta.json
+// contributes to TotalUSD / Adapters / Days.
+func TestWalkAggregatesRunMeta_BUG19(t *testing.T) {
+	work := t.TempDir()
+	_ = os.WriteFile(filepath.Join(work, "go.mod"), []byte(""), 0o644)
+	runDir := filepath.Join(work, ".harness", "runs", "run_01TEST")
+	if err := os.MkdirAll(runDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	meta := []byte(`{"run_id":"run_01TEST","agent_id":"claude","task_tag":"implementation",` +
+		`"started_at":"` + now + `","estimated_cost_usd":0.42,"input_tokens":1000,"output_tokens":250}`)
+	if err := os.WriteFile(filepath.Join(runDir, "meta.json"), meta, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	rep, err := Walk([]string{work}, time.Time{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rep.TotalUSD < 0.41 || rep.TotalUSD > 0.43 {
+		t.Fatalf("TotalUSD = %v, want ~0.42", rep.TotalUSD)
+	}
+	if rep.TotalTurns != 1 {
+		t.Fatalf("TotalTurns = %d, want 1", rep.TotalTurns)
+	}
+	if len(rep.Adapters) == 0 || rep.Adapters[0].AdapterID != "claude" {
+		t.Fatalf("expected claude adapter row, got %+v", rep.Adapters)
+	}
+}

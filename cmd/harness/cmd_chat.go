@@ -150,10 +150,18 @@ the deterministic planner.`,
 				}
 				registry := reg
 				opts.SwitchTo = func(req string) (agents.AgentAdapter, string, error) {
-					if a, ok := registry.Get(req); ok {
-						return a, req, nil
+					a, ok := registry.Get(req)
+					if !ok {
+						return nil, "", fmt.Errorf("adapter %q not registered", req)
 					}
-					return nil, "", fmt.Errorf("adapter %q not registered", req)
+					// Audit BUG-11: /use mid-session previously only swapped
+					// the in-memory adapter; the next `harness <cmd>` from a
+					// new shell still pointed at the old pin. Persist the
+					// switch to active.yaml so it survives /exit.
+					if perr := activeagent.Save(opts.Root, activeagent.Pin{AgentID: req}); perr != nil {
+						fmt.Fprintf(opts.Out, "chat: warning — could not persist /use %s pin: %v\n", req, perr)
+					}
+					return a, req, nil
 				}
 				// Multi-agent routing: route plain text and slash
 				// commands through the router so /plan reaches the

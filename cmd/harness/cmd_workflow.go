@@ -14,7 +14,12 @@ import (
 )
 
 func newAskCmd() *cobra.Command {
-	return &cobra.Command{
+	var (
+		agentID   string
+		budgetUSD float64
+		evidence  bool
+	)
+	c := &cobra.Command{
 		Use:   "ask <question>",
 		Short: "Question mode — read-only, evidence-first answer",
 		Args:  cobra.MinimumNArgs(1),
@@ -25,10 +30,16 @@ func newAskCmd() *cobra.Command {
 			}
 			_, err = workflow.Ask(cmd.Context(), workflow.Options{
 				StartDir: dir, Prompt: strings.Join(args, " "),
+				AgentID: agentID, BudgetUSD: budgetUSD,
+				EvidenceOnly: evidence,
 			}, cmd.OutOrStdout())
 			return err
 		},
 	}
+	c.Flags().StringVar(&agentID, "agent", "", "agent id to synthesise a textual answer from the evidence")
+	c.Flags().Float64Var(&budgetUSD, "budget-usd", 0.05, "max USD spent on the answer step (audit BUG-7)")
+	c.Flags().BoolVar(&evidence, "evidence-only", false, "skip LLM call; emit raw evidence list only")
+	return c
 }
 
 func newPlanCmd() *cobra.Command {

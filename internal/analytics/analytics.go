@@ -80,10 +80,146 @@ func Walk(roots []string, since time.Time) (Report, error) {
 		}
 	}
 
+	// Audit BUG-19: `harness analytics` previously only walked chat sessions
+	// and reported $0 when all spend lived in workflow runs (`harness do`,
+	// `feature`, `ship`). Aggregate the per-run meta.json now that every
+	// executor writes it.
+	for _, root := range roots {
+		if err := walkRuns(root, since, func(stack string, m runMeta) {
+			collectStackFromRun(byStack, stack, m)
+			collectAdapterFromRun(byAdapter, m)
+			collectDayFromRun(byDay, m)
+			r.TotalUSD += m.CostUSD
+			r.TotalTurns++
+		}); err != nil {
+			return r, err
+		}
+	}
+
 	r.Stacks = sortStacks(byStack)
 	r.Adapters = sortAdapters(byAdapter)
 	r.Days = sortDays(byDay)
 	return r, nil
+}
+
+// runMeta is the minimal subset of internal/execution.Result we care about
+// for analytics. We deliberately decouple from the executor package to keep
+// this aggregator dependency-free.
+type runMeta struct {
+	RunID       string
+	AgentID     string
+	TaskTag     string
+	StartedAt   time.Time
+	CostUSD     float64
+	InputToken  int
+	OutputToken int
+}
+
+func walkRuns(root string, since time.Time, hit func(stack string, m runMeta)) error {
+	return filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			if os.IsPermission(err) || os.IsNotExist(err) {
+				return nil
+			}
+			return err
+		}
+		if !d.IsDir() {
+			return nil
+		}
+		if d.Name() != ".harness" {
+			return nil
+		}
+		projectRoot := filepath.Dir(path)
+		stack := detectStack(projectRoot)
+		runsDir := filepath.Join(path, "runs")
+		entries, rerr := os.ReadDir(runsDir)
+		if rerr != nil {
+			return filepath.SkipDir
+		}
+		for _, e := range entries {
+			if !e.IsDir() {
+				continue
+			}
+			meta, ok := loadRunMeta(filepath.Join(runsDir, e.Name(), "meta.json"))
+			if !ok {
+				continue
+			}
+			if !since.IsZero() && !meta.StartedAt.IsZero() && meta.StartedAt.Before(since) {
+				continue
+			}
+			hit(stack, meta)
+		}
+		return filepath.SkipDir
+	})
+}
+
+func loadRunMeta(path string) (runMeta, bool) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return runMeta{}, false
+	}
+	var raw struct {
+		RunID            string    `json:"run_id"`
+		AgentID          string    `json:"agent_id"`
+		TaskTag          string    `json:"task_tag"`
+		StartedAt        time.Time `json:"started_at"`
+		EstimatedCostUSD float64   `json:"estimated_cost_usd"`
+		InputTokens      int       `json:"input_tokens"`
+		OutputTokens     int       `json:"output_tokens"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return runMeta{}, false
+	}
+	return runMeta{
+		RunID:       raw.RunID,
+		AgentID:     raw.AgentID,
+		TaskTag:     raw.TaskTag,
+		StartedAt:   raw.StartedAt,
+		CostUSD:     raw.EstimatedCostUSD,
+		InputToken:  raw.InputTokens,
+		OutputToken: raw.OutputTokens,
+	}, true
+}
+
+func collectStackFromRun(byStack map[string]*Row, stack string, m runMeta) {
+	row, ok := byStack[stack]
+	if !ok {
+		row = &Row{Stack: stack}
+		byStack[stack] = row
+	}
+	row.Turns++
+	row.InTokens += m.InputToken
+	row.OutTokens += m.OutputToken
+	row.CostUSD += m.CostUSD
+}
+
+func collectAdapterFromRun(by map[string]*AdapterRow, m runMeta) {
+	id := m.AgentID
+	if id == "" {
+		id = "unknown"
+	}
+	key := id + "|" + m.TaskTag
+	row, ok := by[key]
+	if !ok {
+		row = &AdapterRow{AdapterID: id, Task: m.TaskTag}
+		by[key] = row
+	}
+	row.Turns++
+	row.CostUSD += m.CostUSD
+}
+
+func collectDayFromRun(by map[string]*DayRow, m runMeta) {
+	if m.StartedAt.IsZero() {
+		return
+	}
+	day := m.StartedAt.UTC().Format("2006-01-02")
+	row, ok := by[day]
+	if !ok {
+		row = &DayRow{Day: day}
+		by[day] = row
+	}
+	row.Turns++
+	row.CostUSD += m.CostUSD
 }
 
 func walkSessions(root string, since time.Time, hit func(stack string, sess *repl.Session)) error {

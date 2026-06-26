@@ -9,8 +9,10 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/ropeixoto/harnessx/internal/agents"
 	"github.com/ropeixoto/harnessx/internal/app/agentcmd"
 	"github.com/ropeixoto/harnessx/internal/configwiz"
+	"github.com/ropeixoto/harnessx/internal/router"
 )
 
 func newConfigCmd() *cobra.Command {
@@ -32,14 +34,21 @@ func configShowCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if len(snap.Routes) == 0 {
-				fmt.Fprintln(cmd.OutOrStdout(), "no overrides (using bundled defaults)")
-				return nil
-			}
 			out := cmd.OutOrStdout()
-			for task, r := range snap.Routes {
-				fmt.Fprintf(out, "%-22s primary=%s fallback=%s budget=$%.2f model=%s\n",
-					task, r.Primary, strings.Join(r.Fallback, ","), r.BudgetUSD, r.Model)
+			source := "override"
+			routes := snap.Routes
+			if len(routes) == 0 {
+				fmt.Fprintln(out, "no overrides — showing effective bundled defaults:")
+				reg, _, regErr := agentcmd.LoadAll(dir)
+				if regErr != nil {
+					reg = agents.NewRegistry()
+				}
+				routes = router.Defaults(reg)
+				source = "bundled"
+			}
+			for task, r := range routes {
+				fmt.Fprintf(out, "%-22s [%s] primary=%s fallback=%s budget=$%.2f model=%s\n",
+					task, source, r.Primary, strings.Join(r.Fallback, ","), r.BudgetUSD, r.Model)
 			}
 			return nil
 		},

@@ -9,6 +9,17 @@ import (
 	"github.com/ropeixoto/harnessx/internal/index"
 )
 
+// pyExcludesCSV is the comma-separated list of directories every Python
+// sensor should skip. ruff/bandit accept CSV; mypy expects a regex.
+// Centralising the list here keeps audit BUG-8/BUG-23 from regressing
+// (sensor must not crawl .venv and friends, which would mint hundreds of
+// false positives and 45-second scans on small projects).
+const pyExcludesCSV = ".venv,venv,.git,__pycache__,.pytest_cache,.mypy_cache,.ruff_cache,node_modules,dist,build"
+
+// pyExcludesRE is the same set rendered as a regex for tools that don't
+// understand the CSV form (mypy --exclude).
+const pyExcludesRE = `(^|/)\.?venv/|(^|/)__pycache__/|(^|/)\.git/|(^|/)\.pytest_cache/|(^|/)\.mypy_cache/|(^|/)\.ruff_cache/|(^|/)node_modules/|(^|/)dist/|(^|/)build/`
+
 // Catalog returns every sensor known to HarnessX, filtered to those that
 // apply to the given project profile. Universal sensors always apply;
 // stack-specific shell sensors require the matching stack to be detected.
@@ -79,11 +90,14 @@ func stackSensors(p index.Profile) []Sensor {
 
 	if hasStack("python") {
 		all = append(all,
-			ShellSensor{IDValue: "py_ruff", CategoryV: CatLint, Binary: "ruff", Args: []string{"check", "."}, Stacks: []string{"python"}, OptionalTool: true},
-			ShellSensor{IDValue: "py_ruff_format", CategoryV: CatFormat, Binary: "ruff", Args: []string{"format", "--check", "."}, Stacks: []string{"python"}, OptionalTool: true},
-			ShellSensor{IDValue: "py_mypy", CategoryV: CatTypecheck, Binary: "mypy", Args: []string{"."}, Stacks: []string{"python"}, OptionalTool: true},
+			// Excludes mirror pyExcludes below; passing them to ruff/mypy/bandit
+			// prevents the "scan .venv for 200 false positives" failure mode
+			// observed in audit BUG-8/BUG-23.
+			ShellSensor{IDValue: "py_ruff", CategoryV: CatLint, Binary: "ruff", Args: []string{"check", "--exclude", pyExcludesCSV, "."}, Stacks: []string{"python"}, OptionalTool: true},
+			ShellSensor{IDValue: "py_ruff_format", CategoryV: CatFormat, Binary: "ruff", Args: []string{"format", "--check", "--exclude", pyExcludesCSV, "."}, Stacks: []string{"python"}, OptionalTool: true},
+			ShellSensor{IDValue: "py_mypy", CategoryV: CatTypecheck, Binary: "mypy", Args: []string{"--exclude", pyExcludesRE, "."}, Stacks: []string{"python"}, OptionalTool: true},
 			ShellSensor{IDValue: "py_pytest", CategoryV: CatTest, Binary: "pytest", Args: nil, Stacks: []string{"python"}, OptionalTool: true, Timeout: 10 * time.Minute},
-			ShellSensor{IDValue: "py_bandit", CategoryV: CatSecurity, Binary: "bandit", Args: []string{"-r", "."}, Stacks: []string{"python"}, OptionalTool: true},
+			ShellSensor{IDValue: "py_bandit", CategoryV: CatSecurity, Binary: "bandit", Args: []string{"-r", "--exclude", pyExcludesCSV, "."}, Stacks: []string{"python"}, OptionalTool: true},
 			ShellSensor{IDValue: "py_pip_audit", CategoryV: CatDeps, Binary: "pip-audit", Args: nil, Stacks: []string{"python"}, OptionalTool: true},
 		)
 	}

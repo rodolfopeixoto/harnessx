@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -37,6 +38,7 @@ type shipOptions struct {
 	watch          bool
 	watchInterval  time.Duration
 	allowDirty     bool
+	budgetUSD      float64
 }
 
 func newShipCmd() *cobra.Command {
@@ -47,6 +49,7 @@ func newShipCmd() *cobra.Command {
 		branchBase:     "develop",
 		branchPrefix:   "feature",
 		autonomy:       "ask",
+		budgetUSD:      1.0,
 	}
 	c := &cobra.Command{
 		Use:   "ship <prompt>",
@@ -85,6 +88,7 @@ chain.`,
 	c.Flags().BoolVar(&opts.watch, "watch", false, "re-run ship loop whenever a project file changes")
 	c.Flags().DurationVar(&opts.watchInterval, "watch-interval", 3*time.Second, "polling interval in --watch mode")
 	c.Flags().BoolVar(&opts.allowDirty, "allow-dirty", false, "do not require a clean working tree before shipping")
+	c.Flags().Float64Var(&opts.budgetUSD, "budget-usd", opts.budgetUSD, "max USD spent across the ship loop; forwarded to 'harness do'")
 	// --yes is accepted as a no-op so `harness ship` can be invoked the same
 	// way every other harness command is (`harness do --yes`, `harness new
 	// --yes`). The REPL /ship slash appends it automatically.
@@ -160,6 +164,9 @@ func buildShipSteps(ctx context.Context, out io.Writer, bin, root string, opts s
 				doArgs := []string{"do", opts.prompt, "--autonomy", opts.autonomy, "--yes"}
 				if opts.agentID != "" {
 					doArgs = append(doArgs, "--agent", opts.agentID)
+				}
+				if opts.budgetUSD > 0 {
+					doArgs = append(doArgs, "--budget-usd", strconv.FormatFloat(opts.budgetUSD, 'f', -1, 64))
 				}
 				return shipRunStep(ctx, out, bin, root, opts,
 					fmt.Sprintf("do attempt %d", attempt), doArgs)
