@@ -217,6 +217,24 @@ func planThenMaybeExecute(ctx stdctx.Context, opts Options, execute bool, out io
 	}
 
 	sp := spec.NewFromPrompt(opts.Prompt, mode)
+	// Audit BUG-26: when the user passed --agent and execution is not
+	// gated by --plan-only-without-agent, ask the adapter to fill the
+	// spec TODO sections so spec-driven dev can actually start. Budget
+	// capped low; failures are downgraded to a warning — the
+	// deterministic TODO spec still writes.
+	if opts.AgentID != "" && !opts.PlanOnly {
+		reg, _, regErr := agentcmd.LoadAll(rc.root)
+		if regErr == nil {
+			if a, ok := reg.Get(opts.AgentID); ok {
+				if filled, cost, fillErr := (spec.Filler{Adapter: a, BudgetUSD: 0.05}).Fill(ctx, sp); fillErr == nil {
+					sp = filled
+					fmt.Fprintf(out, "Spec: enriched via %s (cost $%.4f)\n", opts.AgentID, cost)
+				} else {
+					fmt.Fprintf(out, "Spec: enrichment skipped (%v)\n", fillErr)
+				}
+			}
+		}
+	}
 	specPath, err := sp.Write(rc.root)
 	if err != nil {
 		finishTelemetry(ctx, repo, sess, run, domain.StatusFailed)

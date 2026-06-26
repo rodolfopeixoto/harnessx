@@ -107,3 +107,33 @@ func writeFile(t *testing.T, root, rel, body string) {
 		t.Fatal(err)
 	}
 }
+
+// TestUntouchedPromisedFiles_BUG18 covers the regression where a run
+// claimed `applied` after editing only ancillary files (e.g. tests) and
+// left the requested source file unchanged. Audit BUG-18.
+func TestUntouchedPromisedFiles_BUG18(t *testing.T) {
+	cases := []struct {
+		name     string
+		promised []string
+		changed  []string
+		want     []string
+	}{
+		{"no promises is no miss", nil, []string{"a.go"}, nil},
+		{"all promises touched", []string{"a.go", "b.go"}, []string{"a.go", "b.go"}, nil},
+		{"some untouched", []string{"app.py", "test_app.py"}, []string{"test_app.py"}, []string{"app.py"}},
+		{"none touched", []string{"a", "b"}, nil, []string{"a", "b"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := untouchedPromisedFiles(tc.promised, tc.changed)
+			if len(got) != len(tc.want) {
+				t.Fatalf("got %v want %v", got, tc.want)
+			}
+			for i := range got {
+				if got[i] != tc.want[i] {
+					t.Fatalf("got %v want %v", got, tc.want)
+				}
+			}
+		})
+	}
+}

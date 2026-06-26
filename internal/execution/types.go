@@ -82,6 +82,11 @@ type Request struct {
 	// bind-mounted into /work.
 	Sandbox      string
 	SandboxImage string
+	// PromisedFiles (audit BUG-18) is the optional list of files the
+	// caller has reason to believe should change. The executor sets
+	// Result.Verification.PromisedFilesUntouched to any of these that
+	// don't appear in ChangedFiles after apply.
+	PromisedFiles []string
 }
 
 type SensorOutcome struct {
@@ -105,6 +110,12 @@ type Verification struct {
 	SensorsRun    int `json:"sensors_run"`
 	SensorsPassed int `json:"sensors_passed"`
 	OracleCount   int `json:"oracle_count"`
+	// PromisedFilesUntouched (audit BUG-18) lists files the prompt or
+	// plan said would change but that don't appear in ChangedFiles.
+	// Non-empty means the run was billed as `applied` but its scope
+	// was narrower than the user asked for — callers should re-prompt
+	// or treat the status as `incomplete`.
+	PromisedFilesUntouched []string `json:"promised_files_untouched,omitempty"`
 }
 
 // Recovery reports how much the run wobbled.

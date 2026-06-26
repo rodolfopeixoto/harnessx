@@ -150,11 +150,34 @@ func (e *DefaultExecutor) Execute(ctx context.Context, req Request) (Result, err
 	}
 
 	res.FinishedAt = e.Clock()
+	res.Verification.PromisedFilesUntouched = untouchedPromisedFiles(req.PromisedFiles, res.ChangedFiles)
 	populateMetrics(&res)
 	summary := fmt.Sprintf("status=%s files=%d risk=%s decision=%s", res.Status, len(changed), risk, dec)
 	res.ReportPath = writeReport(runDir, req, res, summary)
 	writeMeta(runDir, res)
 	return res, nil
+}
+
+// untouchedPromisedFiles returns the subset of promised that does NOT
+// appear in changed. Used by audit BUG-18 to surface runs that claim
+// `applied` but only touched a narrower file set than the user
+// requested. Matching is exact-path; the caller normalises before
+// passing the list in.
+func untouchedPromisedFiles(promised, changed []string) []string {
+	if len(promised) == 0 {
+		return nil
+	}
+	hit := make(map[string]struct{}, len(changed))
+	for _, c := range changed {
+		hit[c] = struct{}{}
+	}
+	var miss []string
+	for _, p := range promised {
+		if _, ok := hit[p]; !ok {
+			miss = append(miss, p)
+		}
+	}
+	return miss
 }
 
 // populateMetrics derives Trajectory / Verification / Recovery /
