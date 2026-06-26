@@ -15,6 +15,18 @@ Newest milestones at the top. Dates are when the milestone landed in repo.
   (a) explicit flag → (b) `.harness/config/active.yaml` →
   (c) `HARNESS_DEFAULT_AGENT` env → (d) interactive picker when TTY
   → (e) hard error mentioning `harness use <id>`. Help text updated.
+- **BUG 3 — codex 1024-char skill description guard.**
+  `internal/agents/limits` exposes the per-adapter capability matrix
+  (codex: 1024, claude: 8192) and `PrepareSkills` scans
+  `~/.agents/skills/*/SKILL.md` + `.harness/skills/*` and copies a
+  sanitised version (truncated description + trailing `…`) into a
+  per-session directory under `.harness/runs/<id>/skills/`. Single
+  WARN per (session, path) via `WriteReport`. Paths that cannot be
+  rewritten are emitted as a `CODEX_SKIP_SKILLS` comma list so the
+  upstream CLI skips them entirely. The wave-26 stderr filter
+  already drops the cryptic `ERROR codex_core::session: failed to
+  load skill` line from the live UI so the failure never propagates
+  as a chat turn error.
 
 ### Fixed
 
