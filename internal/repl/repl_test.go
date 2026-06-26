@@ -244,12 +244,27 @@ func TestRunResumeReplaysTurnsBeforeNewInput(t *testing.T) {
 	}
 }
 
-func TestStartSpinnerPlainNoop(t *testing.T) {
+func TestStartSpinnerPlainPrintsStaticLine(t *testing.T) {
 	var buf bytes.Buffer
 	stop := startSpinner(&buf, true)
 	stop()
-	if buf.Len() != 0 {
-		t.Errorf("plain spinner wrote %d bytes; want 0", buf.Len())
+	if !strings.Contains(buf.String(), "agent: working…") {
+		t.Errorf("plain spinner must print static fallback line, got %q", buf.String())
+	}
+	if strings.Contains(buf.String(), "⠋") {
+		t.Errorf("plain spinner must NOT print braille glyphs")
+	}
+}
+
+func TestStartSpinnerNonTTYDoesNotEmitGlyphs(t *testing.T) {
+	var buf bytes.Buffer
+	stop := startSpinner(&buf, false)
+	stop()
+	if strings.Contains(buf.String(), "⠋") || strings.Contains(buf.String(), "\r") {
+		t.Errorf("non-TTY writer must not receive CR-clobbered glyphs, got %q", buf.String())
+	}
+	if !strings.Contains(buf.String(), "agent: working…") {
+		t.Errorf("non-TTY writer must get static fallback, got %q", buf.String())
 	}
 }
 

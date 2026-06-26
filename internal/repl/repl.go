@@ -20,6 +20,8 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/term"
+
 	"github.com/ropeixoto/harnessx/internal/agenthealth"
 	"github.com/ropeixoto/harnessx/internal/agents"
 	"github.com/ropeixoto/harnessx/internal/intentplan"
@@ -717,6 +719,18 @@ func detectAdapterSwitch(input string) string {
 	return strings.ToLower(m[1])
 }
 
+// writerIsTerminal answers true only when out is an *os.File pointing
+// at a real TTY. Buffers, pipes, and tee'd log writers all return
+// false so the spinner falls back to the static "agent: working…"
+// line.
+func writerIsTerminal(out io.Writer) bool {
+	f, ok := out.(*os.File)
+	if !ok {
+		return false
+	}
+	return term.IsTerminal(int(f.Fd()))
+}
+
 // looksLikeShellOrSlash detects inputs that look like CLI commands
 // being typed into the chat by mistake — the user expected the REPL
 // to parse `harness use 4` or `exec do thing` as a command but the
@@ -1096,7 +1110,11 @@ func chatTurnFor(ctx context.Context, sess *Session, opts Options, prompt, task 
 // and codex CLIs hold their JSON output until the call completes,
 // which used to make `harness chat` look frozen for tens of seconds.
 func startSpinner(out io.Writer, plain bool) func() {
-	if plain {
+	if plain || !writerIsTerminal(out) {
+		// Pipe / log file / non-TTY: emit a single "agent: working…"
+		// line so the consumer still sees liveness without getting
+		// CR-clobbered braille glyphs in the log file.
+		fmt.Fprintln(out, "agent: working…")
 		return func() {}
 	}
 	frames := []rune{'⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'}

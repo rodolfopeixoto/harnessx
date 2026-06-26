@@ -27,6 +27,11 @@ Newest milestones at the top. Dates are when the milestone landed in repo.
   already drops the cryptic `ERROR codex_core::session: failed to
   load skill` line from the live UI so the failure never propagates
   as a chat turn error.
+- **BUG 4 — spinner pollution in `--pipe` / non-TTY.** `startSpinner`
+  now detects `!term.IsTerminal(out.Fd())` (or `Plain`) and emits a
+  single `agent: working…` line instead of streaming braille glyphs
+  with `\r` clobbers, so log files captured from
+  `harness chat --pipe < input.txt` no longer carry junk frames.
 
 ### Fixed
 
