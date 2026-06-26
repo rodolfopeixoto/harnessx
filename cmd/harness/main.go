@@ -105,6 +105,7 @@ func newRoot() *cobra.Command {
 		newProfileCmd(),
 		newShipCmd(),
 		newDriveCmd(),
+		newAutoCmd(),
 		newOnboardingCmd(),
 		newAnalyticsCmd(),
 		newNewCmd(),
