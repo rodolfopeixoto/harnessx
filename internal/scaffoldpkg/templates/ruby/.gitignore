@@ -3,3 +3,6 @@
 *.log
 *.gem
 .rspec_status
+
+# HarnessX worktrees (do not commit)
+.harness/worktrees/

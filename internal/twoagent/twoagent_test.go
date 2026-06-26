@@ -69,17 +69,6 @@ func TestLoadDiagnosisBadJSON(t *testing.T) {
 	}
 }
 
-type stubFixer struct {
-	id  string
-	err error
-}
-
-func (s stubFixer) ID() string          { return s.id }
-func (s stubFixer) Description() string { return s.id }
-func (s stubFixer) Apply(ctx context.Context, root string, p Problem, out io.Writer) error {
-	return s.err
-}
-
 func TestApplyAllRoutesByFixID(t *testing.T) {
 	d := Diagnosis{Problems: []Problem{
 		{ID: "p1", FixID: "f1"},

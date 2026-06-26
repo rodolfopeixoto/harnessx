@@ -20,3 +20,5 @@ tmp/
 web/dashboard/test-results/
 harness.exe
 /harness
+.harness/audit-status.json
+.harness/audit-status.json.tmp

@@ -4,7 +4,7 @@ package main
 
 import (
 	"context"
-	"crypto/sha1"
+	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -57,7 +57,7 @@ var watchSkipDirs = map[string]bool{
 }
 
 func hashProjectFiles(root string) (string, error) {
-	h := sha1.New()
+	h := sha256.New()
 	err := filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return nil

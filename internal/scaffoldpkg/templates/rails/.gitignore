@@ -4,3 +4,6 @@
 /tmp/*
 /coverage/
 .byebug_history
+
+# HarnessX worktrees (do not commit)
+.harness/worktrees/

@@ -130,6 +130,15 @@ scaffold-fmt:
 # ci: full local CI gate. Wired to the pre-push hook by `make install-hooks`.
 ci: lint check coverage-gate coverage-shell test-sh e2e-all
 
+# audit-regression: replay the 26 audit findings from
+# .harness/artifacts/HARNESS-AUDIT-COMPLETE.md and assert non-LLM scenarios
+# pass. Use BASELINE=audit-baseline.json to enforce no-regression.
+audit-regression:
+	@bash scripts/audit-regression.sh
+
+audit-baseline:
+	@GENERATE_BASELINE=1 bash scripts/audit-regression.sh
+
 # test-sh: shell test harness (scripts/tests/test-*.sh).
 test-sh:
 	@bash scripts/tests/run-all.sh

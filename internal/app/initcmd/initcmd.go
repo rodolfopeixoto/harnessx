@@ -12,6 +12,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"text/template"
 	"time"
 
@@ -121,6 +122,11 @@ func Run(ctx context.Context, opts Options, out io.Writer) (Result, error) {
 		return res, err
 	}
 
+	// Worktrees show up as embedded repos in `git add .` if not ignored.
+	if err := ensureRootGitignoreLine(root, ".harness/worktrees/"); err != nil {
+		return res, err
+	}
+
 	// Write config from template.
 	if !res.AlreadyInit || opts.Force {
 		tpl, err := template.New("cfg").Parse(configTemplate)
@@ -208,4 +214,26 @@ func writeIfMissing(path string, data []byte, force bool) error {
 		return err
 	}
 	return os.WriteFile(path, data, 0o644)
+}
+
+func ensureRootGitignoreLine(root, line string) error {
+	path := filepath.Join(root, ".gitignore")
+	existing, err := os.ReadFile(path)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	for _, candidate := range strings.Split(string(existing), "\n") {
+		if strings.TrimSpace(candidate) == line {
+			return nil
+		}
+	}
+	var buf strings.Builder
+	buf.Write(existing)
+	if len(existing) > 0 && !strings.HasSuffix(string(existing), "\n") {
+		buf.WriteByte('\n')
+	}
+	buf.WriteString("# HarnessX worktrees (do not commit)\n")
+	buf.WriteString(line)
+	buf.WriteByte('\n')
+	return os.WriteFile(path, []byte(buf.String()), 0o644)
 }

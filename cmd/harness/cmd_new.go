@@ -99,6 +99,7 @@ func runNewProject(ctx context.Context, out io.Writer, opts newOptions) error {
 	return nil
 }
 
+//nolint:gocognit // interactive wizard branches one screen per option
 func resolveNewInputs(opts *newOptions, langs []string, out io.Writer) error {
 	if !opts.yes {
 		if opts.stack == "" {
