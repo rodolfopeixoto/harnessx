@@ -8,11 +8,14 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/ropeixoto/harnessx/internal/agents"
+	"github.com/ropeixoto/harnessx/internal/agents/limits"
 )
 
 // Adapter wraps a YAML spec, executing the configured CLI binary on Run.
@@ -86,6 +89,35 @@ func New(s Spec) *Adapter {
 	return &Adapter{Spec: s, Lookup: exec.LookPath, Runner: defaultRunner{}}
 }
 
+// maybeSanitiseSkills truncates SKILL.md descriptions that exceed the
+// upstream CLI's hard parser limit (codex_core rejects > 1024 chars).
+func maybeSanitiseSkills(adapterID string, req agents.AgentRequest) {
+	cap := limits.ForAdapter(adapterID).MaxSkillDescriptionChars
+	if cap <= 0 {
+		return
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return
+	}
+	roots := []string{filepath.Join(home, ".agents", "skills")}
+	wd := req.WorkingDir
+	if wd == "" {
+		wd, _ = os.Getwd()
+	}
+	if wd == "" {
+		return
+	}
+	outDir := filepath.Join(wd, ".harness", "runs", "_skills", adapterID)
+	_, reports, _, prepErr := limits.PrepareSkills(adapterID, roots, outDir)
+	if prepErr != nil {
+		return
+	}
+	if req.LiveOut != nil && len(reports) > 0 {
+		limits.WriteReport(req.LiveOut, adapterID, reports)
+	}
+}
+
 func (a *Adapter) ID() string                        { return a.Spec.ID }
 func (a *Adapter) Name() string                      { return a.Spec.Name }
 func (a *Adapter) Capabilities() agents.Capabilities { return a.Spec.Capabilities }
@@ -116,6 +148,8 @@ func (a *Adapter) Run(ctx context.Context, req agents.AgentRequest) agents.Agent
 	}
 	rctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
+
+	maybeSanitiseSkills(a.Spec.ID, req)
 
 	args := substituteArgs(a.Spec.Run.Args, req)
 	args = append(args, req.ExtraArgs...)

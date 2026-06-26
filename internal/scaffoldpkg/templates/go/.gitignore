@@ -5,3 +5,6 @@
 coverage.*
 .idea/
 .vscode/
+
+# HarnessX worktrees (do not commit)
+.harness/worktrees/

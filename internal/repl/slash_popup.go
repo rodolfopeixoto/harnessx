@@ -97,7 +97,7 @@ func (s *slashSuggester) matches(line string) []string {
 	}
 	out := make([]string, 0, slashPopupMaxRows)
 	for _, c := range s.allSlash {
-		if c == prefix && strings.IndexAny(trimmed, " \t") < 0 {
+		if c == prefix && !strings.ContainsAny(trimmed, " \t") {
 			return nil
 		}
 		if strings.HasPrefix(c, prefix) {

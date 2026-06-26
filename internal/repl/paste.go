@@ -46,7 +46,9 @@ func (p *pasteCoalescingReader) Read(out []byte) (int, error) {
 	if n == 0 {
 		return 0, err
 	}
-	data := append(p.carry, tmp[:n]...)
+	data := make([]byte, 0, len(p.carry)+n)
+	data = append(data, p.carry...)
+	data = append(data, tmp[:n]...)
 	p.carry = nil
 	processed := p.process(data)
 	if len(processed) == 0 && err == nil {

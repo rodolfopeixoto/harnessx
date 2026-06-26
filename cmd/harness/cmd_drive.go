@@ -311,9 +311,7 @@ func extractPythonBody(s string) string {
 			rest := s[idx+len(fence):]
 			if end := strings.Index(rest, "```"); end > 0 {
 				body := strings.TrimSpace(rest[:end])
-				if strings.HasPrefix(body, "\n") {
-					body = body[1:]
-				}
+				body = strings.TrimPrefix(body, "\n")
 				return body + "\n"
 			}
 		}

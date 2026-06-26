@@ -47,6 +47,9 @@ const (
 	StatusSensorFailed    Status = "sensor_failed"
 	StatusAgentFailed     Status = "agent_failed"
 	StatusAutonomyDenied  Status = "autonomy_denied"
+	// StatusConflict: diff failed `git apply --check`; working tree
+	// untouched, original patch preserved under rejects/diff.patch.
+	StatusConflict Status = "conflict"
 )
 
 type Request struct {
@@ -76,6 +79,9 @@ type Request struct {
 	// bind-mounted into /work.
 	Sandbox      string
 	SandboxImage string
+	// PromisedFiles are paths the caller asserts should change. Any
+	// missing entries land in Verification.PromisedFilesUntouched.
+	PromisedFiles []string
 }
 
 type SensorOutcome struct {
@@ -99,6 +105,9 @@ type Verification struct {
 	SensorsRun    int `json:"sensors_run"`
 	SensorsPassed int `json:"sensors_passed"`
 	OracleCount   int `json:"oracle_count"`
+	// PromisedFilesUntouched: non-empty means the run was billed
+	// `applied` but its scope was narrower than the user asked for.
+	PromisedFilesUntouched []string `json:"promised_files_untouched,omitempty"`
 }
 
 // Recovery reports how much the run wobbled.

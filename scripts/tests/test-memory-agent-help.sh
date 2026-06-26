@@ -61,7 +61,7 @@ echo "── harness version ──"
 check "version emits semver" bash -c "$HARNESS version | grep -qE 'harness v?[0-9]+\.[0-9]+'"
 
 echo "── harness scaffold list ──"
-check "list reports five langs" bash -c "$HARNESS scaffold list | grep -E 'go|python|ruby|rust|react' | wc -l | grep -qE '5'"
+check "list reports all seven scaffolds" bash -c "$HARNESS scaffold list | grep -E '^(go|python|python-ecommerce|ruby|rust|react|rails) ' | wc -l | grep -qE '7'"
 
 echo "── harness sensor list ──"
 check "sensor list non-empty" bash -c "$HARNESS sensor list | grep -qiE 'secrets|forbidden'"

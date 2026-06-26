@@ -10,7 +10,7 @@ package vcr
 
 import (
 	"context"
-	"crypto/sha1"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -141,7 +141,7 @@ func fromResult(res agents.AgentResult, fp, id string) cassette {
 }
 
 func fingerprint(req agents.AgentRequest, adapterID string) string {
-	h := sha1.New()
+	h := sha256.New()
 	h.Write([]byte(adapterID))
 	h.Write([]byte{0})
 	h.Write([]byte(req.Model))
