@@ -38,6 +38,10 @@ func newExecuteCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			agentID, err = resolveDefaultAgent(agentID, root, cmd.OutOrStdout(), cmd.InOrStdin())
+			if err != nil {
+				return err
+			}
 			reg, _, err := agentcmd.LoadAll(root)
 			if err != nil {
 				return fmt.Errorf("load agents: %w", err)
@@ -89,7 +93,7 @@ func newExecuteCmd() *cobra.Command {
 			return err
 		},
 	}
-	c.Flags().StringVar(&agentID, "agent", "fake-real", "agent id from the registry")
+	c.Flags().StringVar(&agentID, "agent", "", "agent adapter id (default: active.yaml pin → $HARNESS_DEFAULT_AGENT → interactive picker)")
 	c.Flags().StringVar(&mode, "mode", "feature", "feature|bugfix|ask|review")
 	c.Flags().BoolVar(&apply, "apply", false, "apply diff to project root after gate allow")
 	c.Flags().BoolVar(&planOnly, "plan-only", false, "skip agent invocation")

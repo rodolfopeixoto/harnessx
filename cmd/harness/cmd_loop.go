@@ -39,6 +39,10 @@ and --test.`,
 			if err != nil {
 				return err
 			}
+			agentID, err = resolveDefaultAgent(agentID, dir, cmd.OutOrStdout(), cmd.InOrStdin())
+			if err != nil {
+				return err
+			}
 			prompt := strings.Join(args, " ")
 			if prompt == "" {
 				prompt = "iterate on the current diff until lint and tests pass"
@@ -65,7 +69,7 @@ and --test.`,
 			return nil
 		},
 	}
-	c.Flags().StringVar(&agentID, "agent", "claude", "agent adapter id")
+	c.Flags().StringVar(&agentID, "agent", "", "agent adapter id (default: active.yaml pin → $HARNESS_DEFAULT_AGENT → interactive picker)")
 	c.Flags().StringVar(&autonomy, "autonomy", "safe_execute", "autonomy level")
 	c.Flags().Float64Var(&budgetUSD, "budget-usd", 1.0, "max USD across all attempts")
 	c.Flags().IntVar(&maxAttempts, "max-attempts", 3, "hard cap on retry attempts (max 10)")
