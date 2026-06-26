@@ -390,8 +390,9 @@ func writeDoReport(dir, prompt string, steps []plannedStep, results []string) (s
 	for _, r := range results {
 		if idx := strings.Index(r, "cost=$"); idx >= 0 {
 			var c float64
-			fmt.Sscanf(r[idx+6:], "%f", &c)
-			totalCost += c
+			if _, err := fmt.Sscanf(r[idx+6:], "%f", &c); err == nil {
+				totalCost += c
+			}
 		}
 	}
 	// Audit BUG-15: surface aggregate cost at the top of the report so

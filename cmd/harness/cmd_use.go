@@ -4,6 +4,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 
 	"github.com/spf13/cobra"
 
@@ -31,58 +32,66 @@ Examples:
   harness use --clear             # remove the pin`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			dir, err := cwd()
-			if err != nil {
-				return err
-			}
-			if clear {
-				if err := activeagent.Clear(dir); err != nil {
-					return err
-				}
-				fmt.Fprintf(cmd.OutOrStdout(), "%s pin cleared\n", ui.MarkSuccess())
-				return nil
-			}
-			if len(args) == 0 {
-				p, err := activeagent.Load(dir)
-				if err != nil {
-					return err
-				}
-				if p.AgentID == "" {
-					fmt.Fprintln(cmd.OutOrStdout(), "no active pin (router defaults apply)")
-					return nil
-				}
-				fmt.Fprintf(cmd.OutOrStdout(), "active: %s model=%s\n", ui.Accent.Render(p.AgentID), p.Model)
-				return nil
-			}
-			id := args[0]
-			ids, err := agentcmd.AvailableAdapterIDs()
-			if err != nil {
-				return err
-			}
-			if !containsString(ids, id) {
-				return fmt.Errorf("use: unknown adapter %q (have %v)", id, ids)
-			}
-			if tier != "" {
-				if model != "" {
-					return fmt.Errorf("use: --tier and --model are mutually exclusive")
-				}
-				resolved, err := resolveTierModel(dir, id, tier)
-				if err != nil {
-					return err
-				}
-				model = resolved
-			}
-			if err := activeagent.Save(dir, activeagent.Pin{AgentID: id, Model: model}); err != nil {
-				return err
-			}
-			fmt.Fprintf(cmd.OutOrStdout(), "%s pinned %s\n", ui.MarkSuccess(), ui.Accent.Render(id))
-			return nil
+			return runUseCmd(cmd, args, model, tier, clear)
 		},
 	}
 	c.Flags().StringVar(&model, "model", "", "model id override (forwarded to the adapter)")
 	c.Flags().StringVar(&tier, "tier", "", "resolve a model tier (cheap|default|deep) from the adapter YAML")
 	c.Flags().BoolVar(&clear, "clear", false, "remove the pin")
 	return c
+}
+
+func runUseCmd(cmd *cobra.Command, args []string, model, tier string, clear bool) error {
+	dir, err := cwd()
+	if err != nil {
+		return err
+	}
+	if clear {
+		if cerr := activeagent.Clear(dir); cerr != nil {
+			return cerr
+		}
+		fmt.Fprintf(cmd.OutOrStdout(), "%s pin cleared\n", ui.MarkSuccess())
+		return nil
+	}
+	if len(args) == 0 {
+		return printActivePin(dir, cmd.OutOrStdout())
+	}
+	id := args[0]
+	ids, err := agentcmd.AvailableAdapterIDs()
+	if err != nil {
+		return err
+	}
+	if !containsString(ids, id) {
+		return fmt.Errorf("use: unknown adapter %q (have %v)", id, ids)
+	}
+	if tier != "" {
+		if model != "" {
+			return fmt.Errorf("use: --tier and --model are mutually exclusive")
+		}
+		resolved, rerr := resolveTierModel(dir, id, tier)
+		if rerr != nil {
+			return rerr
+		}
+		model = resolved
+	}
+	if err := activeagent.Save(dir, activeagent.Pin{AgentID: id, Model: model}); err != nil {
+		return err
+	}
+	fmt.Fprintf(cmd.OutOrStdout(), "%s pinned %s\n", ui.MarkSuccess(), ui.Accent.Render(id))
+	return nil
+}
+
+func printActivePin(dir string, out io.Writer) error {
+	p, err := activeagent.Load(dir)
+	if err != nil {
+		return err
+	}
+	if p.AgentID == "" {
+		fmt.Fprintln(out, "no active pin (router defaults apply)")
+		return nil
+	}
+	fmt.Fprintf(out, "active: %s model=%s\n", ui.Accent.Render(p.AgentID), p.Model)
+	return nil
 }
 
 // resolveTierModel maps a tier label (cheap|default|deep|...) to a concrete
