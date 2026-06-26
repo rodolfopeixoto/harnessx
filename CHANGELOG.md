@@ -3,6 +3,23 @@
 Format: [phase] short summary, then bullet list of concrete additions.
 Newest milestones at the top. Dates are when the milestone landed in repo.
 
+## 2026-06-26 — v0.154.0 — Wave 28: chat adapter-switch heuristic + intent_redirect (F120)
+
+### Fixed
+
+- **BUG 1 — chat REPL adapter-switch heuristic.** Typing `use kimi`,
+  `harness use kimi`, `switch to codex`, `change adapter to gemini`,
+  or `model claude-3-opus` inside `harness chat` no longer bills a
+  paid agent turn. New `detectAdapterSwitch` regex prefilter routes
+  the intent through the existing `/use <id>` slash so `active.yaml`
+  is updated, the user sees the swap confirmation, and the session
+  ledger records nothing as `action=chat`.
+- **BUG 6 — intent-misclassified turns no longer billed as chat.**
+  When the shell-or-slash guard fires (`harness use 4`, `exec foo`,
+  etc) the turn is now persisted with `action: "intent_redirect"`
+  and `cost_usd: 0`, so `/cost` and `harness analytics` correctly
+  attribute it as a routing hint instead of a paid call.
+
 ## 2026-06-24 — v0.153.0 — Wave 27: auto-login + /login slash (F119)
 
 ### New
