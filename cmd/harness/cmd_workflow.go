@@ -21,8 +21,12 @@ func newAskCmd() *cobra.Command {
 	)
 	c := &cobra.Command{
 		Use:   "ask <question>",
-		Short: "Question mode — read-only, evidence-first answer",
-		Args:  cobra.MinimumNArgs(1),
+		Short: "Question mode — deterministic evidence pack (no LLM unless --agent is passed)",
+		Long: `ask builds a deterministic context pack from ripgrep + git_status
+and lists the matching files. No agent is dispatched and no answer
+text is synthesised unless --agent <id> is passed. With --evidence-only
+the LLM step is skipped even if an agent is registered.`,
+		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			dir, err := cwd()
 			if err != nil {
@@ -46,8 +50,12 @@ func newPlanCmd() *cobra.Command {
 	var budget float64
 	c := &cobra.Command{
 		Use:   "plan <prompt>",
-		Short: "Generate spec + plan; no execution",
-		Args:  cobra.MinimumNArgs(1),
+		Short: "Write a deterministic spec + plan template; no LLM unless --agent is passed",
+		Long: `plan writes .harness/artifacts/specs/<ulid>.md and plans/<ulid>.md
+deterministically from the prompt. The bundled template includes
+TODO placeholders — no LLM is invoked. Pass --agent <id> via the
+parent commands (auto/ship/run) to have a model fill the template.`,
+		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			dir, err := cwd()
 			if err != nil {
