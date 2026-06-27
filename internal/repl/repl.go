@@ -82,7 +82,9 @@ type Options struct {
 	// is refused with a clear message instead of falling into the
 	// deterministic-planner harness do loop, which routinely takes
 	// minutes against a fresh scratch project.
-	NoAdapter bool
+	NoAdapter    bool
+	RouteEnabled bool
+	OneShot      bool
 	// Pipe is true for non-interactive runs (`harness chat --pipe`):
 	// suppresses the greeting + session recap and bypasses the
 	// readline TTY path, so stdin is consumed line-by-line and the
@@ -442,6 +444,9 @@ func Run(ctx context.Context, opts Options) error {
 		if opts.OutputJSON {
 			emitTurnJSON(opts.Out, sess.ID, turn)
 		}
+		if opts.OneShot {
+			break
+		}
 	}
 	return persist(opts.Root, sess)
 }
@@ -494,6 +499,31 @@ func handleInput(ctx context.Context, sess *Session, opts *Options, input string
 	case strings.HasPrefix(input, "/use "):
 		turn.Action = "use"
 		switchAdapter(opts, strings.TrimSpace(strings.TrimPrefix(input, "/use ")))
+	case strings.HasPrefix(input, "/model "):
+		turn.Action = "model"
+		switchModel(opts, strings.TrimSpace(strings.TrimPrefix(input, "/model ")))
+	case input == "/model":
+		turn.Action = "model"
+		printModel(opts)
+	case input == "/route on", input == "/routing on":
+		turn.Action = "route"
+		opts.RouteEnabled = true
+		fmt.Fprintln(opts.Out, "  ✓ multi-agent routing ON — text is classified and dispatched per task type")
+	case input == "/route off", input == "/routing off":
+		turn.Action = "route"
+		opts.RouteEnabled = false
+		fmt.Fprintln(opts.Out, "  ✓ multi-agent routing OFF — text always hits the pinned adapter")
+	case input == "/route", input == "/routing":
+		turn.Action = "route"
+		state := "off"
+		if opts.RouteEnabled {
+			state = "on"
+		}
+		fmt.Fprintf(opts.Out, "  routing: %s (toggle: /route on|off)\n", state)
+	case input == "/once":
+		turn.Action = "once"
+		opts.OneShot = true
+		fmt.Fprintln(opts.Out, "  ✓ one-shot mode — REPL exits after the next prompt")
 	case strings.HasPrefix(input, "/budget "):
 		turn.Action = "budget"
 		setBudget(sess, opts.Out, strings.TrimSpace(strings.TrimPrefix(input, "/budget ")))
@@ -754,6 +784,24 @@ func looksLikeShellOrSlash(input string) string {
 		}
 	}
 	return ""
+}
+
+func switchModel(opts *Options, model string) {
+	if model == "" {
+		fmt.Fprintln(opts.Out, "  ✗ /model needs a name (e.g. /model claude-sonnet-4-6, /model gpt-5-mini)")
+		return
+	}
+	opts.Model = model
+	fmt.Fprintf(opts.Out, "  ✓ model switched to %s (next turn picks it up)\n", model)
+}
+
+func printModel(opts *Options) {
+	current := opts.Model
+	if current == "" {
+		current = "(adapter default)"
+	}
+	fmt.Fprintf(opts.Out, "  current model: %s\n", current)
+	fmt.Fprintln(opts.Out, "  swap with: /model <name>")
 }
 
 // switchAdapter performs /use mid-session. Delegates to the SwitchTo
@@ -1053,7 +1101,7 @@ func chatTurn(ctx context.Context, sess *Session, opts Options, prompt string, t
 func chatTurnFor(ctx context.Context, sess *Session, opts Options, prompt, task string, turn *Turn) {
 	adapter := opts.Adapter
 	adapterID := opts.AdapterID
-	if opts.Route != nil {
+	if opts.Route != nil && opts.RouteEnabled {
 		if a, id, err := opts.Route(task); err == nil && a != nil {
 			adapter = a
 			adapterID = id

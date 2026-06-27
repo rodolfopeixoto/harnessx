@@ -33,6 +33,8 @@ func newChatCmd() *cobra.Command {
 		autoGate    bool
 		pipeMode    bool
 		outputJSON  bool
+		oneShot     bool
+		routeOn     bool
 	)
 	c := &cobra.Command{
 		Use:   "chat [<session-id|label>]",
@@ -69,15 +71,17 @@ the deterministic planner.`,
 				replayID = repl.ResolveSessionID(dir, replayID)
 			}
 			opts := repl.Options{
-				Root:        dir,
-				HarnessBin:  bin,
-				Goal:        intentplan.Goal(goal),
-				In:          cmd.InOrStdin(),
-				Out:         cmd.OutOrStdout(),
-				StepTimeout: stepTimeout,
-				AutoGate:    autoGate,
-				NoAdapter:   noAdapter,
-				Pipe:        pipeMode,
+				Root:         dir,
+				HarnessBin:   bin,
+				Goal:         intentplan.Goal(goal),
+				In:           cmd.InOrStdin(),
+				Out:          cmd.OutOrStdout(),
+				StepTimeout:  stepTimeout,
+				AutoGate:     autoGate,
+				NoAdapter:    noAdapter,
+				Pipe:         pipeMode,
+				OneShot:      oneShot,
+				RouteEnabled: routeOn,
 			}
 			if pipeMode || outputJSON {
 				opts.Plain = true
@@ -170,7 +174,15 @@ the deterministic planner.`,
 					}
 					return dec.Chain[0], dec.Chain[0].ID(), nil
 				}
-				fmt.Fprintf(cmd.OutOrStdout(), "chat: %s wired — plain text streams to agent; /exec for harness plan\n", adapterID)
+				mode := "iterative"
+				if oneShot {
+					mode = "one-shot"
+				}
+				routing := "off"
+				if routeOn {
+					routing = "on"
+				}
+				fmt.Fprintf(cmd.OutOrStdout(), "chat: %s wired — mode=%s routing=%s; /model swaps model mid-session, /route on|off toggles per-task routing, /once exits after next turn\n", adapterID, mode, routing)
 				probe := agenthealth.New(adapter, 30*time.Second)
 				probe.Start(cmd.Context())
 				defer probe.Stop()
@@ -190,6 +202,8 @@ the deterministic planner.`,
 	c.Flags().BoolVar(&autoGate, "auto-gate", false, "run harness ci after every agent turn (toggle in-chat with /auto-gate)")
 	c.Flags().BoolVar(&pipeMode, "pipe", false, "non-interactive mode for scripts/CI: plain output, no greet/recap, exit on stdin EOF")
 	c.Flags().BoolVar(&outputJSON, "output-json", false, "emit one JSON envelope per turn on stdout (forces --pipe + --no-adapter unless --adapter set)")
+	c.Flags().BoolVar(&oneShot, "once", false, "non-iterative: exit after the first prompt (one-shot mode)")
+	c.Flags().BoolVar(&routeOn, "route", false, "enable per-task multi-agent routing from the start (toggle in-chat with /route on|off)")
 	c.AddCommand(newChatListCmd())
 	return c
 }
