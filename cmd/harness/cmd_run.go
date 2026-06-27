@@ -4,6 +4,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -51,12 +52,14 @@ func renderRunsTable(out io.Writer, runs []execution.Result) error {
 		return nil
 	}
 	w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "RUN ID\tAGENT\tMODE\tSTATUS\tFILES\tCOST")
+	fmt.Fprintln(w, "RUN ID\tAGENT\tSTATUS\tFILES\tCOST")
 	for _, r := range runs {
-		mode := r.AgentID
-		_ = mode
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%d\t$%.4f\n",
-			r.RunID, r.AgentID, "-", r.Status, len(r.ChangedFiles), r.EstimatedCostUSD)
+		agent := r.AgentID
+		if agent == "" {
+			agent = "-"
+		}
+		fmt.Fprintf(w, "%s\t%s\t%s\t%d\t$%.4f\n",
+			r.RunID, agent, r.Status, len(r.ChangedFiles), r.EstimatedCostUSD)
 	}
 	return w.Flush()
 }
@@ -74,6 +77,9 @@ func newRunInspectCmd() *cobra.Command {
 			}
 			r, err := execution.LoadRun(root, args[0])
 			if err != nil {
+				if errors.Is(err, execution.ErrRunIncomplete) {
+					return fmt.Errorf("run %s exists on disk but has no meta.json; check .harness/runs/%s/report.md or run `harness runs prune` to clean orphans", args[0], args[0])
+				}
 				return err
 			}
 			if jsonOut {
@@ -119,11 +125,20 @@ func newRunReportCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			reportPath := ""
 			r, err := execution.LoadRun(root, args[0])
 			if err != nil {
-				return err
+				if !errors.Is(err, execution.ErrRunIncomplete) {
+					return err
+				}
+				reportPath = filepath.Join(root, ".harness", "runs", args[0], "report.md")
+			} else {
+				reportPath = r.ReportPath
 			}
-			data, err := os.ReadFile(r.ReportPath)
+			if reportPath == "" {
+				return fmt.Errorf("run %s has no report.md", args[0])
+			}
+			data, err := os.ReadFile(reportPath)
 			if err != nil {
 				return err
 			}
@@ -145,6 +160,9 @@ func newRunSensorsCmd() *cobra.Command {
 			}
 			r, err := execution.LoadRun(root, args[0])
 			if err != nil {
+				if errors.Is(err, execution.ErrRunIncomplete) {
+					return fmt.Errorf("run %s incomplete (no meta.json); sensor outcomes are only persisted for runs created by `harness run/auto/ship`", args[0])
+				}
 				return err
 			}
 			if len(r.Sensors) == 0 {

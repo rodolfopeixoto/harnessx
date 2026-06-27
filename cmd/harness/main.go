@@ -7,11 +7,9 @@ package main
 
 import (
 	"os"
-	"strings"
 
 	"github.com/spf13/cobra"
 
-	"github.com/ropeixoto/harnessx/internal/app/workflow"
 	"github.com/ropeixoto/harnessx/internal/ui"
 )
 
@@ -118,19 +116,10 @@ func newRoot() *cobra.Command {
 		newFixCmd(),
 		newUseCmd(),
 	)
-	root.Args = cobra.ArbitraryArgs
-	root.RunE = func(cmd *cobra.Command, args []string) error {
-		if len(args) == 0 {
-			return cmd.Help()
-		}
-		cwd, err := os.Getwd()
-		if err != nil {
-			return err
-		}
-		_, err = workflow.Run(cmd.Context(), workflow.Options{
-			StartDir: cwd, Prompt: strings.Join(args, " "), BudgetUSD: 1.0,
-		}, cmd.OutOrStdout())
-		return err
+	root.SuggestionsMinimumDistance = 2
+	root.Args = cobra.NoArgs
+	root.RunE = func(cmd *cobra.Command, _ []string) error {
+		return cmd.Help()
 	}
 	return root
 }

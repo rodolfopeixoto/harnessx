@@ -82,7 +82,10 @@ func Ask(ctx stdctx.Context, opts Options, out io.Writer) (Result, error) {
 	}
 	res.ContextHash = pack.Hash
 
-	fmt.Fprintf(out, "I detected a Question Mode request.\n")
+	fmt.Fprintf(out, "Question Mode — evidence gathering (deterministic, no LLM).\n")
+	if opts.AgentID == "" || opts.EvidenceOnly {
+		fmt.Fprintln(out, "No agent specified: this command will list relevant files only — it will NOT synthesize an answer. Pass --agent <id> to invoke a model.")
+	}
 	fmt.Fprintf(out, "Context pack hash: %s (%d files, ~%d tokens)\n", pack.Hash[:12], pack.Stats.FilesCount, pack.Stats.EstimatedTokens)
 	if len(pack.RelevantFiles) > 0 {
 		fmt.Fprintln(out, "Relevant evidence:")

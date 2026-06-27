@@ -102,6 +102,10 @@ func runPyCoverage(dir string, threshold float64, out io.Writer) error {
 	if _, err := os.Stat(pytest); err != nil {
 		pytest = "pytest"
 	}
+	if err := ensurePytestCov(pytest); err != nil {
+		fmt.Fprintf(out, "%s coverage: %v\n", ui.MarkInfo(), err)
+		return err
+	}
 	cmd := exec.Command(pytest, "--cov", "--cov-report=term", "-q")
 	cmd.Dir = dir
 	cmd.Env = append(os.Environ(), "HARNESS_PLAIN=1", "PYTHONUNBUFFERED=1")
@@ -124,6 +128,18 @@ func runPyCoverage(dir string, threshold float64, out io.Writer) error {
 		return fmt.Errorf("coverage: %.1f%% < threshold %.0f%%", pct, threshold*100)
 	}
 	fmt.Fprintf(out, "%s coverage %.1f%% ≥ %.0f%%\n", ui.MarkSuccess(), pct, threshold*100)
+	return nil
+}
+
+func ensurePytestCov(pytest string) error {
+	probe := exec.Command(pytest, "--help")
+	body, err := probe.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("pytest --help failed: %w", err)
+	}
+	if !bytes.Contains(body, []byte("--cov")) {
+		return fmt.Errorf("pytest-cov plugin not installed (add `pytest-cov` to requirements.txt and `pip install -r requirements.txt`)")
+	}
 	return nil
 }
 

@@ -49,7 +49,8 @@ const (
 	StatusAutonomyDenied  Status = "autonomy_denied"
 	// StatusConflict: diff failed `git apply --check`; working tree
 	// untouched, original patch preserved under rejects/diff.patch.
-	StatusConflict Status = "conflict"
+	StatusConflict   Status = "conflict"
+	StatusIncomplete Status = "incomplete"
 )
 
 type Request struct {
