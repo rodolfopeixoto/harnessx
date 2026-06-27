@@ -115,6 +115,7 @@ func newRoot() *cobra.Command {
 		newDiagnoseCmd(),
 		newFixCmd(),
 		newUseCmd(),
+		newCostCompareCmd(),
 	)
 	root.SuggestionsMinimumDistance = 2
 	root.Args = cobra.NoArgs

@@ -11,6 +11,32 @@ import (
 	"github.com/ropeixoto/harnessx/internal/index"
 )
 
+func hasNodeModules(root string) bool {
+	if root == "" {
+		return false
+	}
+	st, err := os.Stat(filepath.Join(root, "node_modules"))
+	return err == nil && st.IsDir()
+}
+
+func hasCargoLock(root string) bool {
+	if root == "" {
+		return false
+	}
+	_, err := os.Stat(filepath.Join(root, "Cargo.lock"))
+	return err == nil
+}
+
+func hasBundleInstalled(root string) bool {
+	if root == "" {
+		return false
+	}
+	if _, err := os.Stat(filepath.Join(root, "Gemfile.lock")); err != nil {
+		return false
+	}
+	return true
+}
+
 func pyPipAuditArgs(root string) []string {
 	_ = root
 	return []string{"-l"}
@@ -84,21 +110,25 @@ func stackSensors(p index.Profile) []Sensor {
 	}
 
 	if hasStack("react") || hasStack("nextjs") || hasStack("vite") || hasStack("node") {
-		all = append(all,
-			ShellSensor{IDValue: "node_eslint", CategoryV: CatLint, Binary: "npx", Args: []string{"--no-install", "eslint", "."}, Stacks: []string{"react", "nextjs", "vite", "node"}, OptionalTool: true},
-			ShellSensor{IDValue: "node_prettier_check", CategoryV: CatFormat, Binary: "npx", Args: []string{"--no-install", "prettier", "--check", "."}, Stacks: []string{"react", "nextjs", "vite", "node"}, OptionalTool: true},
-			ShellSensor{IDValue: "node_typecheck", CategoryV: CatTypecheck, Binary: "npx", Args: []string{"--no-install", "tsc", "--noEmit"}, Stacks: []string{"react", "nextjs", "vite", "node"}, OptionalTool: true},
-			ShellSensor{IDValue: "node_test", CategoryV: CatTest, Binary: "npm", Args: []string{"test", "--", "--run"}, Stacks: []string{"react", "nextjs", "vite", "node"}, OptionalTool: true, Timeout: 10 * time.Minute},
-		)
+		if hasNodeModules(p.Root) {
+			all = append(all,
+				ShellSensor{IDValue: "node_eslint", CategoryV: CatLint, Binary: "npx", Args: []string{"--no-install", "eslint", "."}, Stacks: []string{"react", "nextjs", "vite", "node"}, OptionalTool: true},
+				ShellSensor{IDValue: "node_prettier_check", CategoryV: CatFormat, Binary: "npx", Args: []string{"--no-install", "prettier", "--check", "."}, Stacks: []string{"react", "nextjs", "vite", "node"}, OptionalTool: true},
+				ShellSensor{IDValue: "node_typecheck", CategoryV: CatTypecheck, Binary: "npx", Args: []string{"--no-install", "tsc", "--noEmit"}, Stacks: []string{"react", "nextjs", "vite", "node"}, OptionalTool: true},
+				ShellSensor{IDValue: "node_test", CategoryV: CatTest, Binary: "npm", Args: []string{"test", "--", "--run"}, Stacks: []string{"react", "nextjs", "vite", "node"}, OptionalTool: true, Timeout: 10 * time.Minute},
+			)
+		}
 	}
 
 	if hasStack("rails") || hasStack("ruby") {
-		all = append(all,
-			ShellSensor{IDValue: "ruby_rubocop", CategoryV: CatLint, Binary: "rubocop", Args: nil, Stacks: []string{"rails", "ruby"}, OptionalTool: true},
-			ShellSensor{IDValue: "ruby_rspec", CategoryV: CatTest, Binary: "rspec", Args: nil, Stacks: []string{"rails", "ruby"}, OptionalTool: true, Timeout: 10 * time.Minute},
-			ShellSensor{IDValue: "ruby_brakeman", CategoryV: CatSecurity, Binary: "brakeman", Args: []string{"-q"}, Stacks: []string{"rails"}, OptionalTool: true},
-			ShellSensor{IDValue: "ruby_bundle_audit", CategoryV: CatDeps, Binary: "bundle-audit", Args: []string{"check", "--update"}, Stacks: []string{"rails", "ruby"}, OptionalTool: true},
-		)
+		if hasBundleInstalled(p.Root) {
+			all = append(all,
+				ShellSensor{IDValue: "ruby_rubocop", CategoryV: CatLint, Binary: "rubocop", Args: nil, Stacks: []string{"rails", "ruby"}, OptionalTool: true},
+				ShellSensor{IDValue: "ruby_rspec", CategoryV: CatTest, Binary: "rspec", Args: nil, Stacks: []string{"rails", "ruby"}, OptionalTool: true, Timeout: 10 * time.Minute},
+				ShellSensor{IDValue: "ruby_brakeman", CategoryV: CatSecurity, Binary: "brakeman", Args: []string{"-q"}, Stacks: []string{"rails"}, OptionalTool: true},
+				ShellSensor{IDValue: "ruby_bundle_audit", CategoryV: CatDeps, Binary: "bundle-audit", Args: []string{"check", "--update"}, Stacks: []string{"rails", "ruby"}, OptionalTool: true},
+			)
+		}
 	}
 
 	if hasStack("python") {
@@ -115,10 +145,14 @@ func stackSensors(p index.Profile) []Sensor {
 	if hasStack("rust") {
 		all = append(all,
 			ShellSensor{IDValue: "rust_fmt", CategoryV: CatFormat, Binary: "cargo", Args: []string{"fmt", "--check"}, Stacks: []string{"rust"}, OptionalTool: true},
-			ShellSensor{IDValue: "rust_clippy", CategoryV: CatLint, Binary: "cargo", Args: []string{"clippy", "--all-targets", "--all-features", "--", "-D", "warnings"}, Stacks: []string{"rust"}, OptionalTool: true},
-			ShellSensor{IDValue: "rust_test", CategoryV: CatTest, Binary: "cargo", Args: []string{"test", "--all"}, Stacks: []string{"rust"}, OptionalTool: true, Timeout: 15 * time.Minute},
-			ShellSensor{IDValue: "rust_audit", CategoryV: CatDeps, Binary: "cargo", Args: []string{"audit"}, Stacks: []string{"rust"}, OptionalTool: true},
 		)
+		if hasCargoLock(p.Root) {
+			all = append(all,
+				ShellSensor{IDValue: "rust_clippy", CategoryV: CatLint, Binary: "cargo", Args: []string{"clippy", "--all-targets", "--all-features", "--offline", "--", "-D", "warnings"}, Stacks: []string{"rust"}, OptionalTool: true},
+				ShellSensor{IDValue: "rust_test", CategoryV: CatTest, Binary: "cargo", Args: []string{"test", "--all", "--offline"}, Stacks: []string{"rust"}, OptionalTool: true, Timeout: 15 * time.Minute},
+				ShellSensor{IDValue: "rust_audit", CategoryV: CatDeps, Binary: "cargo-audit", Args: []string{"audit"}, Stacks: []string{"rust"}, OptionalTool: true},
+			)
+		}
 	}
 
 	if hasStack("docker") {
@@ -193,8 +227,10 @@ func stackSensors(p index.Profile) []Sensor {
 	for _, s := range all {
 		out = append(out, Wrap(s))
 	}
-	// Stable order: by ID. The runner re-sorts to put computational first;
-	// within each kind, alphabetical keeps output deterministic.
+	for _, s := range p.Stacks {
+		out = append(out, smellSensorsFor(s.Name)...)
+	}
+	out = append(out, CommentStyleSensor{IDValue: "comment_style"})
 	sort.Slice(out, func(i, j int) bool { return out[i].ID() < out[j].ID() })
 	return out
 }

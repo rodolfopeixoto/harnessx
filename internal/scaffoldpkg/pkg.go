@@ -90,7 +90,29 @@ func ReadTemplate(lang, template, name string) ([]byte, error) {
 	if name == "" {
 		return raw, nil
 	}
-	return []byte(strings.ReplaceAll(string(raw), "$NAME", name)), nil
+	body := strings.ReplaceAll(string(raw), "$NAME_IDENT", identifierize(name))
+	body = strings.ReplaceAll(body, "$NAME", name)
+	return []byte(body), nil
+}
+
+func identifierize(name string) string {
+	var b strings.Builder
+	for _, r := range name {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9':
+			b.WriteRune(r)
+		default:
+			b.WriteRune('_')
+		}
+	}
+	out := b.String()
+	if len(out) > 0 && out[0] >= '0' && out[0] <= '9' {
+		out = "_" + out
+	}
+	if out == "" {
+		out = "app"
+	}
+	return out
 }
 
 // ApplyOptions controls how Apply writes the scaffold to disk.

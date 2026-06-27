@@ -4,9 +4,14 @@ use tower::ServiceExt;
 
 #[tokio::test]
 async fn healthz_ok() {
-    let app = $NAME::router();
+    let app = $NAME_IDENT::router();
     let response = app
-        .oneshot(Request::builder().uri("/healthz").body(axum::body::Body::empty()).unwrap())
+        .oneshot(
+            Request::builder()
+                .uri("/healthz")
+                .body(axum::body::Body::empty())
+                .unwrap(),
+        )
         .await
         .unwrap();
     assert_eq!(response.status(), StatusCode::OK);
