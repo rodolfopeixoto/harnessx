@@ -63,9 +63,7 @@ func newRunID() string {
 // writes a report. DryRun keeps the diff in the worktree (no apply).
 // Apply attempts to merge the worktree into the project root after gate
 // allow.
-//
-//nolint:gocyclo,gocognit // single critical execution path; readability suffers when split arbitrarily.
-func (e *DefaultExecutor) Execute(ctx context.Context, req Request) (Result, error) {
+func (e *DefaultExecutor) Execute(ctx context.Context, req Request) (Result, error) { //nolint:gocyclo // critical execution path; readability suffers when split arbitrarily
 	if e.Adapter == nil {
 		return Result{}, errors.New("execution: nil adapter")
 	}
