@@ -11,9 +11,14 @@ import (
 	"github.com/ropeixoto/harnessx/internal/index"
 )
 
+func pyPipAuditArgs(root string) []string {
+	_ = root
+	return []string{"-l"}
+}
+
 func pyBanditArgs(root string) []string {
 	args := []string{"-r", "--exclude", pyBanditExcludesCSV}
-	for _, candidate := range []string{".bandit", "bandit.yaml", "bandit.yml"} {
+	for _, candidate := range []string{"bandit.yaml", "bandit.yml"} {
 		path := filepath.Join(root, candidate)
 		if st, err := os.Stat(path); err == nil && !st.IsDir() {
 			args = append(args, "-c", path)
@@ -103,7 +108,7 @@ func stackSensors(p index.Profile) []Sensor {
 			ShellSensor{IDValue: "py_mypy", CategoryV: CatTypecheck, Binary: "mypy", Args: []string{"--exclude", pyExcludesRE, "."}, Stacks: []string{"python"}, OptionalTool: true},
 			ShellSensor{IDValue: "py_pytest", CategoryV: CatTest, Binary: "pytest", Args: nil, Stacks: []string{"python"}, OptionalTool: true, Timeout: 10 * time.Minute},
 			ShellSensor{IDValue: "py_bandit", CategoryV: CatSecurity, Binary: "bandit", Args: pyBanditArgs(p.Root), Stacks: []string{"python"}, OptionalTool: true},
-			ShellSensor{IDValue: "py_pip_audit", CategoryV: CatDeps, Binary: "pip-audit", Args: nil, Stacks: []string{"python"}, OptionalTool: true},
+			ShellSensor{IDValue: "py_pip_audit", CategoryV: CatDeps, Binary: "pip-audit", Args: pyPipAuditArgs(p.Root), Stacks: []string{"python"}, OptionalTool: true},
 		)
 	}
 

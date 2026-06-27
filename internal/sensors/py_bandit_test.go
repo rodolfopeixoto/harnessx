@@ -21,35 +21,27 @@ func TestPyBanditArgsExcludesTestsByDefault(t *testing.T) {
 	}
 }
 
-func TestPyBanditArgsPicksUpDotBandit(t *testing.T) {
+func TestPyBanditArgsDoesNotPassDashCForDotBanditINI(t *testing.T) {
 	root := t.TempDir()
-	cfg := filepath.Join(root, ".bandit")
-	if err := os.WriteFile(cfg, []byte("[bandit]\nskips=B101\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(root, ".bandit"), []byte("[bandit]\nskips=B101\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	got := pyBanditArgs(root)
 	joined := strings.Join(got, " ")
-	if !strings.Contains(joined, "-c "+cfg) {
-		t.Fatalf("expected -c %s in args, got %s", cfg, joined)
+	if strings.Contains(joined, "-c") {
+		t.Fatalf("must not pass -c for INI .bandit (bandit auto-discovers it), got %s", joined)
 	}
 }
 
-func TestPyBanditArgsPrefersDotBanditOverYAML(t *testing.T) {
+func TestPyBanditArgsPassesDashCForYAML(t *testing.T) {
 	root := t.TempDir()
-	dot := filepath.Join(root, ".bandit")
 	yml := filepath.Join(root, "bandit.yaml")
-	if err := os.WriteFile(dot, []byte("[bandit]\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
 	if err := os.WriteFile(yml, []byte("skips: [B101]\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	got := pyBanditArgs(root)
 	joined := strings.Join(got, " ")
-	if !strings.Contains(joined, dot) {
-		t.Fatalf("expected .bandit chosen, got %s", joined)
-	}
-	if strings.Contains(joined, yml) {
-		t.Fatalf("yaml should not be chosen when .bandit present: %s", joined)
+	if !strings.Contains(joined, "-c "+yml) {
+		t.Fatalf("expected -c %s for YAML config, got %s", yml, joined)
 	}
 }

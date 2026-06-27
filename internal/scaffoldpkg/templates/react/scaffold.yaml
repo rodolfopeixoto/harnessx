@@ -25,6 +25,8 @@ files:
     template: src/vite-env.d.ts
   - path: .eslintrc.json
     template: .eslintrc.json
+  - path: .prettierignore
+    template: .prettierignore
   - path: .gitignore
     template: .gitignore
   - path: README.md

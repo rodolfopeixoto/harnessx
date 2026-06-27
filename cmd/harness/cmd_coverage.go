@@ -55,7 +55,7 @@ Supported stacks:
 			case "ruby", "rails":
 				return runStreamProgram(dir, "bundle", []string{"exec", "rake", "coverage"}, out)
 			case "node":
-				return runStreamProgram(dir, "npx", []string{"c8", "--reporter=text", "--lines", fmt.Sprintf("%.0f", threshold*100), "npm", "test"}, out)
+				return runStreamProgram(dir, "npx", []string{"c8", "--reporter=text", "--lines", fmt.Sprintf("%.0f", threshold*100), "npm", "test", "--", "--run"}, out)
 			}
 			return fmt.Errorf("coverage: stack %q not wired (PRs welcome)", stack)
 		},

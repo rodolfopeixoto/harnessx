@@ -24,7 +24,11 @@ func List(out io.Writer, startDir string) error {
 	cfg, _ := config.Load(filepath.Join(root, ".harness", "config", "harness.yaml"), root)
 	dbPath := config.Resolve(root, cfg.Database.Path)
 	if _, err := os.Stat(dbPath); err != nil {
-		return fmt.Errorf("skill list: db missing (run `harness init`)")
+		if os.IsNotExist(err) {
+			fmt.Fprintln(out, "(no skill versions yet — db will be created on first `harness init`)")
+			return nil
+		}
+		return fmt.Errorf("skill list: %w", err)
 	}
 	repo, err := sqlite.Open(dbPath)
 	if err != nil {

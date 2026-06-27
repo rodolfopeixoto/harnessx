@@ -31,6 +31,10 @@ func List(out io.Writer, opts ListOptions) error {
 		base = filepath.Join(base, opts.Kind)
 	}
 	if _, err := os.Stat(base); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			fmt.Fprintln(out, "(no artifacts under .harness/artifacts)")
+			return nil
+		}
 		return fmt.Errorf("artifact ls: %w", err)
 	}
 	type row struct {

@@ -31,6 +31,8 @@ files:
 post_steps:
   - name: venv
     cmd: ["python3", "-m", "venv", ".venv"]
+  - name: pip-upgrade
+    cmd: [".venv/bin/pip", "install", "--quiet", "--upgrade", "pip"]
   - name: pip-install
     cmd: [".venv/bin/pip", "install", "-r", "requirements.txt"]
 
