@@ -1,0 +1,7 @@
+defmodule AppTest do
+  use ExUnit.Case, async: true
+
+  test "greeting mentions the project name" do
+    assert App.greeting() =~ "$NAME"
+  end
+end

@@ -1,0 +1,27 @@
+language: php
+description: Minimal Composer PHP 8.3 project with PHPUnit + PHPStan
+tested_against: "php 8.3+, composer 2.7+"
+
+required_tools:
+  - php
+  - composer
+
+files:
+  - path: composer.json
+    template: composer.json.tmpl
+  - path: src/App.php
+    template: src/App.php.tmpl
+  - path: tests/AppTest.php
+    template: tests/AppTest.php.tmpl
+  - path: phpunit.xml
+    template: phpunit.xml
+  - path: phpstan.neon
+    template: phpstan.neon
+  - path: .gitignore
+    template: .gitignore
+  - path: README.md
+    template: README.md.tmpl
+
+lint_command: "vendor/bin/phpstan analyse"
+test_command: "vendor/bin/phpunit"
+run_command:  "php -r 'require_once \"vendor/autoload.php\"; echo App\\App::greeting();'"

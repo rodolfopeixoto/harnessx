@@ -17,7 +17,7 @@ import (
 
 func newConfigCmd() *cobra.Command {
 	c := &cobra.Command{Use: "config", Short: "Inspect and edit .harness/config (paper §3.5.3)"}
-	c.AddCommand(configShowCmd(), configSetCmd(), configUnsetCmd(), configWizardCmd())
+	c.AddCommand(configShowCmd(), configSetCmd(), configUnsetCmd(), configWizardCmd(), newConfigSourcesCmd())
 	return c
 }
 
@@ -115,6 +115,74 @@ func configWizardCmd() *cobra.Command {
 				In:           cmd.InOrStdin(),
 				Out:          cmd.OutOrStdout(),
 			})
+		},
+	}
+}
+
+func newConfigSourcesCmd() *cobra.Command {
+	c := &cobra.Command{
+		Use:   "sources",
+		Short: "Manage upstream source URLs (update repo, adapter index)",
+	}
+	c.AddCommand(configSourcesGetCmd(), configSourcesSetCmd(), configSourcesResetCmd())
+	return c
+}
+
+func configSourcesGetCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "get [key]",
+		Short: "Print one source key or the whole file",
+		Args:  cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			data, err := readSourcesFile()
+			if err != nil {
+				return err
+			}
+			if len(args) == 0 {
+				if len(data) == 0 {
+					fmt.Fprintln(cmd.OutOrStdout(), "(no overrides — using bundled defaults)")
+					return nil
+				}
+				_, err := cmd.OutOrStdout().Write(data)
+				return err
+			}
+			key := args[0]
+			for _, line := range strings.Split(string(data), "\n") {
+				if strings.HasPrefix(line, key+":") {
+					fmt.Fprintln(cmd.OutOrStdout(), strings.TrimSpace(strings.TrimPrefix(line, key+":")))
+					return nil
+				}
+			}
+			return fmt.Errorf("source key %q not set (try `harness config sources set %s <value>`)", key, key)
+		},
+	}
+}
+
+func configSourcesSetCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set <key> <value>",
+		Short: "Persist a source override (key in: update_repo, adapter_index_url, install_index_url)",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := writeSourceKey(args[0], args[1]); err != nil {
+				return err
+			}
+			fmt.Fprintf(cmd.OutOrStdout(), "set %s = %s\n", args[0], args[1])
+			return nil
+		},
+	}
+}
+
+func configSourcesResetCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "reset [key]",
+		Short: "Remove one source override (or all when no key passed)",
+		Args:  cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) == 0 {
+				return removeSourcesFile()
+			}
+			return removeSourceKey(args[0])
 		},
 	}
 }

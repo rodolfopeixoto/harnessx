@@ -1,0 +1,12 @@
+name: php-cs-fixer
+description: PHP coding standards fixer
+category: format
+probe:
+  binary: php-cs-fixer
+  version_args: ["--version"]
+strategies:
+  - kind: brew
+    platform: { os: [darwin] }
+    args: { package: php-cs-fixer }
+  - kind: composer_global
+    args: { package: friendsofphp/php-cs-fixer }

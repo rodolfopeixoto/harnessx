@@ -1,0 +1,10 @@
+name: ktlint
+description: Kotlin linter and formatter
+category: lint
+probe:
+  binary: ktlint
+  version_args: ["--version"]
+strategies:
+  - kind: brew
+    platform: { os: [darwin] }
+    args: { package: ktlint }

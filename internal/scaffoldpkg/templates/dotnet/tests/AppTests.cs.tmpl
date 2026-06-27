@@ -1,0 +1,12 @@
+using Xunit;
+
+namespace App.Tests;
+
+public sealed class AppTests
+{
+    [Fact]
+    public void GreetingMentionsName()
+    {
+        Assert.Contains("$NAME", App.Program.Greeting());
+    }
+}

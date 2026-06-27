@@ -1,0 +1,24 @@
+language: dotnet
+description: Minimal .NET 8 console + xUnit test project
+tested_against: ".NET SDK 8.0+"
+
+required_tools:
+  - dotnet
+
+files:
+  - path: App.csproj
+    template: App.csproj.tmpl
+  - path: Program.cs
+    template: Program.cs.tmpl
+  - path: Tests/Tests.csproj
+    template: tests/Tests.csproj.tmpl
+  - path: Tests/AppTests.cs
+    template: tests/AppTests.cs.tmpl
+  - path: .gitignore
+    template: .gitignore
+  - path: README.md
+    template: README.md.tmpl
+
+lint_command: "dotnet format --verify-no-changes"
+test_command: "dotnet test --nologo --verbosity quiet"
+run_command:  "dotnet run"

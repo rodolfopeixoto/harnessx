@@ -1,0 +1,13 @@
+name: credo
+description: Elixir code analysis (via mix archive)
+category: lint
+probe:
+  binary: mix
+  version_args: ["--version"]
+strategies:
+  - kind: brew
+    platform: { os: [darwin] }
+    args: { package: elixir }
+  - kind: apt
+    platform: { os: [linux] }
+    args: { package: elixir }

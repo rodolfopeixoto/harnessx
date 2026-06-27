@@ -1,0 +1,22 @@
+language: swift
+description: SwiftPM executable with XCTest target
+tested_against: "swift 5.10+"
+
+required_tools:
+  - swift
+
+files:
+  - path: Package.swift
+    template: Package.swift.tmpl
+  - path: Sources/App/App.swift
+    template: Sources/App.swift.tmpl
+  - path: Tests/AppTests/AppTests.swift
+    template: tests/AppTests.swift.tmpl
+  - path: .gitignore
+    template: .gitignore
+  - path: README.md
+    template: README.md.tmpl
+
+lint_command: "swift-format lint -r Sources"
+test_command: "swift test"
+run_command:  "swift run"

@@ -1,0 +1,27 @@
+language: elixir
+description: Mix project skeleton with ExUnit, Credo, Dialyzer hooks
+tested_against: "elixir 1.16+, otp 26+"
+
+required_tools:
+  - mix
+  - elixir
+
+files:
+  - path: mix.exs
+    template: mix.exs.tmpl
+  - path: lib/app.ex
+    template: lib/app.ex.tmpl
+  - path: test/app_test.exs
+    template: test/app_test.exs.tmpl
+  - path: test/test_helper.exs
+    template: test/test_helper.exs
+  - path: .formatter.exs
+    template: .formatter.exs
+  - path: .gitignore
+    template: .gitignore
+  - path: README.md
+    template: README.md.tmpl
+
+lint_command: "mix format --check-formatted"
+test_command: "mix test"
+run_command:  "mix run --no-halt"

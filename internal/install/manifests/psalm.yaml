@@ -1,0 +1,9 @@
+name: psalm
+description: PHP static analysis (Vimeo)
+category: typecheck
+probe:
+  binary: psalm
+  version_args: ["--version"]
+strategies:
+  - kind: composer_global
+    args: { package: vimeo/psalm }

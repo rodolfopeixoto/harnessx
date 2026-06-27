@@ -1,0 +1,10 @@
+name: swift-format
+description: Apple's official Swift formatter
+category: format
+probe:
+  binary: swift-format
+  version_args: ["--version"]
+strategies:
+  - kind: brew
+    platform: { os: [darwin] }
+    args: { package: swift-format }

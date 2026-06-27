@@ -1,0 +1,13 @@
+name: dotnet
+description: .NET SDK
+category: tool
+probe:
+  binary: dotnet
+  version_args: ["--version"]
+strategies:
+  - kind: brew
+    platform: { os: [darwin] }
+    args: { package: dotnet }
+  - kind: apt
+    platform: { os: [linux] }
+    args: { package: dotnet-sdk-8.0 }

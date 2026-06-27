@@ -1,0 +1,10 @@
+// swift-tools-version:5.10
+import PackageDescription
+
+let package = Package(
+    name: "$NAME",
+    targets: [
+        .executableTarget(name: "App", path: "Sources/App"),
+        .testTarget(name: "AppTests", dependencies: ["App"], path: "Tests/AppTests"),
+    ]
+)

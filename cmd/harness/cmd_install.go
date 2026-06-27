@@ -51,8 +51,75 @@ cargo install, pip --user). Examples:
 	}
 	c.Flags().BoolVar(&dryRun, "dry-run", false, "print command without executing")
 	c.Flags().BoolVar(&upgrade, "upgrade", false, "reinstall even when probe already passes")
-	c.AddCommand(newInstallListCmd(), newInstallShowCmd(), newInstallLSPCmd())
+	c.AddCommand(newInstallListCmd(), newInstallShowCmd(), newInstallLSPCmd(), newInstallToolsCmd())
 	return c
+}
+
+func newInstallToolsCmd() *cobra.Command {
+	var dryRun bool
+	c := &cobra.Command{
+		Use:   "tools <stack>",
+		Short: "Install the recommended lint/format/test tools for a stack",
+		Long: `Resolve the tool pack for the given stack and install each missing
+binary in turn. Supported stacks: go, python, node, react, ruby, rust,
+java, kotlin, swift, elixir, php, dotnet, dart, flutter.`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			stack := args[0]
+			tools := toolsForStack(stack)
+			if len(tools) == 0 {
+				return fmt.Errorf("install tools: no tool pack defined for stack %q", stack)
+			}
+			out := cmd.OutOrStdout()
+			fmt.Fprintf(out, "stack %q: %d tools — %v\n", stack, len(tools), tools)
+			reg := install.NewRegistry()
+			for _, name := range tools {
+				m, err := install.LoadBundled(name)
+				if err != nil {
+					fmt.Fprintf(out, "  [skip] %s: %v\n", name, err)
+					continue
+				}
+				if isInstalled(m.Probe.Binary) {
+					fmt.Fprintf(out, "  [ok]   %s already installed\n", name)
+					continue
+				}
+				plan, err := reg.Pick(m)
+				if err != nil {
+					fmt.Fprintf(out, "  [skip] %s: %v\n", name, err)
+					continue
+				}
+				fmt.Fprintf(out, "  [run]  %s\n", name)
+				if err := install.Execute(cmd.Context(), plan, dryRun, out, out); err != nil {
+					fmt.Fprintf(out, "  [fail] %s: %v\n", name, err)
+				}
+			}
+			return nil
+		},
+	}
+	c.Flags().BoolVar(&dryRun, "dry-run", false, "print commands without executing")
+	return c
+}
+
+func toolsForStack(stack string) []string {
+	packs := map[string][]string{
+		"go":      {"gopls", "golangci-lint", "govulncheck"},
+		"python":  {"basedpyright"},
+		"node":    {"tsserver"},
+		"react":   {"tsserver"},
+		"ruby":    {"ruby-lsp", "solargraph"},
+		"rust":    {"rust-analyzer"},
+		"java":    {},
+		"kotlin":  {"ktlint", "detekt"},
+		"swift":   {"swiftlint", "swift-format"},
+		"elixir":  {"credo"},
+		"php":     {"phpstan", "psalm", "php-cs-fixer"},
+		"laravel": {"phpstan", "psalm", "php-cs-fixer"},
+		"symfony": {"phpstan", "psalm", "php-cs-fixer"},
+		"dotnet":  {"dotnet"},
+		"dart":    {"dart"},
+		"flutter": {"dart"},
+	}
+	return packs[stack]
 }
 
 // newInstallLSPCmd narrows install down to LSP servers. Without an arg

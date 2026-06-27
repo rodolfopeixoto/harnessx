@@ -68,6 +68,79 @@ func DetectStacks(root string) []Stack {
 		add("rust", ConfidenceHigh, "Cargo.toml")
 	}
 
+	// Java / Kotlin (Maven, Gradle)
+	if exists("pom.xml") {
+		add("java", ConfidenceHigh, "pom.xml")
+	} else if exists("build.gradle") || exists("build.gradle.kts") || exists("settings.gradle") || exists("settings.gradle.kts") {
+		raw, _ := os.ReadFile(filepath.Join(root, "build.gradle.kts"))
+		if len(raw) == 0 {
+			raw, _ = os.ReadFile(filepath.Join(root, "build.gradle"))
+		}
+		s := string(raw)
+		if contains(s, "kotlin") || exists("build.gradle.kts") {
+			add("kotlin", ConfidenceHigh, "build.gradle*")
+		} else {
+			add("java", ConfidenceHigh, "build.gradle*")
+		}
+	}
+
+	// Swift
+	if exists("Package.swift") || exists("Project.swift") {
+		add("swift", ConfidenceHigh, "Package.swift")
+	} else {
+		entries, _ := os.ReadDir(root)
+		for _, e := range entries {
+			if filepath.Ext(e.Name()) == ".xcodeproj" || filepath.Ext(e.Name()) == ".xcworkspace" {
+				add("swift", ConfidenceHigh, e.Name())
+				break
+			}
+		}
+	}
+
+	// Elixir
+	if exists("mix.exs") {
+		add("elixir", ConfidenceHigh, "mix.exs")
+	}
+
+	// PHP
+	if exists("composer.json") {
+		raw, _ := os.ReadFile(filepath.Join(root, "composer.json"))
+		s := string(raw)
+		switch {
+		case contains(s, `"laravel/framework"`):
+			add("laravel", ConfidenceHigh, "composer.json:laravel")
+		case contains(s, `"symfony/`):
+			add("symfony", ConfidenceHigh, "composer.json:symfony")
+		default:
+			add("php", ConfidenceHigh, "composer.json")
+		}
+	}
+
+	// C# / .NET
+	{
+		entries, _ := os.ReadDir(root)
+		for _, e := range entries {
+			ext := filepath.Ext(e.Name())
+			if ext == ".csproj" || ext == ".sln" || ext == ".fsproj" {
+				add("dotnet", ConfidenceHigh, e.Name())
+				break
+			}
+		}
+		if exists("global.json") {
+			add("dotnet", ConfidenceMedium, "global.json")
+		}
+	}
+
+	// Dart / Flutter
+	if exists("pubspec.yaml") {
+		raw, _ := os.ReadFile(filepath.Join(root, "pubspec.yaml"))
+		if contains(string(raw), "flutter:") {
+			add("flutter", ConfidenceHigh, "pubspec.yaml:flutter")
+		} else {
+			add("dart", ConfidenceHigh, "pubspec.yaml")
+		}
+	}
+
 	// Docker
 	if exists("Dockerfile") || exists("docker-compose.yml") || exists("docker-compose.yaml") || exists("compose.yaml") {
 		ev := []string{}
@@ -100,6 +173,20 @@ func DetectLanguages(stacks []Stack) []string {
 			set["python"] = struct{}{}
 		case "rust":
 			set["rust"] = struct{}{}
+		case "java":
+			set["java"] = struct{}{}
+		case "kotlin":
+			set["kotlin"] = struct{}{}
+		case "swift":
+			set["swift"] = struct{}{}
+		case "elixir":
+			set["elixir"] = struct{}{}
+		case "php", "laravel", "symfony":
+			set["php"] = struct{}{}
+		case "dotnet":
+			set["csharp"] = struct{}{}
+		case "dart", "flutter":
+			set["dart"] = struct{}{}
 		}
 	}
 	out := make([]string, 0, len(set))
@@ -119,6 +206,12 @@ func DetectMarkers(root string) []string {
 		"Gemfile", "Gemfile.lock", "config/application.rb",
 		"pyproject.toml", "requirements.txt",
 		"Cargo.toml", "Cargo.lock",
+		"pom.xml", "build.gradle", "build.gradle.kts", "settings.gradle", "settings.gradle.kts",
+		"Package.swift", "Project.swift",
+		"mix.exs",
+		"composer.json", "composer.lock",
+		"global.json",
+		"pubspec.yaml",
 		"Dockerfile", "docker-compose.yml", "docker-compose.yaml", "compose.yaml",
 		"Makefile", "AGENTS.md", "CLAUDE.md", "README.md",
 	}

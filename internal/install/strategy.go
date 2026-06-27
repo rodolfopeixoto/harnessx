@@ -52,6 +52,7 @@ func NewRegistry() *StrategyRegistry {
 	r.Register(&NpmGlobalStrategy{})
 	r.Register(&CargoInstallStrategy{})
 	r.Register(&PipUserStrategy{})
+	r.Register(&ComposerGlobalStrategy{})
 	return r
 }
 
@@ -242,4 +243,15 @@ func (PipUserStrategy) Plan(m Manifest, args map[string]string) (Plan, error) {
 		pkg = m.Name
 	}
 	return Plan{Kind: "pip_user", Command: []string{"pip3", "install", "--user", pkg}}, nil
+}
+
+type ComposerGlobalStrategy struct{}
+
+func (ComposerGlobalStrategy) Kind() string { return "composer_global" }
+func (ComposerGlobalStrategy) Plan(m Manifest, args map[string]string) (Plan, error) {
+	pkg := args["package"]
+	if pkg == "" {
+		pkg = m.Name
+	}
+	return Plan{Kind: "composer_global", Command: []string{"composer", "global", "require", pkg}}, nil
 }

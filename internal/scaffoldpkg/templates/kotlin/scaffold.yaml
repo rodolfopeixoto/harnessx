@@ -1,0 +1,24 @@
+language: kotlin
+description: Minimal Kotlin/JVM Gradle project with JUnit 5
+tested_against: "kotlin 2.0+, gradle 8.7+"
+
+required_tools:
+  - gradle
+
+files:
+  - path: build.gradle.kts
+    template: build.gradle.kts.tmpl
+  - path: settings.gradle.kts
+    template: settings.gradle.kts.tmpl
+  - path: src/main/kotlin/App.kt
+    template: src/App.kt.tmpl
+  - path: src/test/kotlin/AppTest.kt
+    template: src/AppTest.kt.tmpl
+  - path: .gitignore
+    template: .gitignore
+  - path: README.md
+    template: README.md.tmpl
+
+lint_command: "gradle -q ktlintCheck"
+test_command: "gradle -q test"
+run_command:  "gradle -q run"

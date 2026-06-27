@@ -1,0 +1,10 @@
+name: dart
+description: Dart SDK
+category: tool
+probe:
+  binary: dart
+  version_args: ["--version"]
+strategies:
+  - kind: brew
+    platform: { os: [darwin] }
+    args: { package: dart }

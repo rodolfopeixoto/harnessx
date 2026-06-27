@@ -1,0 +1,22 @@
+language: java
+description: Minimal Maven Java 21 project with JUnit 5
+tested_against: "java 21+, maven 3.9+"
+
+required_tools:
+  - mvn
+
+files:
+  - path: pom.xml
+    template: pom.xml.tmpl
+  - path: src/main/java/App.java
+    template: src/App.java.tmpl
+  - path: src/test/java/AppTest.java
+    template: src/AppTest.java.tmpl
+  - path: .gitignore
+    template: .gitignore
+  - path: README.md
+    template: README.md.tmpl
+
+lint_command: "mvn -q -DskipTests verify"
+test_command: "mvn -q test"
+run_command:  "mvn -q exec:java -Dexec.mainClass=App"

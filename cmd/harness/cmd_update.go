@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"text/tabwriter"
 
 	"github.com/spf13/cobra"
@@ -17,6 +18,45 @@ import (
 )
 
 const defaultRepo = "rodolfopeixoto/harnessx"
+
+func resolveRepo() string {
+	if v := os.Getenv("HARNESS_UPDATE_REPO"); v != "" {
+		return v
+	}
+	home, err := os.UserHomeDir()
+	if err == nil {
+		data, err := os.ReadFile(filepath.Join(home, ".config", "harness", "sources.yaml"))
+		if err == nil {
+			lines := splitLines(string(data))
+			for _, line := range lines {
+				if strings.HasPrefix(line, "update_repo:") {
+					v := strings.TrimSpace(strings.TrimPrefix(line, "update_repo:"))
+					if v != "" {
+						return v
+					}
+				}
+			}
+		}
+	}
+	return defaultRepo
+}
+
+func splitLines(s string) []string {
+	var out []string
+	cur := ""
+	for _, r := range s {
+		if r == '\n' {
+			out = append(out, cur)
+			cur = ""
+			continue
+		}
+		cur += string(r)
+	}
+	if cur != "" {
+		out = append(out, cur)
+	}
+	return out
+}
 
 func newUpdateCmd() *cobra.Command {
 	c := &cobra.Command{
@@ -54,7 +94,7 @@ var updateFlags struct {
 }
 
 func addUpdateFlags(c *cobra.Command) {
-	c.Flags().StringVar(&updateFlags.repo, "repo", defaultRepo, "GitHub repo (owner/name)")
+	c.Flags().StringVar(&updateFlags.repo, "repo", resolveRepo(), "GitHub repo (owner/name)")
 	c.Flags().StringVar(&updateFlags.tag, "tag", "", "pin a specific tag (overrides --channel)")
 	c.Flags().StringVar(&updateFlags.channel, "channel", "stable", "stable|beta|develop")
 	c.Flags().BoolVar(&updateFlags.dryRun, "dry-run", false, "print plan without replacing binary")
