@@ -19,6 +19,7 @@ import (
 	"github.com/ropeixoto/harnessx/internal/agents"
 	"github.com/ropeixoto/harnessx/internal/agents/vcr"
 	"github.com/ropeixoto/harnessx/internal/app/agentcmd"
+	"github.com/ropeixoto/harnessx/internal/execution"
 	"github.com/ropeixoto/harnessx/internal/platform/constants"
 	"github.com/ropeixoto/harnessx/internal/router"
 	"github.com/ropeixoto/harnessx/internal/ui"
@@ -333,15 +334,27 @@ func driveExpectRedTests(ctx context.Context, out io.Writer, opts driveOpts) boo
 
 func driveImplLoop(ctx context.Context, out io.Writer, opts driveOpts) error {
 	preSnapshot := gitTreeSnapshot(ctx, opts.root)
+	logDriveImplChain(out, opts.root)
 	for attempt := 1; attempt <= opts.maxAttempts; attempt++ {
 		driveHeader(out, "4/5", "impl",
 			fmt.Sprintf("— harness do attempt %d/%d (implementation chain)", attempt, opts.maxAttempts))
-		if err := runHarnessChild(ctx, opts.bin, opts.root, out,
-			[]string{"do", opts.prompt, "--yes", "--autonomy", opts.autonomy}); err != nil {
+		doArgs := []string{"do", opts.prompt, "--yes", "--autonomy", opts.autonomy}
+		if pin := os.Getenv("HARNESS_DRIVE_IMPL_ADAPTER"); pin != "" {
+			doArgs = append(doArgs, "--agent", pin)
+			fmt.Fprintln(out, "  "+ui.Info.Render("HARNESS_DRIVE_IMPL_ADAPTER="+pin+" pinning implementation adapter"))
+		}
+		if err := runHarnessChild(ctx, opts.bin, opts.root, out, doArgs); err != nil {
 			fmt.Fprintln(out, "  "+ui.MarkWarn()+" "+ui.Warn.Render(fmt.Sprintf("harness do failed (%v); retrying", err)))
 			continue
 		}
 		if gitTreeSnapshot(ctx, opts.root) == preSnapshot {
+			if isLatestRunWaitingApproval(opts.root) {
+				fmt.Fprintln(out, "  "+ui.MarkSuccess()+" "+ui.Success.Render("agent produced a diff (waiting_approval); deferring apply per autonomy gate"))
+				if opts.skipCommit {
+					return nil
+				}
+				return driveCommit(ctx, out, opts)
+			}
 			return fmt.Errorf("drive: agent produced no changes — prompt may be incomplete or ambiguous; refine and re-run /drive")
 		}
 		driveHeader(out, "5/5", "gate", "— harness ci")
@@ -355,6 +368,31 @@ func driveImplLoop(ctx context.Context, out io.Writer, opts driveOpts) error {
 		fmt.Fprintf(out, "drive: ci red on attempt %d; retrying\n", attempt)
 	}
 	return fmt.Errorf("drive: ci still red after %d attempts", opts.maxAttempts)
+}
+
+func logDriveImplChain(out io.Writer, root string) {
+	reg, _, err := agentcmd.LoadAll(root)
+	if err != nil || reg == nil {
+		return
+	}
+	rtr := router.New(reg, router.Defaults(reg))
+	dec, derr := rtr.Select(constants.DriveTaskImplementation)
+	if derr != nil || len(dec.Chain) == 0 {
+		return
+	}
+	ids := make([]string, 0, len(dec.Chain))
+	for _, a := range dec.Chain {
+		ids = append(ids, a.ID())
+	}
+	fmt.Fprintln(out, "  "+ui.Info.Render("implementation chain (from config): "+strings.Join(ids, " → ")))
+}
+
+func isLatestRunWaitingApproval(root string) bool {
+	runs, err := execution.ListRuns(root)
+	if err != nil || len(runs) == 0 {
+		return false
+	}
+	return runs[0].Status == execution.StatusWaitingApproval && len(runs[0].ChangedFiles) > 0
 }
 
 func gitTreeSnapshot(ctx context.Context, root string) string {
@@ -455,7 +493,7 @@ func runGitInDir(ctx context.Context, dir string, args ...string) error {
 }
 
 func runHarnessChild(ctx context.Context, bin, dir string, out io.Writer, args []string) error {
-	c := exec.CommandContext(ctx, bin, args...)
+	c := exec.CommandContext(ctx, bin, args...) //nolint:gosec // bin is the harness binary path from os.Executable(), args are harness subcommands
 	c.Dir = dir
 	c.Env = append(os.Environ(), "HARNESS_PLAIN=1", "NO_COLOR=1")
 	c.Stdout = out

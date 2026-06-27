@@ -72,5 +72,9 @@ func Render(out io.Writer, res Result, opts Options) error {
 	fmt.Fprintln(out, "  - Token estimates are deterministic (BPE approximation, not exact tokenizer).")
 	fmt.Fprintln(out, "  - LLM column is what a direct API call would cost, not what harness charges.")
 	fmt.Fprintln(out, "  - For commands that DO call an LLM (--agent), real cost lands in `harness metrics`.")
+	fmt.Fprintln(out, "  - LOWER-BOUND ONLY: real code-gen runs typically consume 3-6× more input tokens than")
+	fmt.Fprintln(out, "    the context-pack count above (full session history + system prompts + tool messages).")
+	fmt.Fprintln(out, "    The harness $0 row applies to read-only / deterministic work — for code-gen the LLM")
+	fmt.Fprintln(out, "    is required and real cost will be 3-6× the figure above. Trust `harness metrics`.")
 	return nil
 }

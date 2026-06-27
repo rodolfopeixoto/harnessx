@@ -40,10 +40,12 @@ type Spec struct {
 	} `yaml:"run"`
 
 	Output struct {
-		Format               string `yaml:"format"` // jsonl | text
-		FinalMessageJSONPath string `yaml:"final_message_json_path"`
-		ErrorJSONPath        string `yaml:"error_json_path"`
-		UsageJSONPath        string `yaml:"usage_json_path"`
+		Format                string   `yaml:"format"` // jsonl | text
+		FinalMessageJSONPath  string   `yaml:"final_message_json_path"`
+		FinalMessageJSONPaths []string `yaml:"final_message_json_paths"`
+		ErrorJSONPath         string   `yaml:"error_json_path"`
+		UsageJSONPath         string   `yaml:"usage_json_path"`
+		UsageJSONPaths        []string `yaml:"usage_json_paths"`
 	} `yaml:"output"`
 
 	FailureDetection map[string][]string `yaml:"failure_detection"`

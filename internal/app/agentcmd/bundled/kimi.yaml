@@ -25,13 +25,13 @@ models:
   default: kimi-k2
 
 execution:
-  prompt_mode: stdin
+  prompt_mode: arg
   working_directory: project
   timeout_seconds: 900
   max_retries: 1
 
 run:
-  args: ["chat"]
+  args: ["--print", "-p", "{{prompt}}"]
 
 output:
   format: text

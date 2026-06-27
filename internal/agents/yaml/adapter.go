@@ -183,8 +183,12 @@ func (a *Adapter) Run(ctx context.Context, req agents.AgentRequest) agents.Agent
 		stdout, stderr, code, err = a.Runner.Run(rctx, a.Spec.Command.Binary, args, stdin, wd)
 	}
 	out := agents.AgentOutput{Stdout: stdout, Stderr: stderr}
-	if a.Spec.Output.FinalMessageJSONPath != "" {
-		out.FinalMessage = extractJSONPath(stdout, a.Spec.Output.Format, a.Spec.Output.FinalMessageJSONPath)
+	paths := finalMessagePaths(a.Spec.Output.FinalMessageJSONPath, a.Spec.Output.FinalMessageJSONPaths)
+	for _, p := range paths {
+		if v := extractJSONPath(stdout, a.Spec.Output.Format, p); v != "" {
+			out.FinalMessage = v
+			break
+		}
 	}
 	if out.FinalMessage == "" {
 		out.FinalMessage = trimLine(string(stdout))
@@ -206,20 +210,23 @@ func (a *Adapter) Run(ctx context.Context, req agents.AgentRequest) agents.Agent
 
 func (a *Adapter) ParseUsage(output agents.AgentOutput) agents.Usage {
 	u := agents.Usage{Mode: "estimated"}
-	if a.Spec.Output.UsageJSONPath != "" {
-		raw := extractJSONPath(output.Stdout, a.Spec.Output.Format, a.Spec.Output.UsageJSONPath)
-		if raw != "" {
-			var m map[string]any
-			if err := json.Unmarshal([]byte(raw), &m); err == nil {
-				u.InputTokens = readInt(m, "input_tokens", "prompt_tokens", "in_tokens")
-				u.OutputTokens = readInt(m, "output_tokens", "completion_tokens", "out_tokens")
-				u.CachedInputTokens = readInt(m, "cached_input_tokens", "cache_read_input_tokens")
-				u.ReasoningTokens = readInt(m, "reasoning_tokens")
-				if u.InputTokens > 0 || u.OutputTokens > 0 {
-					u.Mode = "reported"
-					return u
-				}
-			}
+	usagePaths := finalMessagePaths(a.Spec.Output.UsageJSONPath, a.Spec.Output.UsageJSONPaths)
+	for _, up := range usagePaths {
+		raw := extractJSONPath(output.Stdout, a.Spec.Output.Format, up)
+		if raw == "" {
+			continue
+		}
+		var m map[string]any
+		if err := json.Unmarshal([]byte(raw), &m); err != nil {
+			continue
+		}
+		u.InputTokens = readInt(m, "input_tokens", "prompt_tokens", "in_tokens")
+		u.OutputTokens = readInt(m, "output_tokens", "completion_tokens", "out_tokens")
+		u.CachedInputTokens = readInt(m, "cached_input_tokens", "cache_read_input_tokens")
+		u.ReasoningTokens = readInt(m, "reasoning_tokens")
+		if u.InputTokens > 0 || u.OutputTokens > 0 {
+			u.Mode = "reported"
+			return u
 		}
 	}
 	// Fallback estimate: ~4 chars per token (heuristic).
@@ -259,6 +266,20 @@ func (a *Adapter) estimateCost(u agents.Usage) float64 {
 	in := float64(u.InputTokens) / 1_000_000.0
 	out := float64(u.OutputTokens) / 1_000_000.0
 	return in*a.Spec.Cost.InputTokenPricePer1M + out*a.Spec.Cost.OutputTokenPricePer1M
+}
+
+func finalMessagePaths(primary string, fallbacks []string) []string {
+	out := make([]string, 0, 1+len(fallbacks))
+	if primary != "" {
+		out = append(out, primary)
+	}
+	for _, p := range fallbacks {
+		if p == "" {
+			continue
+		}
+		out = append(out, p)
+	}
+	return out
 }
 
 func substituteArgs(args []string, req agents.AgentRequest) []string {

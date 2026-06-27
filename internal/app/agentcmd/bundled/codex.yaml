@@ -38,7 +38,18 @@ run:
 output:
   format: jsonl
   final_message_json_path: "$.message"
+  final_message_json_paths:
+    - "$.agent_message.text"
+    - "$.response.text"
+    - "$.thread.completed.message"
+    - "$.thread.completed.response"
+    - "$.event.message"
+    - "$.text"
+    - "$.content"
   usage_json_path: "$.usage"
+  usage_json_paths:
+    - "$.thread.completed.usage"
+    - "$.response.usage"
 
 failure_detection:
   rate_limit: ["rate limit", "429"]

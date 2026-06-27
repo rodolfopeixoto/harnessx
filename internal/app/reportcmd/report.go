@@ -179,7 +179,8 @@ func PrintLast(startDir string, out io.Writer) error {
 	runsDir := filepath.Join(paths.HarnessDir(root), "runs")
 	entries, err := os.ReadDir(runsDir)
 	if err != nil {
-		return ErrNoReport
+		fmt.Fprintln(out, "(no runs yet — start with `harness ci` to gate deterministic work, or `harness auto <prompt> --agent <id>` to spawn a real run; this prints the most recent report.md after either)")
+		return nil
 	}
 	var newest string
 	var newestMod time.Time
@@ -198,7 +199,8 @@ func PrintLast(startDir string, out io.Writer) error {
 		}
 	}
 	if newest == "" {
-		return ErrNoReport
+		fmt.Fprintln(out, "(no runs yet — start with `harness ci` to gate deterministic work, or `harness auto <prompt> --agent <id>` to spawn a real run; this prints the most recent report.md after either)")
+		return nil
 	}
 	b, err := os.ReadFile(newest)
 	if err != nil {

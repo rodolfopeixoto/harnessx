@@ -56,6 +56,7 @@ func (m *Manager) Prepare(ctx context.Context, runID string) (Worktree, error) {
 		if out, err := cmd.CombinedOutput(); err != nil {
 			return Worktree{}, fmt.Errorf("execution: git worktree add: %w: %s", err, strings.TrimSpace(string(out)))
 		}
+		writeWorktreeGitignore(wtDir)
 		return Worktree{RunID: runID, Kind: "git_worktree", Path: wtDir, Branch: branch, BaseHead: base}, nil
 	}
 	if err := copyTree(m.ProjectRoot, wtDir); err != nil {
@@ -101,6 +102,60 @@ func gitHead(ctx context.Context, root string) (string, error) {
 	return strings.TrimSpace(string(out)), nil
 }
 
+var defaultWorktreeSkipDirs = []string{
+	".harness", ".git", ".venv", "venv", "__pycache__", "node_modules",
+	"target", "dist", "build", "_build", "deps", ".gradle", ".idea",
+	".pytest_cache", ".mypy_cache", ".ruff_cache", "bin", "obj", "coverage",
+}
+
+func writeWorktreeGitignore(dir string) {
+	body := "# harness: auto-excluded from agent worktree diffs\n"
+	for _, d := range defaultWorktreeSkipDirs {
+		if d == ".harness" || d == ".git" {
+			continue
+		}
+		body += d + "/\n"
+	}
+	body += "*.tsbuildinfo\n*.log\n"
+	dotGit := filepath.Join(dir, ".git")
+	info, err := os.Stat(dotGit)
+	if err != nil {
+		return
+	}
+	infoDir := ""
+	if info.IsDir() {
+		infoDir = filepath.Join(dotGit, "info")
+	} else {
+		data, err := os.ReadFile(dotGit)
+		if err != nil {
+			return
+		}
+		for _, line := range strings.Split(string(data), "\n") {
+			if strings.HasPrefix(line, "gitdir:") {
+				infoDir = filepath.Join(strings.TrimSpace(strings.TrimPrefix(line, "gitdir:")), "info")
+				break
+			}
+		}
+	}
+	if infoDir == "" {
+		return
+	}
+	_ = os.MkdirAll(infoDir, 0o755)
+	excludePath := filepath.Join(infoDir, "exclude")
+	existing, _ := os.ReadFile(excludePath)
+	full := string(existing) + "\n" + body
+	_ = os.WriteFile(excludePath, []byte(full), 0o644)
+}
+
+func isSkippedWorktreePart(part string) bool {
+	for _, d := range defaultWorktreeSkipDirs {
+		if part == d {
+			return true
+		}
+	}
+	return false
+}
+
 func copyTree(src, dst string) error {
 	return filepath.Walk(src, func(p string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -113,8 +168,12 @@ func copyTree(src, dst string) error {
 		if rel == "." {
 			return os.MkdirAll(dst, 0o755)
 		}
-		if strings.HasPrefix(rel, ".harness"+string(os.PathSeparator)) || strings.HasPrefix(rel, ".git"+string(os.PathSeparator)) {
-			return filepath.SkipDir
+		first := strings.SplitN(rel, string(os.PathSeparator), 2)[0]
+		if isSkippedWorktreePart(first) {
+			if info.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
 		}
 		target := filepath.Join(dst, rel)
 		if info.IsDir() {

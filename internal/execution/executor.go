@@ -63,6 +63,8 @@ func newRunID() string {
 // writes a report. DryRun keeps the diff in the worktree (no apply).
 // Apply attempts to merge the worktree into the project root after gate
 // allow.
+//
+//nolint:gocyclo,gocognit // single critical execution path; readability suffers when split arbitrarily.
 func (e *DefaultExecutor) Execute(ctx context.Context, req Request) (Result, error) {
 	if e.Adapter == nil {
 		return Result{}, errors.New("execution: nil adapter")
@@ -123,6 +125,10 @@ func (e *DefaultExecutor) Execute(ctx context.Context, req Request) (Result, err
 	res.OutputTokens = agentRes.Usage.OutputTokens
 	res.EstimatedCostUSD = agentRes.Usage.EstimatedCostUSD
 	res.ExactUsageAvailable = agentRes.Usage.Mode == "reported"
+
+	if budgetErr := e.enforceBudget(ctx, req, wt, runDir, &res); budgetErr != nil {
+		return res, budgetErr
+	}
 
 	if agentRes.Failure != agents.FailureNone || agentRes.Err != nil {
 		e.finalizeAgentFailure(ctx, req, wt, runDir, &res, agentRes)
@@ -346,6 +352,21 @@ func (e *DefaultExecutor) dispatchPreHooks(ctx context.Context, req Request, wt 
 	res.ReportPath = writeReport(runDir, req, *res, "pre-tool-use hook blocked execution")
 	writeMeta(runDir, *res)
 	return true, fmt.Errorf("pre-tool-use hook blocked: %s", failures)
+}
+
+func (e *DefaultExecutor) enforceBudget(ctx context.Context, req Request, wt Worktree, runDir string, res *Result) error {
+	if req.BudgetUSD <= 0 || res.EstimatedCostUSD <= req.BudgetUSD {
+		return nil
+	}
+	res.Status = StatusAgentFailed
+	res.ErrorType = "budget_exceeded"
+	res.ErrorMessage = fmt.Sprintf("estimated cost $%.4f exceeded --budget-usd $%.4f", res.EstimatedCostUSD, req.BudgetUSD)
+	res.FinishedAt = e.Clock()
+	_ = e.Manager.Cleanup(ctx, wt)
+	res.WorktreePath = ""
+	res.ReportPath = writeReport(runDir, req, *res, res.ErrorMessage)
+	writeMeta(runDir, *res)
+	return fmt.Errorf("execution: %s", res.ErrorMessage)
 }
 
 func writeMeta(runDir string, res Result) {
