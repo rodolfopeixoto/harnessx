@@ -231,6 +231,13 @@ func stackSensors(p index.Profile) []Sensor {
 		out = append(out, smellSensorsFor(s.Name)...)
 	}
 	out = append(out, CommentStyleSensor{IDValue: "comment_style"})
+	out = append(out, InferenceCandidateSensor{
+		IDValue:          "inference_candidates",
+		MinLinesForFlag:  300,
+		MaxFuncLines:     80,
+		FlagRegexComplex: true,
+		FlagBareTODO:     true,
+	})
 	sort.Slice(out, func(i, j int) bool { return out[i].ID() < out[j].ID() })
 	return out
 }
