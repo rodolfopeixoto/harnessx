@@ -51,6 +51,45 @@ func TestProjectLocalEnvPrependsVenvBin(t *testing.T) {
 	}
 }
 
+func TestShellSensorSurfacesStderrFirstLine(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, ".venv", "bin"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	script := "#!/bin/sh\necho 'B101 assert_used in tests/foo.py' >&2\nexit 1\n"
+	bin := filepath.Join(dir, ".venv", "bin", "boomtool")
+	if err := os.WriteFile(bin, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	s := ShellSensor{IDValue: "boomtool", Binary: "boomtool", Timeout: 5 * time.Second}
+	res := s.Run(RunCtx{Ctx: context.Background(), Root: dir, OutputDir: t.TempDir()})
+	if res.Status != StatusFailed {
+		t.Fatalf("want failed, got %s", res.Status)
+	}
+	if !strings.Contains(res.Detail, "B101 assert_used") {
+		t.Fatalf("Detail should surface stderr first line, got %q", res.Detail)
+	}
+	if !strings.Contains(res.Detail, "exit 1") {
+		t.Fatalf("Detail should still include exit code, got %q", res.Detail)
+	}
+}
+
+func TestFirstNonEmptyLine(t *testing.T) {
+	cases := []struct {
+		in, want string
+	}{
+		{"", ""},
+		{"\n\nhello\nworld\n", "hello"},
+		{"  \t \n line2 \n", "line2"},
+		{"single", "single"},
+	}
+	for _, c := range cases {
+		if got := firstNonEmptyLine([]byte(c.in)); got != c.want {
+			t.Errorf("firstNonEmptyLine(%q): want %q, got %q", c.in, c.want, got)
+		}
+	}
+}
+
 func TestShellSensorRunsVenvBinaryWithoutPATH(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(dir, ".venv", "bin"), 0o755); err != nil {

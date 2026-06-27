@@ -61,8 +61,8 @@ func detectProject(root string) Project {
 func computeDeps(root string) DepsMetrics {
 	d := DepsMetrics{ByEcosystem: map[string]int{}}
 	var deps index.Dependencies
-	if err := index.ReadMap(root, index.MapDependencies, &deps); err != nil {
-		return d
+	if err := index.ReadMap(root, index.MapDependencies, &deps); err != nil || len(deps.Ecosystems) == 0 {
+		deps = index.BuildDependencies(root, nil)
 	}
 	for eco, e := range deps.Ecosystems {
 		d.ByEcosystem[eco] = e.Count

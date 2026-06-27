@@ -89,9 +89,11 @@ func NewFromPrompt(prompt string, mode domain.Mode) Spec {
 	return s
 }
 
-const tmplBody = `# Spec: {{.Title}}
-
-- **ID:** {{.ID}}
+const tmplBody = "# Spec: {{.Title}}\n\n" +
+	"> ⚠️ **Stub template.** This spec was generated deterministically from the\n" +
+	"> prompt — no LLM was invoked. Sections marked `_TODO:_` need a human\n" +
+	"> (or an agent invoked with `--agent <id>`) to fill in.\n\n" +
+	`- **ID:** {{.ID}}
 - **Mode:** {{.Mode}}
 - **Generated:** {{.GeneratedAt.Format "2006-01-02T15:04:05Z07:00"}}
 

@@ -44,9 +44,14 @@ echo "→ run (natural form via classifier)"
 "$BIN" run "optimize Docker image size" --yes > /tmp/hx-run.txt
 grep -q "Detected intent: optimization" /tmp/hx-run.txt
 
-echo "→ natural prompt"
-"$BIN" "review the latest diff" > /tmp/hx-nat.txt
+echo "natural prompt routed via plan (no silent positional fallthrough)"
+"$BIN" plan "review the latest diff" > /tmp/hx-nat.txt
 grep -q "Detected intent: review" /tmp/hx-nat.txt
+
+echo "bare unknown positional must exit 1 (no silent feature dispatch)"
+if "$BIN" "review the latest diff" > /tmp/hx-bare.txt 2>&1; then
+  echo "bare positional should exit non-zero"; cat /tmp/hx-bare.txt; exit 1
+fi
 
 echo "→ plan (no execute)"
 "$BIN" plan "create product search with filters" > /tmp/hx-plan.txt

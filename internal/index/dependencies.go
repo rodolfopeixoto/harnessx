@@ -31,9 +31,8 @@ func BuildDependencies(root string, stacks []Stack) Dependencies {
 	}
 	if e, ok := readRequirementsTxt(filepath.Join(root, "requirements.txt")); ok {
 		d.Ecosystems["python"] = e
-	} else if _, err := os.Stat(filepath.Join(root, "pyproject.toml")); err == nil {
-		// Mark presence without parsing TOML (avoids a heavy dep).
-		d.Ecosystems["python"] = Ecosystem{Manifest: "pyproject.toml"}
+	} else if e, ok := readPyProjectToml(filepath.Join(root, "pyproject.toml")); ok {
+		d.Ecosystems["python"] = e
 	}
 	if _, err := os.Stat(filepath.Join(root, "Cargo.toml")); err == nil {
 		d.Ecosystems["rust"] = Ecosystem{Manifest: "Cargo.toml"}
@@ -211,6 +210,112 @@ func readRequirementsTxt(path string) (Ecosystem, bool) {
 	sortDeps(e.Runtime)
 	e.Count = len(e.Runtime)
 	return e, true
+}
+
+var pyProjectDepLine = regexp.MustCompile(`^\s*"([A-Za-z0-9_\-.]+)\s*(?:[=<>!~][^"]*)?"\s*,?\s*$`)
+
+func readPyProjectToml(path string) (Ecosystem, bool) {
+	f, err := os.Open(path)
+	if err != nil {
+		return Ecosystem{}, false
+	}
+	defer f.Close()
+	e := Ecosystem{Manifest: "pyproject.toml"}
+	scanner := bufio.NewScanner(f)
+	section := ""
+	for scanner.Scan() {
+		raw := strings.TrimRight(scanner.Text(), "\r\n")
+		trim := strings.TrimSpace(raw)
+		if trim == "" || strings.HasPrefix(trim, "#") {
+			continue
+		}
+		if strings.HasPrefix(trim, "[") && strings.HasSuffix(trim, "]") {
+			section = strings.Trim(trim, "[]")
+			continue
+		}
+		if section == "project" && strings.HasPrefix(trim, "dependencies") {
+			collectInlineList(scanner, trim, &e.Runtime)
+			continue
+		}
+		if section == "project.optional-dependencies" || strings.HasPrefix(section, "project.optional-dependencies") {
+			collectInlineList(scanner, trim, &e.Dev)
+			continue
+		}
+		if section == "tool.poetry.dependencies" {
+			if name := poetryDepName(trim); name != "" {
+				e.Runtime = append(e.Runtime, DependencyEntry{Name: name})
+			}
+			continue
+		}
+		if section == "tool.poetry.dev-dependencies" || section == "tool.poetry.group.dev.dependencies" {
+			if name := poetryDepName(trim); name != "" {
+				e.Dev = append(e.Dev, DependencyEntry{Name: name})
+			}
+			continue
+		}
+	}
+	sortDeps(e.Runtime)
+	sortDeps(e.Dev)
+	e.Count = len(e.Runtime) + len(e.Dev)
+	if e.Count == 0 {
+		return e, true
+	}
+	return e, true
+}
+
+func collectInlineList(scanner *bufio.Scanner, first string, dst *[]DependencyEntry) {
+	if idx := strings.Index(first, "["); idx >= 0 {
+		first = first[idx+1:]
+	}
+	for {
+		body := strings.TrimSpace(first)
+		closed := strings.HasSuffix(body, "]")
+		if closed {
+			body = strings.TrimSpace(strings.TrimSuffix(body, "]"))
+		}
+		body = strings.TrimSuffix(strings.TrimSpace(body), ",")
+		for _, part := range strings.Split(body, ",") {
+			part = strings.TrimSpace(part)
+			if part == "" {
+				continue
+			}
+			if m := pyProjectDepLine.FindStringSubmatch(part); m != nil {
+				*dst = append(*dst, DependencyEntry{Name: m[1]})
+			} else if name := pyProjectFreeDep(part); name != "" {
+				*dst = append(*dst, DependencyEntry{Name: name})
+			}
+		}
+		if closed {
+			return
+		}
+		if !scanner.Scan() {
+			return
+		}
+		first = scanner.Text()
+	}
+}
+
+var pyProjectFreeRE = regexp.MustCompile(`"([A-Za-z0-9_\-.]+)`)
+
+func pyProjectFreeDep(part string) string {
+	m := pyProjectFreeRE.FindStringSubmatch(part)
+	if m == nil {
+		return ""
+	}
+	return m[1]
+}
+
+var poetryNameRE = regexp.MustCompile(`^([A-Za-z0-9_\-.]+)\s*=`)
+
+func poetryDepName(line string) string {
+	m := poetryNameRE.FindStringSubmatch(line)
+	if m == nil {
+		return ""
+	}
+	if m[1] == "python" {
+		return ""
+	}
+	return m[1]
 }
 
 func sortDeps(d []DependencyEntry) {

@@ -3,15 +3,30 @@
 package sensors
 
 import (
+	"os"
+	"path/filepath"
 	"sort"
 	"time"
 
 	"github.com/ropeixoto/harnessx/internal/index"
 )
 
-// pyExcludesCSV / pyExcludesRE: ruff + bandit take CSV, mypy takes regex.
+func pyBanditArgs(root string) []string {
+	args := []string{"-r", "--exclude", pyBanditExcludesCSV}
+	for _, candidate := range []string{".bandit", "bandit.yaml", "bandit.yml"} {
+		path := filepath.Join(root, candidate)
+		if st, err := os.Stat(path); err == nil && !st.IsDir() {
+			args = append(args, "-c", path)
+			break
+		}
+	}
+	args = append(args, ".")
+	return args
+}
+
 const pyExcludesCSV = ".venv,venv,.git,__pycache__,.pytest_cache,.mypy_cache,.ruff_cache,node_modules,dist,build"
 const pyExcludesRE = `(^|/)\.?venv/|(^|/)__pycache__/|(^|/)\.git/|(^|/)\.pytest_cache/|(^|/)\.mypy_cache/|(^|/)\.ruff_cache/|(^|/)node_modules/|(^|/)dist/|(^|/)build/`
+const pyBanditExcludesCSV = pyExcludesCSV + ",tests"
 
 // Catalog returns every sensor known to HarnessX, filtered to those that
 // apply to the given project profile. Universal sensors always apply;
@@ -87,7 +102,7 @@ func stackSensors(p index.Profile) []Sensor {
 			ShellSensor{IDValue: "py_ruff_format", CategoryV: CatFormat, Binary: "ruff", Args: []string{"format", "--check", "--exclude", pyExcludesCSV, "."}, Stacks: []string{"python"}, OptionalTool: true},
 			ShellSensor{IDValue: "py_mypy", CategoryV: CatTypecheck, Binary: "mypy", Args: []string{"--exclude", pyExcludesRE, "."}, Stacks: []string{"python"}, OptionalTool: true},
 			ShellSensor{IDValue: "py_pytest", CategoryV: CatTest, Binary: "pytest", Args: nil, Stacks: []string{"python"}, OptionalTool: true, Timeout: 10 * time.Minute},
-			ShellSensor{IDValue: "py_bandit", CategoryV: CatSecurity, Binary: "bandit", Args: []string{"-r", "--exclude", pyExcludesCSV, "."}, Stacks: []string{"python"}, OptionalTool: true},
+			ShellSensor{IDValue: "py_bandit", CategoryV: CatSecurity, Binary: "bandit", Args: pyBanditArgs(p.Root), Stacks: []string{"python"}, OptionalTool: true},
 			ShellSensor{IDValue: "py_pip_audit", CategoryV: CatDeps, Binary: "pip-audit", Args: nil, Stacks: []string{"python"}, OptionalTool: true},
 		)
 	}

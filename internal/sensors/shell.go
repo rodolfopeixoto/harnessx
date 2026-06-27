@@ -106,12 +106,42 @@ func (s ShellSensor) Run(rc RunCtx) Result {
 	case errors.As(err, &exitErr):
 		res.ExitCode = exitErr.ExitCode()
 		res.Status = StatusFailed
-		res.Detail = fmt.Sprintf("exit %d", exitErr.ExitCode())
+		hint := firstNonEmptyLine(stderr.Bytes())
+		if hint == "" {
+			hint = firstNonEmptyLine(stdout.Bytes())
+		}
+		if hint != "" {
+			res.Detail = fmt.Sprintf("exit %d — %s", exitErr.ExitCode(), hint)
+		} else {
+			res.Detail = fmt.Sprintf("exit %d", exitErr.ExitCode())
+		}
 	default:
 		res.Status = StatusFailed
 		res.Detail = err.Error()
 	}
 	return res
+}
+
+func firstNonEmptyLine(b []byte) string {
+	const max = 200
+	start := 0
+	for i := 0; i < len(b); i++ {
+		if b[i] == '\n' {
+			line := bytes.TrimSpace(b[start:i])
+			if len(line) > 0 {
+				if len(line) > max {
+					line = line[:max]
+				}
+				return string(line)
+			}
+			start = i + 1
+		}
+	}
+	tail := bytes.TrimSpace(b[start:])
+	if len(tail) > max {
+		tail = tail[:max]
+	}
+	return string(tail)
 }
 
 // projectLocalBinary returns an absolute path to a project-scoped binary

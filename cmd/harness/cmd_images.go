@@ -3,9 +3,11 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"text/tabwriter"
 	"time"
 
@@ -39,6 +41,12 @@ func newImagesListCmd() *cobra.Command {
 				return err
 			}
 			images, err := rt.ListImages(ctx)
+			if err != nil || len(images) == 0 {
+				if fallback, ok := dockerFallbackImages(ctx); ok {
+					images = fallback
+					err = nil
+				}
+			}
 			if err != nil {
 				return err
 			}
@@ -56,6 +64,17 @@ func newImagesListCmd() *cobra.Command {
 	}
 	c.Flags().BoolVar(&jsonOut, "json", false, "emit JSON")
 	return c
+}
+
+func dockerFallbackImages(ctx context.Context) ([]containers.Image, bool) {
+	if _, err := exec.LookPath("docker"); err != nil {
+		return nil, false
+	}
+	imgs, err := (containers.Docker{}).ListImages(ctx)
+	if err != nil {
+		return nil, false
+	}
+	return imgs, true
 }
 
 func newImagesPruneCmd() *cobra.Command {

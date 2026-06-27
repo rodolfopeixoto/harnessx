@@ -33,9 +33,10 @@ func newStackCmd() *cobra.Command {
 
 	status := &cobra.Command{
 		Use:   "status",
-		Short: "Probe the dashboard health endpoint",
+		Short: "Probe the dashboard health endpoint (exits 0 when offline; --strict to fail)",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			addr, _ := cmd.Flags().GetString("addr")
+			strict, _ := cmd.Flags().GetBool("strict")
 			probe := containers.HealthProbe{
 				URL:     fmt.Sprintf("http://%s/api/health", addr),
 				Client:  &http.Client{Timeout: 2 * time.Second},
@@ -43,14 +44,18 @@ func newStackCmd() *cobra.Command {
 				Backoff: 200 * time.Millisecond,
 			}
 			if err := probe.Wait(cmd.Context()); err != nil {
-				fmt.Fprintf(cmd.OutOrStdout(), "dashboard: offline (%v)\n", err)
-				return err
+				fmt.Fprintf(cmd.OutOrStdout(), "dashboard: offline at http://%s — start with `harness dashboard --addr %s`\n", addr, addr)
+				if strict {
+					return err
+				}
+				return nil
 			}
 			fmt.Fprintf(cmd.OutOrStdout(), "dashboard: online at http://%s\n", addr)
 			return nil
 		},
 	}
 	status.Flags().String("addr", "127.0.0.1:7373", "dashboard listen address")
+	status.Flags().Bool("strict", false, "exit non-zero when dashboard is offline (for CI gates)")
 
 	audit := &cobra.Command{
 		Use:   "audit",

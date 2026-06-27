@@ -30,10 +30,14 @@ DASH_ROOT="$WORK/dash"
 "$BIN" stack tour --root "$DASH_ROOT" --keep --dashboard --addr 127.0.0.1:17820 > "$WORK/dash.txt"
 grep -q "dashboard_probe" "$WORK/dash.txt" || { echo "✗ dashboard probe missing"; cat "$WORK/dash.txt"; exit 1; }
 
-echo "→ stack status reports offline when nothing running"
-if "$BIN" stack status --addr 127.0.0.1:1 > "$WORK/status.txt" 2>&1; then
-  echo "✗ status must fail when offline"; cat "$WORK/status.txt"; exit 1
-fi
+echo "→ stack status reports offline when nothing running (default exit 0)"
+"$BIN" stack status --addr 127.0.0.1:1 > "$WORK/status.txt" 2>&1 || { echo "✗ default status must not exit non-zero when offline"; cat "$WORK/status.txt"; exit 1; }
 grep -q "offline" "$WORK/status.txt" || { echo "✗ missing offline marker"; cat "$WORK/status.txt"; exit 1; }
+
+echo "→ stack status --strict exits non-zero when offline"
+if "$BIN" stack status --strict --addr 127.0.0.1:1 > "$WORK/status-strict.txt" 2>&1; then
+  echo "✗ --strict must fail when offline"; cat "$WORK/status-strict.txt"; exit 1
+fi
+grep -q "offline" "$WORK/status-strict.txt" || { echo "✗ --strict missing offline marker"; cat "$WORK/status-strict.txt"; exit 1; }
 
 echo "✓ e2e-phase20 passed"

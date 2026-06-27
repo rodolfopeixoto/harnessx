@@ -215,9 +215,77 @@ func (c Colima) PruneImages(ctx context.Context, opts ImagePruneOptions) (PruneR
 func (a AppleContainer) Run(ctx context.Context, spec RunSpec) (RunResult, error) {
 	return RunResult{}, errors.New("containers: apple_container Run not yet wired; pick docker/podman via harness runtime set")
 }
+
+var appleContainerBinary = "container"
+
 func (a AppleContainer) ListImages(ctx context.Context) ([]Image, error) {
-	return nil, errors.New("containers: apple_container ListImages not yet wired")
+	return appleListImages(ctx, appleContainerBinary)
 }
+
+func appleListImages(ctx context.Context, binary string) ([]Image, error) {
+	out, err := exec.CommandContext(ctx, binary, "images", "list", "--format", "json").Output()
+	if err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			return nil, fmt.Errorf("apple_container images list: exit %d: %s", exitErr.ExitCode(), strings.TrimSpace(string(exitErr.Stderr)))
+		}
+		return nil, fmt.Errorf("apple_container images list: %w", err)
+	}
+	trimmed := strings.TrimSpace(string(out))
+	if trimmed == "" || trimmed == "null" || trimmed == "[]" {
+		return nil, nil
+	}
+	if trimmed[0] == '[' {
+		return parseAppleImagesArray([]byte(trimmed))
+	}
+	return parseAppleImagesNDJSON([]byte(trimmed))
+}
+
+func parseAppleImagesArray(b []byte) ([]Image, error) {
+	var raw []map[string]any
+	if err := json.Unmarshal(b, &raw); err != nil {
+		return nil, fmt.Errorf("apple_container images parse: %w", err)
+	}
+	out := make([]Image, 0, len(raw))
+	for _, r := range raw {
+		out = append(out, appleImageFromMap(r))
+	}
+	return out, nil
+}
+
+func parseAppleImagesNDJSON(b []byte) ([]Image, error) {
+	lines := strings.Split(string(b), "\n")
+	out := make([]Image, 0, len(lines))
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		var r map[string]any
+		if err := json.Unmarshal([]byte(line), &r); err != nil {
+			continue
+		}
+		out = append(out, appleImageFromMap(r))
+	}
+	return out, nil
+}
+
+func appleImageFromMap(r map[string]any) Image {
+	img := Image{
+		ID:         firstNonEmpty(r, "id", "ID", "Digest", "digest"),
+		Repository: firstNonEmpty(r, "repository", "Repository", "name", "Name"),
+		Tag:        firstNonEmpty(r, "tag", "Tag", "reference", "Reference"),
+	}
+	if s, ok := r["size"].(float64); ok {
+		img.SizeBytes = int64(s)
+	} else if s, ok := r["Size"].(float64); ok {
+		img.SizeBytes = int64(s)
+	}
+	if v := firstNonEmpty(r, "created", "Created", "createdAt", "CreatedAt"); v != "" {
+		img.CreatedAt = parseFlexibleTime(v)
+	}
+	return img
+}
+
 func (a AppleContainer) PruneImages(ctx context.Context, _ ImagePruneOptions) (PruneResult, error) {
 	return PruneResult{}, errors.New("containers: apple_container PruneImages not yet wired")
 }

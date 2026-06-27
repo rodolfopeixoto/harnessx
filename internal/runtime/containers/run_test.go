@@ -30,13 +30,10 @@ func TestPruneImagesRequiresAck(t *testing.T) {
 	}
 }
 
-func TestAppleContainerNotWired(t *testing.T) {
+func TestAppleContainerRunAndPruneStillStub(t *testing.T) {
 	apple := AppleContainer{}
 	if _, err := apple.Run(context.Background(), RunSpec{Image: "busybox"}); err == nil {
 		t.Fatal("expected not-wired error from AppleContainer.Run")
-	}
-	if _, err := apple.ListImages(context.Background()); err == nil {
-		t.Fatal("expected not-wired error from AppleContainer.ListImages")
 	}
 	if _, err := apple.PruneImages(context.Background(), ImagePruneOptions{IUnderstand: true}); err == nil {
 		t.Fatal("expected not-wired error from AppleContainer.PruneImages")

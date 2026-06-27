@@ -357,8 +357,8 @@ func writeMeta(runDir string, res Result) {
 	_ = os.WriteFile(path, data, 0o644)
 }
 
-// ListRuns reads the .harness/runs directory and returns one Result per
-// run, newest first by RunID.
+var ErrRunIncomplete = errors.New("execution: run incomplete (meta.json missing)")
+
 func ListRuns(projectRoot string) ([]Result, error) {
 	dir := filepath.Join(projectRoot, ".harness", "runs")
 	entries, err := os.ReadDir(dir)
@@ -376,6 +376,9 @@ func ListRuns(projectRoot string) ([]Result, error) {
 		}
 		r, err := LoadRun(projectRoot, e.Name())
 		if err != nil {
+			if errors.Is(err, ErrRunIncomplete) {
+				out = append(out, degradedRun(projectRoot, e.Name()))
+			}
 			continue
 		}
 		out = append(out, r)
@@ -383,11 +386,30 @@ func ListRuns(projectRoot string) ([]Result, error) {
 	return out, nil
 }
 
-// LoadRun rehydrates the persisted Result for a single run id.
+func degradedRun(projectRoot, runID string) Result {
+	r := Result{RunID: runID, Status: StatusIncomplete}
+	runDir := filepath.Join(projectRoot, ".harness", "runs", runID)
+	if st, err := os.Stat(runDir); err == nil {
+		r.StartedAt = st.ModTime()
+	}
+	reportPath := filepath.Join(runDir, "report.md")
+	if _, err := os.Stat(reportPath); err == nil {
+		r.ReportPath = reportPath
+	}
+	return r
+}
+
 func LoadRun(projectRoot, runID string) (Result, error) {
-	path := filepath.Join(projectRoot, ".harness", "runs", runID, "meta.json")
+	runDir := filepath.Join(projectRoot, ".harness", "runs", runID)
+	if _, err := os.Stat(runDir); err != nil {
+		return Result{}, err
+	}
+	path := filepath.Join(runDir, "meta.json")
 	data, err := os.ReadFile(path)
 	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return Result{}, fmt.Errorf("%w: %s", ErrRunIncomplete, runID)
+		}
 		return Result{}, err
 	}
 	var r Result
