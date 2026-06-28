@@ -82,9 +82,10 @@ type Options struct {
 	// is refused with a clear message instead of falling into the
 	// deterministic-planner harness do loop, which routinely takes
 	// minutes against a fresh scratch project.
-	NoAdapter    bool
-	RouteEnabled bool
-	OneShot      bool
+	NoAdapter     bool
+	RouteEnabled  bool
+	OneShot       bool
+	Deterministic bool
 	// Pipe is true for non-interactive runs (`harness chat --pipe`):
 	// suppresses the greeting + session recap and bypasses the
 	// readline TTY path, so stdin is consumed line-by-line and the
@@ -454,6 +455,11 @@ func Run(ctx context.Context, opts Options) error {
 //nolint:gocognit,gocyclo // one slash-command dispatch table; splitting fragments break audit
 func handleInput(ctx context.Context, sess *Session, opts *Options, input string) Turn {
 	turn := Turn{Time: time.Now().UTC(), Input: input}
+	if opts.Deterministic && callsLLM(input) {
+		fmt.Fprintln(opts.Out, "  ✗ deterministic mode (chat --deterministic): refuses any agent call. /ci /test /lint /history /agents /cost /diff /timeline /help /clear /budget /goal /save /branch are allowed.")
+		turn.Action = "deterministic-block"
+		return turn
+	}
 	if sess.ReadOnly && isMutatingInput(input) {
 		fmt.Fprintf(opts.Out, "  ✗ session is read-only (--replay); /history /agents /cost /diff /help are still available\n")
 		turn.Action = "read-only-block"
@@ -869,6 +875,25 @@ func signalAwareCtx(parent context.Context, out io.Writer) (context.Context, con
 	}
 }
 
+func callsLLM(input string) bool {
+	if input == "" {
+		return false
+	}
+	llmSlashes := []string{
+		"/exec ", "/do ", "/ship ", "/drive ", "/spec ", "/recap", "/btw ", "/cycle", "/plan ",
+		"/login",
+	}
+	for _, p := range llmSlashes {
+		if input == strings.TrimSpace(p) || strings.HasPrefix(input, p) {
+			return true
+		}
+	}
+	if strings.HasPrefix(input, "/") || strings.HasPrefix(input, "!") {
+		return false
+	}
+	return true
+}
+
 // isMutatingInput reports whether an input would change state or
 // call out to an agent. Used by --replay to refuse anything beyond
 // inspection commands.
@@ -884,6 +909,7 @@ func isMutatingInput(input string) bool {
 		"/use ", "/budget ", "/auto-gate", "/autogate",
 		"/clear", "/save ", "/recap", "/btw ", "/cycle", "/login", "/plan ", "/goal ",
 		"/last", "/branch ", "/save-prompt ", "/prompt ",
+		"/model ", "/route on", "/route off", "/routing on", "/routing off", "/once",
 	}
 	for _, p := range mutating {
 		if input == strings.TrimSpace(p) || strings.HasPrefix(input, p) {
