@@ -89,6 +89,6 @@ func newMemoryCmd() *cobra.Command {
 	}
 	recallC.Flags().IntVar(&recallLimit, "limit", 5, "max matches")
 
-	c.AddCommand(listC, promoteC, recallC, newMemoryLearnCmd())
+	c.AddCommand(listC, promoteC, recallC, newMemoryLearnCmd(), newMemoryConsolidateCmd(), newMemoryScoreCmd())
 	return c
 }

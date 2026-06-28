@@ -23,18 +23,19 @@ import (
 //nolint:gocognit,gocyclo // cobra chat setup wires every flag inline; splitting hurts readability
 func newChatCmd() *cobra.Command {
 	var (
-		goal        string
-		adapterID   string
-		model       string
-		stepTimeout time.Duration
-		noAdapter   bool
-		resumeID    string
-		replayID    string
-		autoGate    bool
-		pipeMode    bool
-		outputJSON  bool
-		oneShot     bool
-		routeOn     bool
+		goal          string
+		adapterID     string
+		model         string
+		stepTimeout   time.Duration
+		noAdapter     bool
+		resumeID      string
+		replayID      string
+		autoGate      bool
+		pipeMode      bool
+		outputJSON    bool
+		oneShot       bool
+		routeOn       bool
+		deterministic bool
 	)
 	c := &cobra.Command{
 		Use:   "chat [<session-id|label>]",
@@ -86,6 +87,11 @@ the deterministic planner.`,
 			if pipeMode || outputJSON {
 				opts.Plain = true
 				opts.Pipe = true
+			}
+			if deterministic {
+				noAdapter = true
+				opts.NoAdapter = true
+				opts.Deterministic = true
 			}
 			opts.OutputJSON = outputJSON
 			if resumeID != "" && replayID != "" {
@@ -204,6 +210,7 @@ the deterministic planner.`,
 	c.Flags().BoolVar(&outputJSON, "output-json", false, "emit one JSON envelope per turn on stdout (forces --pipe + --no-adapter unless --adapter set)")
 	c.Flags().BoolVar(&oneShot, "once", false, "non-iterative: exit after the first prompt (one-shot mode)")
 	c.Flags().BoolVar(&routeOn, "route", false, "enable per-task multi-agent routing from the start (toggle in-chat with /route on|off)")
+	c.Flags().BoolVar(&deterministic, "deterministic", false, "LLM-free mode: refuse every agent call; only inspection slashes + deterministic gates are allowed")
 	c.AddCommand(newChatListCmd())
 	return c
 }
