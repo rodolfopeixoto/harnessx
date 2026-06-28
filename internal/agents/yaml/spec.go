@@ -20,8 +20,9 @@ type Spec struct {
 	Type    string `yaml:"type"` // "cli"
 
 	Command struct {
-		Binary string `yaml:"binary"`
-		Check  string `yaml:"check"`
+		Binary           string   `yaml:"binary"`
+		FallbackBinaries []string `yaml:"fallback_binaries"`
+		Check            string   `yaml:"check"`
 	} `yaml:"command"`
 
 	Capabilities agents.Capabilities `yaml:"capabilities"`

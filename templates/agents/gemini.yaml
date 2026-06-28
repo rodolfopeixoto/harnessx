@@ -13,17 +13,18 @@ capabilities:
   files: true
   folders: true
   diff: false
-  json_output: true
+  json_output: false
   stream_output: true
-  tool_use: false
-  mcp: false
+  tool_use: true
+  mcp: true
   max_context_tokens: 1000000
 
-strengths: [prompt_refinement, cheap_review, codebase_exploration]
+strengths: [code, vision, image, search, docs, cheap_review]
 
 models:
   default: gemini-2.5-pro
   cheap: gemini-2.5-flash
+  deep: gemini-2.5-pro
 
 execution:
   prompt_mode: arg
@@ -32,14 +33,14 @@ execution:
   max_retries: 1
 
 run:
-  args: ["-p", "{{prompt}}"]
+  args: ["-p", "{{prompt}}", "--skip-trust", "--approval-mode", "yolo"]
 
 output:
   format: text
 
 failure_detection:
   rate_limit: ["quota", "rate limit", "429"]
-  auth: ["unauthorized", "permission denied"]
+  auth: ["unauthorized", "permission denied", "Please set an Auth", "not authenticated"]
   context_limit: ["maximum context", "token limit"]
   transient: ["timeout", "internal error"]
 
@@ -49,6 +50,6 @@ cost:
   output_token_price_per_1m: 5.0
 
 auth:
+  env_var: GEMINI_API_KEY
   login_command: gemini auth login
-  doc_url: https://github.com/google-gemini/gemini-cli#auth
-  check: gemini -p 'ok'
+  doc_url: https://aistudio.google.com/app/apikey

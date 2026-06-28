@@ -122,9 +122,26 @@ func (a *Adapter) ID() string                        { return a.Spec.ID }
 func (a *Adapter) Name() string                      { return a.Spec.Name }
 func (a *Adapter) Capabilities() agents.Capabilities { return a.Spec.Capabilities }
 
+func (a *Adapter) resolveBinary() string {
+	if _, err := a.Lookup(a.Spec.Command.Binary); err == nil {
+		return a.Spec.Command.Binary
+	}
+	for _, alt := range a.Spec.Command.FallbackBinaries {
+		if alt == "" {
+			continue
+		}
+		if _, err := a.Lookup(alt); err == nil {
+			return alt
+		}
+	}
+	return ""
+}
+
 func (a *Adapter) Healthcheck(ctx context.Context) agents.HealthcheckResult {
-	if _, err := a.Lookup(a.Spec.Command.Binary); err != nil {
-		return agents.HealthcheckResult{OK: false, Err: "binary not on PATH: " + a.Spec.Command.Binary}
+	resolved := a.resolveBinary()
+	if resolved == "" {
+		tried := append([]string{a.Spec.Command.Binary}, a.Spec.Command.FallbackBinaries...)
+		return agents.HealthcheckResult{OK: false, Err: "binary not on PATH (tried: " + strings.Join(tried, ", ") + ")"}
 	}
 	check := a.Spec.Command.Check
 	if check == "" {
@@ -174,13 +191,17 @@ func (a *Adapter) Run(ctx context.Context, req agents.AgentRequest) agents.Agent
 		jsonFmt = newJSONStreamFormatter(live)
 		live = jsonFmt
 	}
+	bin := a.resolveBinary()
+	if bin == "" {
+		bin = a.Spec.Command.Binary
+	}
 	if live != nil {
-		stdout, stderr, code, err = runStreamed(rctx, a.Spec.Command.Binary, args, stdin, wd, live)
+		stdout, stderr, code, err = runStreamed(rctx, bin, args, stdin, wd, live)
 		if jsonFmt != nil {
 			jsonFmt.Flush()
 		}
 	} else {
-		stdout, stderr, code, err = a.Runner.Run(rctx, a.Spec.Command.Binary, args, stdin, wd)
+		stdout, stderr, code, err = a.Runner.Run(rctx, bin, args, stdin, wd)
 	}
 	out := agents.AgentOutput{Stdout: stdout, Stderr: stderr}
 	paths := finalMessagePaths(a.Spec.Output.FinalMessageJSONPath, a.Spec.Output.FinalMessageJSONPaths)

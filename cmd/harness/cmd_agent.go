@@ -73,7 +73,7 @@ func newAgentCmd() *cobra.Command {
 	certifyC.Flags().BoolVar(&skipRun, "skip-run", false, "skip checks that execute the CLI binary")
 	certifyC.Flags().DurationVar(&simpleTimeout, "simple-timeout", 90*time.Second, "bound on the simple_prompt round-trip (real LLMs need 30s+)")
 
-	c.AddCommand(listC, addC, discoverC, certifyC, newAgentLoginCmd(), newAgentInstallCmd())
+	c.AddCommand(listC, addC, discoverC, certifyC, newAgentLoginCmd(), newAgentInstallCmd(), newAgentUpdateCmd())
 	return c
 }
 
