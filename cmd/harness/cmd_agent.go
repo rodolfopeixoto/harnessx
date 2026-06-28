@@ -4,6 +4,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -76,7 +77,7 @@ func newAgentCmd() *cobra.Command {
 	return c
 }
 
-func newAgentLoginCmd() *cobra.Command {
+func newAgentLoginCmd() *cobra.Command { //nolint:gocognit // single cobra wiring + auth branches
 	var fromEnv string
 	c := &cobra.Command{
 		Use:   "login <id>",
@@ -96,6 +97,24 @@ func newAgentLoginCmd() *cobra.Command {
 				return fmt.Errorf("agent %q not registered", args[0])
 			}
 			caps := ad.Capabilities()
+			if caps.AuthEnvVar != "" {
+				if existing := os.Getenv(caps.AuthEnvVar); existing != "" {
+					fmt.Fprintf(cmd.OutOrStdout(), "✓ %s already set in this shell (%d chars). The %s CLI will use it directly.\n", caps.AuthEnvVar, len(existing), args[0])
+					if caps.AuthDocURL != "" {
+						fmt.Fprintf(cmd.OutOrStdout(), "  docs: %s\n", caps.AuthDocURL)
+					}
+					return nil
+				}
+				fmt.Fprintf(cmd.OutOrStdout(), "Adapter %q reads its API key from $%s.\n", args[0], caps.AuthEnvVar)
+				if caps.AuthDocURL != "" {
+					fmt.Fprintf(cmd.OutOrStdout(), "  get a key: %s\n", caps.AuthDocURL)
+				}
+				fmt.Fprintf(cmd.OutOrStdout(), "  add to your shell rc: export %s=<your-key>\n", caps.AuthEnvVar)
+				if caps.LoginCommand != "" {
+					fmt.Fprintf(cmd.OutOrStdout(), "  alternative interactive login: %s\n", caps.LoginCommand)
+				}
+				return nil
+			}
 			if caps.LoginCommand != "" {
 				fmt.Fprintf(cmd.OutOrStdout(), "CLI login: %s\n", caps.LoginCommand)
 				if caps.AuthDocURL != "" {

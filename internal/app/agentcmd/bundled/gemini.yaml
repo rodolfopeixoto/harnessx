@@ -49,5 +49,6 @@ cost:
   output_token_price_per_1m: 5.0
 
 auth:
+  env_var: GEMINI_API_KEY
   login_command: gemini auth login
-  doc_url: https://github.com/google-gemini/gemini-cli#auth
+  doc_url: https://aistudio.google.com/app/apikey

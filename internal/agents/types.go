@@ -38,6 +38,7 @@ type Capabilities struct {
 	// are surfaced by certify/doctor when an auth failure is detected.
 	LoginCommand string `json:"login_command,omitempty" yaml:"login_command,omitempty"`
 	AuthDocURL   string `json:"auth_doc_url,omitempty"  yaml:"auth_doc_url,omitempty"`
+	AuthEnvVar   string `json:"auth_env_var,omitempty"  yaml:"auth_env_var,omitempty"`
 }
 
 type HealthcheckResult struct {

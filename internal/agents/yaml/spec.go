@@ -63,6 +63,7 @@ type Spec struct {
 		LoginCommand string `yaml:"login_command"`
 		DocURL       string `yaml:"doc_url"`
 		Check        string `yaml:"check"`
+		EnvVar       string `yaml:"env_var"`
 	} `yaml:"auth"`
 
 	API APISpec `yaml:"api"`
@@ -144,6 +145,9 @@ func Load(path string) (Spec, error) {
 	}
 	if s.Capabilities.AuthDocURL == "" {
 		s.Capabilities.AuthDocURL = s.Auth.DocURL
+	}
+	if s.Capabilities.AuthEnvVar == "" {
+		s.Capabilities.AuthEnvVar = s.Auth.EnvVar
 	}
 	return s, nil
 }
