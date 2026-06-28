@@ -228,6 +228,16 @@ func hasFile(root, name string) bool {
 	return err == nil
 }
 
+// runShell executes a literal --apply FixCmd through /bin/sh -c.
+// G204 is suppressed at the function level: scripts originate from
+// bundled FixCmd templates inside this package, never from network or
+// user input. The --apply gate keeps this opt-in.
+func runShell(script string) ([]byte, error) {
+	// #nosec G204 -- scripts originate from in-package bundled FixCmd templates;
+	// opt-in via --apply; never sourced from user input or network.
+	return exec.Command("/bin/sh", "-c", script).CombinedOutput()
+}
+
 func runCapture(dir, name string, args ...string) (string, error) {
 	cmd := exec.Command(name, args...)
 	cmd.Dir = dir
@@ -243,8 +253,7 @@ func applyFix(c Check) (string, error) {
 		return "unset " + key + " for this process (add `unset " + key + "` to your shell rc to persist)", nil
 	case strings.HasPrefix(c.FixCmd, "exec:"):
 		script := strings.TrimPrefix(c.FixCmd, "exec:")
-		cmd := exec.Command("/bin/sh", "-c", script) //nolint:gosec // G204: user-explicit --apply path; script built from bundled FixCmd
-		out, err := cmd.CombinedOutput()
+		out, err := runShell(script)
 		if err != nil {
 			return "", fmt.Errorf("%w: %s", err, strings.TrimSpace(string(out)))
 		}
