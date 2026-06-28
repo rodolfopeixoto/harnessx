@@ -28,14 +28,14 @@ func Defaults(reg *agents.Registry) map[string]RouteConfig {
 		return RouteConfig{Primary: filtered[0], Fallback: filtered[1:]}
 	}
 	return map[string]RouteConfig{
-		"prompt_refinement":     pick("gemini", "kimi", "claude"),
-		"planning":              pick("claude", "kimi", "gemini"),
-		"codebase_exploration":  pick("kimi", "claude", "gemini"),
-		"implementation":        pick("codex", "claude", "gemini", "kimi"),
-		"design_to_product":     pick("claude", "codex", "kimi", "gemini"),
-		"resource_optimization": pick("claude", "codex", "kimi", "gemini"),
-		"dependency_audit":      pick("kimi", "claude", "gemini"),
+		"prompt_refinement":     pick("antigravity", "kimi", "claude"),
+		"planning":              pick("claude", "kimi", "antigravity"),
+		"codebase_exploration":  pick("kimi", "claude", "antigravity"),
+		"implementation":        pick("codex", "claude", "antigravity", "kimi"),
+		"design_to_product":     pick("claude", "codex", "kimi", "antigravity"),
+		"resource_optimization": pick("claude", "codex", "kimi", "antigravity"),
+		"dependency_audit":      pick("kimi", "claude", "antigravity"),
 		"security_review":       pick("claude", "kimi", "codex"),
-		"cheap_review":          pick("gemini", "kimi", "codex"),
+		"cheap_review":          pick("antigravity", "kimi", "codex"),
 	}
 }

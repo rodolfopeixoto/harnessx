@@ -9,10 +9,10 @@ import (
 )
 
 var agentUpdateRegistry = map[string]string{
-	"claude": "claude",
-	"codex":  "codex",
-	"gemini": "gemini",
-	"kimi":   "kimi",
+	"claude":      "claude",
+	"codex":       "codex",
+	"antigravity": "antigravity",
+	"kimi":        "kimi",
 }
 
 func newAgentUpdateCmd() *cobra.Command {

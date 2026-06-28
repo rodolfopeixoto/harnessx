@@ -546,7 +546,7 @@ var onboardingTools = []toolCheck{
 var onboardingAdapters = []toolCheck{
 	{"claude", "claude", "Anthropic Claude Code CLI", "https://docs.claude.com/en/docs/claude-code"},
 	{"codex", "codex", "OpenAI Codex CLI", "https://github.com/openai/codex"},
-	{"gemini", "gemini", "Google Gemini CLI", "https://github.com/google-gemini/gemini-cli"},
+	{"antigravity", "antigravity", "Google Antigravity CLI (replaces Gemini CLI)", "https://antigravity.google/download"},
 	{"kimi", "kimi", "Moonshot Kimi CLI", "https://platform.moonshot.cn/"},
 	{"ollama", "ollama", "Local Ollama runtime", "https://ollama.com/"},
 }
@@ -628,7 +628,7 @@ func pickSuggestedAdapter(adapters []checkedTool, root string) string {
 	reg, _, err := agentcmd.LoadAll(root)
 	if err == nil {
 		ids := reg.IDs()
-		for _, preferred := range []string{"ollama", "kimi", "gemini", "codex", "claude"} {
+		for _, preferred := range []string{"ollama", "kimi", "antigravity", "codex", "claude"} {
 			for _, id := range ids {
 				if id == preferred {
 					for _, a := range adapters {

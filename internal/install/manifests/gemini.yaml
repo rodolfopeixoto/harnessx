@@ -1,9 +1,0 @@
-name: gemini
-description: Google Gemini CLI for agentic workflows
-category: agent
-probe:
-  binary: gemini
-  version_args: ["--version"]
-strategies:
-  - kind: npm_global
-    args: { package: "@google/gemini-cli" }

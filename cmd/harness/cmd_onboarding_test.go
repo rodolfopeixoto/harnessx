@@ -79,10 +79,10 @@ func TestPickSuggestedAdapterPrefersCheapest(t *testing.T) {
 	// `harness use <id>` when they want the stronger model.
 	a := []checkedTool{
 		{toolCheck: toolCheck{name: "claude"}, found: true},
-		{toolCheck: toolCheck{name: "gemini"}, found: true},
+		{toolCheck: toolCheck{name: "antigravity"}, found: true},
 	}
-	if got := pickSuggestedAdapter(a, t.TempDir()); got != "gemini" {
-		t.Errorf("want gemini (cheaper), got %q", got)
+	if got := pickSuggestedAdapter(a, t.TempDir()); got != "antigravity" {
+		t.Errorf("want antigravity (cheaper), got %q", got)
 	}
 }
 
@@ -97,20 +97,20 @@ func TestPickSuggestedAdapterFallsBackToFirstFound(t *testing.T) {
 
 func TestRenderRoutesYAMLEmitsTaskMapping(t *testing.T) {
 	picks := map[string]string{
-		"planning":       "gemini",
+		"planning":       "antigravity",
 		"implementation": "claude",
 		"cheap_review":   "kimi",
 	}
-	got := renderRoutesYAML(picks, []string{"claude", "gemini", "kimi"})
+	got := renderRoutesYAML(picks, []string{"claude", "antigravity", "kimi"})
 	for _, want := range []string{
 		"routes:",
 		"planning:",
-		"primary: gemini",
+		"primary: antigravity",
 		"implementation:",
 		"primary: claude",
 		"cheap_review:",
 		"primary: kimi",
-		"fallback: [gemini, kimi]",
+		"fallback: [antigravity, kimi]",
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("missing %q in routes yaml:\n%s", want, got)
