@@ -1065,6 +1065,11 @@ func checkBudget(sess *Session, out io.Writer) bool {
 }
 
 func executePlan(ctx context.Context, sess *Session, opts Options, prompt string, turn *Turn) {
+	if opts.Planner == nil {
+		turn.Action = "no-planner"
+		fmt.Fprintln(opts.Out, "  ✗ no planner wired — pin an adapter with `harness use <id>` or pass --no-adapter to fall back to deterministic mode")
+		return
+	}
 	plan, err := opts.Planner(ctx, sess.Goal, prompt)
 	if err != nil {
 		turn.Action = "plan-error"
@@ -1354,6 +1359,9 @@ func printHelp(out io.Writer) {
 	fmt.Fprintln(out, "  /ci | /test | /lint            run harness gate")
 	fmt.Fprintln(out, "  /agents                        list registered adapters; mark active")
 	fmt.Fprintln(out, "  /use <id>                      switch adapter mid-session")
+	fmt.Fprintln(out, "  /model [name]                  swap model mid-session (no arg = print current)")
+	fmt.Fprintln(out, "  /route [on|off]                toggle per-task multi-agent routing")
+	fmt.Fprintln(out, "  /once                          exit after the next prompt (non-iterative)")
 	fmt.Fprintln(out, "  /diff                          git diff --stat + full diff (project root)")
 	fmt.Fprintln(out, "  /cost                          cumulative session token + USD spend")
 	fmt.Fprintln(out, "  /timeline                      ASCII timeline of every turn in this session")
@@ -1406,7 +1414,8 @@ var knownSlashes = []string{
 	"/save", "/branch", "/recap",
 	"/save-prompt", "/prompt", "/prompts",
 	"/exec", "/do", "/ship", "/drive", "/spec", "/ci", "/test", "/lint",
-	"/use", "/budget", "/goal", "/plan",
+	"/use", "/model", "/route", "/routing", "/once",
+	"/budget", "/goal", "/plan",
 }
 
 func firstToken(s string) string {
@@ -1519,6 +1528,9 @@ func printSlashMenu(out io.Writer) {
 		{"agents + cost", []slashEntry{
 			{"/agents", "list registered adapters"},
 			{"/use <id>", "switch active adapter"},
+			{"/model [name]", "swap model mid-session"},
+			{"/route [on|off]", "toggle per-task multi-agent routing"},
+			{"/once", "exit after the next prompt"},
 			{"/cost", "per-adapter token + USD spend"},
 			{"/budget <usd|off>", "cap session spend"},
 			{"/timeline", "ASCII turn timeline"},
