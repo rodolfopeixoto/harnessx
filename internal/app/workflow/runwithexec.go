@@ -8,6 +8,7 @@ import (
 	"io"
 
 	"github.com/ropeixoto/harnessx/internal/app/agentcmd"
+	"github.com/ropeixoto/harnessx/internal/app/learncmd"
 	hxcontext "github.com/ropeixoto/harnessx/internal/context"
 	"github.com/ropeixoto/harnessx/internal/domain"
 	"github.com/ropeixoto/harnessx/internal/execution"
@@ -41,7 +42,7 @@ func runWithExecutorAndComplexity(ctx stdctx.Context, rc runtimeCtx, mode domain
 	ex := execution.NewDefaultExecutor(rc.root, adapter, defaultSensors(opts.NoSensors), rc.profile)
 	ex.Status = func(msg string) { fmt.Fprintf(out, "  [agent] %s\n", msg) }
 	ex.LiveOut = newAgentLivePrefix(out)
-	enhancement := promptenh.Enhance(opts.Prompt, mode, pack, nil)
+	enhancement := promptenh.Enhance(opts.Prompt, mode, pack, promptenh.BundledSkills{})
 	model := router.PickModel(adapter, complexity)
 	if model != "" {
 		fmt.Fprintf(out, "Routing: complexity=%s -> model=%s\n", complexity, model)
@@ -62,6 +63,9 @@ func runWithExecutorAndComplexity(ctx stdctx.Context, rc runtimeCtx, mode domain
 	if res.RunID != "" {
 		if _, werr := promptenh.Write(fmt.Sprintf("%s/.harness/runs/%s", rc.root, res.RunID), enhancement); werr == nil {
 			fmt.Fprintf(out, "  enhancement: %s/.harness/runs/%s/enhancement.json\n", rc.root, res.RunID)
+		}
+		if _, _, lerr := learncmd.UpdateIncremental(rc.root, res); lerr != nil {
+			fmt.Fprintf(out, "  memory incremental update warn: %v\n", lerr)
 		}
 		fmt.Fprintf(out, "Execute: run=%s status=%s files=%d cost=$%.4f\n",
 			res.RunID, res.Status, len(res.ChangedFiles), res.EstimatedCostUSD)

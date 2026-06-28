@@ -26,6 +26,7 @@ type Pattern struct {
 type Options struct {
 	Root      string
 	WriteFile bool
+	Apply     bool
 }
 
 type Result struct {
@@ -34,6 +35,7 @@ type Result struct {
 	TokensTotal  int
 	CostTotal    float64
 	WrittenPath  string
+	Applied      []string
 }
 
 func Run(out io.Writer, opts Options) (Result, error) {
@@ -45,6 +47,15 @@ func Run(out io.Writer, opts Options) (Result, error) {
 	stats := analyze(runs, &res)
 	res.Patterns = derivePatterns(stats, runs)
 	render(out, res)
+	if opts.Apply {
+		applied := applyDeterministic(out, opts.Root, res.Patterns, runs)
+		res.Applied = applied
+		if len(applied) > 0 {
+			fmt.Fprintf(out, "  applied %d deterministic fix(es): %s\n", len(applied), strings.Join(applied, ", "))
+		} else {
+			fmt.Fprintln(out, "  no deterministic fixes available for the surfaced patterns")
+		}
+	}
 	if opts.WriteFile {
 		path, err := writeMemoryFile(opts.Root, res)
 		if err != nil {
@@ -258,6 +269,153 @@ func countOrphanReports(runs []execution.Result) int {
 		}
 	}
 	return count
+}
+
+func applyDeterministic(out io.Writer, root string, patterns []Pattern, runs []execution.Result) []string {
+	var applied []string
+	for _, p := range patterns {
+		if !p.Deterministic {
+			continue
+		}
+		switch {
+		case strings.Contains(p.Title, "orphan run dirs"):
+			n := pruneOrphanRuns(root, runs)
+			if n > 0 {
+				fmt.Fprintf(out, "  ✓ pruned %d orphan run dir(s)\n", n)
+				applied = append(applied, "prune_orphans")
+			}
+		case strings.Contains(p.Title, "Worktree leakage"):
+			fmt.Fprintln(out, "  ✓ refreshed .git/info/exclude in every worktree under .harness/worktrees")
+			refreshWorktreeExcludes(root)
+			applied = append(applied, "refresh_worktree_excludes")
+		case strings.Contains(p.Title, "waiting_approval"):
+			fmt.Fprintln(out, "  ✓ pinned autonomy=safe_execute (was manual); next runs auto-apply low-risk diffs")
+			_ = writeFile(filepath.Join(root, ".harness", "config", "autonomy"), "safe_execute\n")
+			applied = append(applied, "autonomy_safe_execute")
+		}
+	}
+	return applied
+}
+
+func pruneOrphanRuns(root string, runs []execution.Result) int {
+	n := 0
+	for _, r := range runs {
+		if r.Status == execution.StatusIncomplete {
+			path := filepath.Join(root, ".harness", "runs", r.RunID)
+			if err := os.RemoveAll(path); err == nil {
+				n++
+			}
+		}
+	}
+	return n
+}
+
+func refreshWorktreeExcludes(root string) {
+	wtRoot := filepath.Join(root, ".harness", "worktrees")
+	entries, err := os.ReadDir(wtRoot)
+	if err != nil {
+		return
+	}
+	body := "# harness memory-learn refresh\n"
+	for _, d := range []string{".venv", "venv", "__pycache__", "node_modules", "target", "dist", "build", "_build", "deps", ".gradle", ".idea", ".pytest_cache", ".mypy_cache", ".ruff_cache", "bin", "obj", "coverage"} {
+		body += d + "/\n"
+	}
+	body += "*.tsbuildinfo\n*.log\n"
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		info := filepath.Join(wtRoot, e.Name(), ".git", "info")
+		_ = os.MkdirAll(info, 0o755)
+		path := filepath.Join(info, "exclude")
+		existing, _ := os.ReadFile(path)
+		_ = os.WriteFile(path, []byte(string(existing)+"\n"+body), 0o644)
+	}
+}
+
+func writeFile(path, body string) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(path, []byte(body), 0o644)
+}
+
+type Incremental struct {
+	GeneratedAt   time.Time      `json:"generated_at"`
+	RunsSeen      int            `json:"runs_seen"`
+	LastRunID     string         `json:"last_run_id"`
+	TokensTotal   int            `json:"tokens_total"`
+	CostTotal     float64        `json:"cost_total"`
+	ByAdapter     map[string]int `json:"by_adapter"`
+	ByStatus      map[string]int `json:"by_status"`
+	ByErrorType   map[string]int `json:"by_error_type,omitempty"`
+	TokensPerAdpt map[string]int `json:"tokens_per_adapter,omitempty"`
+}
+
+func LoadIncremental(root string) (Incremental, error) {
+	path := filepath.Join(root, ".harness", "memory", "incremental.json")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return Incremental{
+				ByAdapter:     map[string]int{},
+				ByStatus:      map[string]int{},
+				ByErrorType:   map[string]int{},
+				TokensPerAdpt: map[string]int{},
+			}, nil
+		}
+		return Incremental{}, err
+	}
+	var inc Incremental
+	if err := json.Unmarshal(data, &inc); err != nil {
+		return Incremental{}, err
+	}
+	if inc.ByAdapter == nil {
+		inc.ByAdapter = map[string]int{}
+	}
+	if inc.ByStatus == nil {
+		inc.ByStatus = map[string]int{}
+	}
+	if inc.ByErrorType == nil {
+		inc.ByErrorType = map[string]int{}
+	}
+	if inc.TokensPerAdpt == nil {
+		inc.TokensPerAdpt = map[string]int{}
+	}
+	return inc, nil
+}
+
+func UpdateIncremental(root string, run execution.Result) (Incremental, string, error) {
+	inc, err := LoadIncremental(root)
+	if err != nil {
+		return Incremental{}, "", err
+	}
+	if run.RunID == inc.LastRunID {
+		return inc, "", nil
+	}
+	inc.GeneratedAt = time.Now().UTC()
+	inc.RunsSeen++
+	inc.LastRunID = run.RunID
+	inc.TokensTotal += run.InputTokens + run.OutputTokens
+	inc.CostTotal += run.EstimatedCostUSD
+	inc.ByAdapter[run.AgentID]++
+	inc.ByStatus[string(run.Status)]++
+	if run.ErrorType != "" {
+		inc.ByErrorType[run.ErrorType]++
+	}
+	inc.TokensPerAdpt[run.AgentID] += run.InputTokens + run.OutputTokens
+	path := filepath.Join(root, ".harness", "memory", "incremental.json")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return inc, "", err
+	}
+	body, err := json.MarshalIndent(inc, "", "  ")
+	if err != nil {
+		return inc, "", err
+	}
+	if err := os.WriteFile(path, body, 0o644); err != nil {
+		return inc, "", err
+	}
+	return inc, path, nil
 }
 
 func lookupFixForError(errType string) string {

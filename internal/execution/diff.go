@@ -32,6 +32,7 @@ func CaptureDiff(ctx context.Context, wt Worktree, runDir string) ([]string, err
 	if out, err := staging.CombinedOutput(); err != nil {
 		return nil, fmt.Errorf("execution: git add: %w: %s", err, strings.TrimSpace(string(out)))
 	}
+	resetExcluded(ctx, wt.Path)
 	names := exec.CommandContext(ctx, "git", "diff", "--cached", "--name-only")
 	names.Dir = wt.Path
 	nameOut, err := names.Output()
@@ -82,6 +83,27 @@ func captureCopyDiff(wt Worktree, runDir string) ([]string, error) {
 	}
 	cfBytes, _ := json.MarshalIndent(changed, "", "  ")
 	return changed, os.WriteFile(filepath.Join(runDir, "changed-files.json"), cfBytes, 0o644)
+}
+
+func resetExcluded(ctx context.Context, worktreePath string) {
+	pathspecs := []string{"--"}
+	for _, d := range defaultWorktreeSkipDirs {
+		if d == ".harness" || d == ".git" {
+			continue
+		}
+		pathspecs = append(pathspecs, ":(exclude)"+d+"/**", ":(exclude)"+d)
+	}
+	pathspecs = append(pathspecs, ":(exclude)*.tsbuildinfo", ":(exclude)*.log")
+	args := append([]string{"rm", "--cached", "-r", "--ignore-unmatch", "--quiet"}, pathspecs[1:]...)
+	for _, d := range defaultWorktreeSkipDirs {
+		if d == ".harness" || d == ".git" {
+			continue
+		}
+		cmd := exec.CommandContext(ctx, "git", "rm", "--cached", "-r", "--ignore-unmatch", "--quiet", d)
+		cmd.Dir = worktreePath
+		_ = cmd.Run()
+	}
+	_ = args
 }
 
 func splitLines(s string) []string {

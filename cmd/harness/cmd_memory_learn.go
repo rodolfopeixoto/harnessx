@@ -7,7 +7,7 @@ import (
 )
 
 func newMemoryLearnCmd() *cobra.Command {
-	var write bool
+	var write, apply bool
 	c := &cobra.Command{
 		Use:   "learn",
 		Short: "Analyze .harness/runs/* and surface deterministic optimization patterns (no LLM)",
@@ -27,10 +27,11 @@ persisted to .harness/memory/learned-patterns.json for future reads.`,
 			if err != nil {
 				return err
 			}
-			_, err = learncmd.Run(cmd.OutOrStdout(), learncmd.Options{Root: root, WriteFile: write})
+			_, err = learncmd.Run(cmd.OutOrStdout(), learncmd.Options{Root: root, WriteFile: write, Apply: apply})
 			return err
 		},
 	}
 	c.Flags().BoolVar(&write, "write", false, "also persist the patterns to .harness/memory/learned-patterns.json")
+	c.Flags().BoolVar(&apply, "apply", false, "execute the deterministic fixes (prune orphans, refresh worktree excludes, pin autonomy)")
 	return c
 }
