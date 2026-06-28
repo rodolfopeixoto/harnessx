@@ -738,6 +738,9 @@ func cycleAdapter(opts *Options) {
 	}
 	opts.Adapter = a
 	opts.AdapterID = id
+	if opts.HealthProbe != nil {
+		opts.HealthProbe.Swap(a)
+	}
 	fmt.Fprintf(opts.Out, "  [swap] now using %s (%s)\n", id, adapterBillingMode(id))
 }
 
@@ -822,6 +825,9 @@ func switchAdapter(opts *Options, id string) {
 		fmt.Fprintln(opts.Out, "  ✗ /use unavailable: chat was started without an adapter")
 		return
 	}
+	if n, err := strconv.Atoi(id); err == nil && n >= 1 && n <= len(opts.AdaptersList) {
+		id = opts.AdaptersList[n-1]
+	}
 	adapter, canonical, err := opts.SwitchTo(id)
 	if err != nil {
 		fmt.Fprintf(opts.Out, "  ✗ /use %s: %v\n", id, err)
@@ -829,6 +835,9 @@ func switchAdapter(opts *Options, id string) {
 	}
 	opts.Adapter = adapter
 	opts.AdapterID = canonical
+	if opts.HealthProbe != nil {
+		opts.HealthProbe.Swap(adapter)
+	}
 	fmt.Fprintf(opts.Out, "  ✓ switched to %s\n", canonical)
 }
 
@@ -1155,8 +1164,9 @@ func chatTurnFor(ctx context.Context, sess *Session, opts Options, prompt, task 
 	defer cancel()
 	spinStop := startSpinner(opts.Out, opts.Plain)
 	defer spinStop()
+	live.onFirstWrite = spinStop
 	res := adapter.Run(rctx, agents.AgentRequest{
-		Prompt:     withConversationContext(sess, prompt),
+		Prompt:     withConversationContext(sess, opts.AdapterID, opts.Model, prompt),
 		Model:      opts.Model,
 		WorkingDir: opts.Root,
 		Timeout:    timeout,
@@ -1211,10 +1221,10 @@ func startSpinner(out io.Writer, plain bool) func() {
 		for {
 			select {
 			case <-stop:
-				fmt.Fprint(out, "\r  \r")
+				fmt.Fprint(out, "\r\033[2K")
 				return
 			case <-t.C:
-				fmt.Fprintf(out, "\r  %c thinking…", frames[i%len(frames)])
+				fmt.Fprintf(out, "\r\033[2K  %c thinking…", frames[i%len(frames)])
 				i++
 			}
 		}
@@ -1233,10 +1243,26 @@ func startSpinner(out io.Writer, plain bool) func() {
 // series of isolated single-shot calls (paper §3.2.1 Working Memory).
 // Truncates aggressively because adapter context budgets are bounded
 // and the most recent few turns dominate the signal.
-func withConversationContext(sess *Session, prompt string) string {
+func withConversationContext(sess *Session, adapterID, model, prompt string) string {
+	identity := buildIdentityPreface(adapterID, model)
 	if sess == nil || len(sess.Turns) == 0 {
-		return prompt
+		return identity + prompt
 	}
+	var b strings.Builder
+	b.WriteString(identity)
+	b.WriteString("# Conversation so far\n\n")
+	if !writeConversationTurns(&b, sess) {
+		return identity + prompt
+	}
+	b.WriteString("# New user message\n\n")
+	b.WriteString(prompt)
+	return b.String()
+}
+
+// writeConversationTurns appends the trailing window of session turns to
+// b and returns true when at least one turn was written. Split out to
+// keep withConversationContext's cyclomatic complexity within budget.
+func writeConversationTurns(b *strings.Builder, sess *Session) bool {
 	const maxTurns = 5
 	const maxOutputBytes = 1200
 	start := sess.ContextMark
@@ -1246,8 +1272,6 @@ func withConversationContext(sess *Session, prompt string) string {
 	if start < 0 {
 		start = 0
 	}
-	var b strings.Builder
-	b.WriteString("# Conversation so far\n\n")
 	wrote := false
 	for i := start; i < len(sess.Turns); i++ {
 		t := sess.Turns[i]
@@ -1256,23 +1280,37 @@ func withConversationContext(sess *Session, prompt string) string {
 			continue
 		}
 		wrote = true
-		fmt.Fprintf(&b, "[turn %d] user: %s\n", i+1, in)
+		fmt.Fprintf(b, "[turn %d] user: %s\n", i+1, in)
 		if t.Result != nil && len(t.Result.Steps) > 0 {
-			fmt.Fprintf(&b, "[turn %d] harness ran %d steps (ok=%t)\n", i+1, len(t.Result.Steps), t.Result.OK)
+			fmt.Fprintf(b, "[turn %d] harness ran %d steps (ok=%t)\n", i+1, len(t.Result.Steps), t.Result.OK)
 		}
 		if t.Action == "chat" {
-			out := truncateForContext(t.Input, maxOutputBytes)
-			if out != "" {
-				fmt.Fprintf(&b, "[turn %d] agent replied (truncated): %s\n", i+1, out)
+			if out := truncateForContext(t.Input, maxOutputBytes); out != "" {
+				fmt.Fprintf(b, "[turn %d] agent replied (truncated): %s\n", i+1, out)
 			}
 		}
 		b.WriteByte('\n')
 	}
-	if !wrote {
-		return prompt
+	return wrote
+}
+
+// buildIdentityPreface tells the underlying agent which adapter and
+// model it is running as. Without it the CLI cannot answer "qual modelo
+// está usando?" — most adapters (kimi-cli, antigravity, codex) have no
+// introspection of the harness routing layer that picked them.
+func buildIdentityPreface(adapterID, model string) string {
+	if adapterID == "" {
+		return ""
 	}
-	b.WriteString("# New user message\n\n")
-	b.WriteString(prompt)
+	var b strings.Builder
+	b.WriteString("# Runtime identity\n\n")
+	fmt.Fprintf(&b, "You are running inside harness chat as the `%s` adapter.\n", adapterID)
+	if model != "" {
+		fmt.Fprintf(&b, "Active model override: `%s`.\n", model)
+	} else {
+		b.WriteString("Active model: adapter default (no /model override set).\n")
+	}
+	b.WriteString("If the user asks which model or adapter is in use, answer with these values.\n\n")
 	return b.String()
 }
 
@@ -1311,13 +1349,21 @@ func runHarnessCmd(ctx context.Context, opts Options, args []string) {
 }
 
 type prefixWriter struct {
-	w      io.Writer
-	prefix string
-	buf    []byte
-	atBOL  bool
+	w            io.Writer
+	prefix       string
+	buf          []byte
+	atBOL        bool
+	onFirstWrite func()
+	firstWritten bool
 }
 
 func (p *prefixWriter) Write(b []byte) (int, error) {
+	if !p.firstWritten && len(b) > 0 {
+		p.firstWritten = true
+		if p.onFirstWrite != nil {
+			p.onFirstWrite()
+		}
+	}
 	if p.buf == nil {
 		p.atBOL = true
 	}
@@ -1351,7 +1397,12 @@ func (p *prefixWriter) flush() {
 
 func shouldExit(line string) bool {
 	switch line {
-	case "/exit", "/quit", "exit", "quit":
+	case "/exit", "/quit", "exit", "quit", ":q", ":wq":
+		return true
+	}
+	first := firstToken(line)
+	switch first {
+	case "/exit", "/quit":
 		return true
 	}
 	return false

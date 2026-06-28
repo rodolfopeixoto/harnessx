@@ -270,7 +270,7 @@ func TestStartSpinnerNonTTYDoesNotEmitGlyphs(t *testing.T) {
 }
 
 func TestWithConversationContextEmptyReturnsPrompt(t *testing.T) {
-	if got := withConversationContext(&Session{}, "hi"); got != "hi" {
+	if got := withConversationContext(&Session{}, "", "", "hi"); got != "hi" {
 		t.Errorf("empty session must pass prompt through; got %q", got)
 	}
 }
@@ -281,7 +281,7 @@ func TestWithConversationContextThreadsRecentTurns(t *testing.T) {
 		{Input: "/exec foo", Action: "executed"},
 		{Input: "fix 500 in cart", Action: "chat"},
 	}}
-	out := withConversationContext(sess, "checkout next?")
+	out := withConversationContext(sess, "", "", "checkout next?")
 	for _, want := range []string{
 		"# Conversation so far",
 		"add /products",
@@ -303,7 +303,7 @@ func TestWithConversationContextCapsAtFiveTurns(t *testing.T) {
 	for i := 0; i < 12; i++ {
 		sess.Turns = append(sess.Turns, Turn{Input: "msg-" + string(rune('a'+i)), Action: "chat"})
 	}
-	out := withConversationContext(sess, "now")
+	out := withConversationContext(sess, "", "", "now")
 	if strings.Contains(out, "msg-a") {
 		t.Errorf("oldest turn should be trimmed: %s", out)
 	}
