@@ -13,7 +13,7 @@ func TestListBundledReturnsKnownAdapters(t *testing.T) {
 		"claude":             false,
 		"claude-interactive": false,
 		"codex":              false,
-		"gemini":             false,
+		"antigravity":        false,
 		"fake":               false,
 		"kimi":               false,
 		"anthropic-api":      false,

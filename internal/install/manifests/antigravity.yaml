@@ -1,0 +1,14 @@
+name: antigravity
+description: Google Antigravity CLI (replaces deprecated Gemini CLI)
+category: agent
+probe:
+  binary: antigravity
+  version_args: ["--version"]
+strategies:
+  - kind: brew
+    platform: { os: [darwin] }
+    args: { package: antigravity-cli }
+  - kind: npm_global
+    args: { package: "@google/antigravity-cli" }
+  - kind: pip_user
+    args: { package: antigravity-cli }

@@ -7,7 +7,7 @@ import (
 )
 
 func TestLoadBundled_KnownTools(t *testing.T) {
-	for _, name := range []string{"gopls", "ripgrep", "gemini", "claude"} {
+	for _, name := range []string{"gopls", "ripgrep", "antigravity", "claude"} {
 		m, err := LoadBundled(name)
 		if err != nil {
 			t.Fatalf("load %s: %v", name, err)
