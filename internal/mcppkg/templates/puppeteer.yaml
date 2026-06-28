@@ -1,0 +1,6 @@
+name: puppeteer
+description: Browser automation MCP via @modelcontextprotocol/server-puppeteer (navigate, click, screenshot, evaluate)
+transport: stdio
+command: npx
+args: ["-y", "@modelcontextprotocol/server-puppeteer"]
+docs: https://github.com/modelcontextprotocol/servers/tree/main/src/puppeteer

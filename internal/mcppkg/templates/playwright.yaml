@@ -1,0 +1,6 @@
+name: playwright
+description: Browser automation MCP via @playwright/mcp (multi-engine navigate, locate, fill, screenshot, trace)
+transport: stdio
+command: npx
+args: ["-y", "@playwright/mcp@latest"]
+docs: https://github.com/microsoft/playwright-mcp
