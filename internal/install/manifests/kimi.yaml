@@ -1,9 +1,12 @@
 name: kimi
-description: Moonshot Kimi CLI
+description: Moonshot Kimi CLI (kimi-cli v1.46+)
 category: agent
 probe:
-  binary: kimi
+  binary: kimi-cli
   version_args: ["--version"]
 strategies:
-  - kind: npm_global
-    args: { package: "@moonshot/kimi-cli" }
+  - kind: pip_user
+    args: { package: "kimi-cli" }
+  - kind: brew
+    platform: { os: [darwin] }
+    args: { package: "kimi-cli" }
