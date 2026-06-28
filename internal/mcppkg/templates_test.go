@@ -10,13 +10,16 @@ func TestListReturnsBundledMCPs(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := map[string]bool{
-		"filesystem":   false,
-		"github":       false,
-		"postgres":     false,
-		"sqlite":       false,
-		"brave-search": false,
-		"fetch":        false,
-		"memory":       false,
+		"filesystem":      false,
+		"github":          false,
+		"postgres":        false,
+		"sqlite":          false,
+		"brave-search":    false,
+		"fetch":           false,
+		"memory":          false,
+		"puppeteer":       false,
+		"playwright":      false,
+		"chrome-devtools": false,
 	}
 	for _, name := range got {
 		if _, ok := want[name]; ok {

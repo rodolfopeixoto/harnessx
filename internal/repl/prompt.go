@@ -27,6 +27,7 @@ var staticSlashCommands = []string{
 	"/save-prompt", "/prompt", "/prompts",
 	"/exec", "/do", "/ship", "/drive", "/ci", "/test", "/lint",
 	"/budget", "/goal", "/plan",
+	"/model", "/route", "/route on", "/route off", "/once",
 }
 
 func newPromptReader(in io.Reader, out io.Writer, historyPath string, completer readline.AutoCompleter) promptReader {

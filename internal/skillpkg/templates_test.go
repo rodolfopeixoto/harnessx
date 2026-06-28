@@ -14,6 +14,9 @@ func TestListReturnsBundledSkills(t *testing.T) {
 		"clean-code":    false,
 		"go-feature":    false,
 		"security-rule": false,
+		"humanize":      false,
+		"design":        false,
+		"frontend":      false,
 	}
 	for _, tpl := range got {
 		want[tpl.Name] = true

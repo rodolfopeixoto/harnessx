@@ -1,0 +1,6 @@
+name: chrome-devtools
+description: Chrome DevTools MCP for live tab inspection, network capture, console + performance traces
+transport: stdio
+command: npx
+args: ["-y", "chrome-devtools-mcp@latest"]
+docs: https://github.com/ChromeDevTools/chrome-devtools-mcp
