@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/ropeixoto/harnessx/internal/execution"
 )
 
 func writeRun(t *testing.T, root, id, body string) {
@@ -63,6 +65,88 @@ func TestRunSurfacesRecurringError(t *testing.T) {
 	}
 	if !strings.Contains(buf.String(), "Raise --budget-usd") {
 		t.Fatalf("expected actionable fix, got: %s", buf.String())
+	}
+}
+
+func TestApplySetsAutonomyOnWaitingApproval(t *testing.T) {
+	root := t.TempDir()
+	for i := 0; i < 4; i++ {
+		writeRun(t, root, "r"+string(rune('a'+i)), `{"run_id":"r","agent_id":"claude","status":"waiting_approval","changed_files":["x"]}`)
+	}
+	var buf bytes.Buffer
+	res, err := Run(&buf, Options{Root: root, Apply: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !containsLearn(res.Applied, "autonomy_safe_execute") {
+		t.Fatalf("expected autonomy fix applied, got %+v\noutput:\n%s", res.Applied, buf.String())
+	}
+	body, err := os.ReadFile(filepath.Join(root, ".harness", "config", "autonomy"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.TrimSpace(string(body)) != "safe_execute" {
+		t.Fatalf("expected safe_execute, got %s", string(body))
+	}
+}
+
+func containsLearn(ss []string, want string) bool {
+	for _, s := range ss {
+		if s == want {
+			return true
+		}
+	}
+	return false
+}
+
+func TestUpdateIncrementalAppendsAndDedupes(t *testing.T) {
+	root := t.TempDir()
+	run1 := makeExecRes("r1", "claude", "applied", 1000, 500, 0.05, "")
+	inc1, path1, err := UpdateIncremental(root, run1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if path1 == "" {
+		t.Fatal("expected written path")
+	}
+	if inc1.RunsSeen != 1 {
+		t.Errorf("want 1 run seen, got %d", inc1.RunsSeen)
+	}
+	if inc1.TokensTotal != 1500 {
+		t.Errorf("want 1500 tokens, got %d", inc1.TokensTotal)
+	}
+	if _, _, err := UpdateIncremental(root, run1); err != nil {
+		t.Fatal(err)
+	}
+	inc2, err := LoadIncremental(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if inc2.RunsSeen != 1 {
+		t.Errorf("idempotent on same run id; want still 1, got %d", inc2.RunsSeen)
+	}
+	run2 := makeExecRes("r2", "codex", "applied", 2000, 800, 0.10, "")
+	inc3, _, err := UpdateIncremental(root, run2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if inc3.RunsSeen != 2 {
+		t.Errorf("want 2 runs seen, got %d", inc3.RunsSeen)
+	}
+	if inc3.ByAdapter["codex"] != 1 || inc3.ByAdapter["claude"] != 1 {
+		t.Errorf("ByAdapter wrong: %+v", inc3.ByAdapter)
+	}
+}
+
+func makeExecRes(id, adapter, status string, in, out int, cost float64, errType string) execution.Result {
+	return execution.Result{
+		RunID:            id,
+		AgentID:          adapter,
+		Status:           execution.Status(status),
+		InputTokens:      in,
+		OutputTokens:     out,
+		EstimatedCostUSD: cost,
+		ErrorType:        errType,
 	}
 }
 
