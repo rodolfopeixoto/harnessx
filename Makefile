@@ -20,8 +20,8 @@ LDFLAGS := -s -w \
 PLATFORMS ?= darwin/amd64 darwin/arm64 linux/amd64 linux/arm64 windows/amd64 windows/arm64
 
 .PHONY: all build test test-short vet lint fmt tidy check ci cd release \
-        e2e e2e-all bench coverage coverage-gate security licenses sbom \
-        profile-mem profile-cpu \
+        e2e e2e-all e2e-tutorial bench coverage coverage-gate security licenses sbom \
+        profile-mem profile-cpu vulncheck \
         clean install-hooks uninstall-hooks \
         dashboard-install dashboard-dev dashboard-build dashboard-test \
         help
@@ -217,6 +217,9 @@ e2e-all: build
 	  echo "=== $$s ==="; \
 	  bash "$$s" || exit 1; \
 	done
+
+e2e-tutorial: build
+	bash scripts/e2e-tutorial.sh
 
 clean:
 	rm -rf bin dist coverage.* *.out
