@@ -5,6 +5,7 @@ package context
 import (
 	stdctx "context"
 	"errors"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -63,6 +64,36 @@ func TestAutoLSP_NoBinaries_ReturnsDefaults(t *testing.T) {
 	chain := AutoLSP(t.TempDir())
 	// Without LSP binaries on PATH this should equal the default chain.
 	require.Equal(t, len(DefaultProviders()), len(chain))
+}
+
+func TestAutoClients_ManifestPresentButBinaryMissing(t *testing.T) {
+	// Isolate PATH so no real LSP servers are found even in dev machines.
+	t.Setenv("PATH", t.TempDir())
+	root := t.TempDir()
+	writeFile(t, root, "go.mod", "module x\n")
+	writeFile(t, root, "Gemfile", "source 'https://rubygems.org'\n")
+	writeFile(t, root, "pyproject.toml", "[tool.x]\n")
+	writeFile(t, root, "Cargo.toml", "[package]\nname='x'\n")
+	writeFile(t, root, "tsconfig.json", "{}\n")
+	require.Empty(t, autoClients(root), "no clients expected when PATH is empty")
+}
+
+func TestAutoClients_NoManifestReturnsEmpty(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+	require.Empty(t, autoClients(t.TempDir()))
+}
+
+func TestAutoClients_FakeGoplsExercisesLookPath(t *testing.T) {
+	// Isolate PATH and drop a fake `gopls` — verifies the LookPath-hit +
+	// startable-fail branch of autoClients (fake exits immediately, so the
+	// LSP handshake fails and no client is kept).
+	binDir := t.TempDir()
+	fake := filepath.Join(binDir, "gopls")
+	require.NoError(t, os.WriteFile(fake, []byte("#!/bin/sh\nexit 0\n"), 0o755))
+	t.Setenv("PATH", binDir)
+	root := t.TempDir()
+	writeFile(t, root, "go.mod", "module x\n")
+	_ = autoClients(root) // must not panic
 }
 
 func TestAnyFile_Hit(t *testing.T) {

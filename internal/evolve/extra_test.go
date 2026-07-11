@@ -73,6 +73,27 @@ func TestTruncateShortPassthrough(t *testing.T) {
 	}
 }
 
+func TestTruncateTable(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name string
+		in   string
+		n    int
+		want string
+	}{
+		{"empty", "", 5, ""},
+		{"equal", "abcde", 5, "abcde"},
+		{"cut", "abcdefgh", 5, "abcde...[truncated]"},
+		{"unicode_byte_boundary", "áéíóúñ", 4, "áé...[truncated]"},
+		{"zeroLimit", "abc", 0, "...[truncated]"},
+	}
+	for _, c := range cases {
+		if got := truncate(c.in, c.n); got != c.want {
+			t.Errorf("%s: got %q want %q", c.name, got, c.want)
+		}
+	}
+}
+
 func TestDiagnoseSkipsInvalidLines(t *testing.T) {
 	dir := t.TempDir()
 	writeEvents(t, dir, []string{

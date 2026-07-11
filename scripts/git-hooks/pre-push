@@ -11,12 +11,18 @@ set -euo pipefail
 
 unset GOROOT || true
 
+cd "$(git rev-parse --show-toplevel)"
+
+# Bypass guardrail runs first — blocks unaudited HARNESS_SKIP_* usage,
+# audit-logs authorized ones (requires HARNESS_BYPASS_REASON).
+if [[ -x scripts/git-hooks/pre-push-bypass-check.sh ]]; then
+  bash scripts/git-hooks/pre-push-bypass-check.sh || exit 1
+fi
+
 if [[ "${HARNESS_SKIP_CI:-}" == "1" ]]; then
   echo "→ HARNESS_SKIP_CI=1 — skipping local ci (do not push to main/develop without it)"
   exit 0
 fi
-
-cd "$(git rev-parse --show-toplevel)"
 
 remote="${1:-origin}"
 url="${2:-unknown}"

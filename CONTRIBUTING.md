@@ -155,6 +155,34 @@ HARNESS_ALLOW_PRIVATE=1 git commit ...
 
 Reviewers will ask why on the PR.
 
+## Bypass guardrail — HARNESS_SKIP_*
+
+Local CI/spec-gate hooks are the contract. Skipping them is possible
+but audited.
+
+- `HARNESS_SKIP_CI=1` — skips `make ci` in `pre-push`.
+- `HARNESS_SKIP_SPEC_GATE=1` — skips the spec-gate in `pre-push`.
+
+Either flag **without** `HARNESS_BYPASS_REASON` is blocked by
+`scripts/git-hooks/pre-commit-bypass-check.sh` and
+`scripts/git-hooks/pre-push-bypass-check.sh`. To bypass legitimately
+(e.g. production hotfix), export a documented reason:
+
+```sh
+HARNESS_SKIP_CI=1 \
+HARNESS_BYPASS_REASON="hotfix #123 — outage rollback" \
+git push
+```
+
+The bypass is appended to `.harness/logs/gate-bypass.jsonl` as one
+JSON line per event: `ts`, `user`, `hooks_skipped`, `reason`, `hook`.
+Repeated bypasses on the same branch will be surfaced in the audit
+review — treat this file as evidence, not noise.
+
+Never combine bypass with `git push --force`, `--admin`, or
+`--no-verify` unless you also have written approval from a maintainer
+on the PR.
+
 ## Code rules (non-negotiable)
 
 **Constants** — every magic value lives in

@@ -18,6 +18,12 @@ if [[ -x scripts/git-hooks/pre-commit-privatecheck.sh ]]; then
   scripts/git-hooks/pre-commit-privatecheck.sh
 fi
 
+# Bypass guardrail — blocks HARNESS_SKIP_CI=1 / HARNESS_SKIP_SPEC_GATE=1
+# unless HARNESS_BYPASS_REASON is set (and then it audit-logs the bypass).
+if [[ -x scripts/git-hooks/pre-commit-bypass-check.sh ]]; then
+  scripts/git-hooks/pre-commit-bypass-check.sh
+fi
+
 staged="$(git diff --cached --name-only --diff-filter=ACMR -- '*.go' || true)"
 if [[ -z "$staged" ]]; then
   exit 0

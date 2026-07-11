@@ -3,6 +3,9 @@ package sensors
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -86,6 +89,60 @@ func TestCoverageSensorPropagatesRunnerError(t *testing.T) {
 	}
 	if !strings.Contains(r.Detail, "compile error") {
 		t.Errorf("detail missing error: %s", r.Detail)
+	}
+}
+
+func TestTruncateBoundaries(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name string
+		in   string
+		n    int
+		want string
+	}{
+		{"empty", "", 4, ""},
+		{"underLimit", "abc", 4, "abc"},
+		{"atLimit", "abcd", 4, "abcd"},
+		{"overLimit", "abcdef", 4, "abcd...[truncated]"},
+	}
+	for _, c := range cases {
+		if got := truncate(c.in, c.n); got != c.want {
+			t.Errorf("%s: got %q want %q", c.name, got, c.want)
+		}
+	}
+}
+
+func TestDefaultCoverageRunnerSuccessAndFailure(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell script mock not portable on windows")
+	}
+	shim := t.TempDir()
+	okScript := "#!/bin/sh\necho 'ok  \tgithub.com/x/a\t0.1s\tcoverage: 91.0% of statements'\n"
+	if err := os.WriteFile(filepath.Join(shim, "go"), []byte(okScript), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	oldPath := os.Getenv("PATH")
+	t.Setenv("PATH", shim+string(os.PathListSeparator)+oldPath)
+	out, err := defaultCoverageRunner(context.Background(), shim, "./...")
+	if err != nil {
+		t.Fatalf("expected success, got %v: %s", err, out)
+	}
+	if !strings.Contains(string(out), "coverage: 91.0%") {
+		t.Errorf("stdout missing coverage line: %s", out)
+	}
+
+	failShim := t.TempDir()
+	failScript := "#!/bin/sh\necho 'compile broken' >&2\nexit 2\n"
+	if err := os.WriteFile(filepath.Join(failShim, "go"), []byte(failScript), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", failShim+string(os.PathListSeparator)+oldPath)
+	out2, err2 := defaultCoverageRunner(context.Background(), failShim, "./...")
+	if err2 == nil {
+		t.Fatal("expected failure")
+	}
+	if !strings.Contains(string(out2), "compile broken") {
+		t.Errorf("expected stderr captured, got %q", out2)
 	}
 }
 
