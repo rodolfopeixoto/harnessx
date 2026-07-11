@@ -15,12 +15,10 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	_ "modernc.org/sqlite" // registers the "sqlite" driver via init()
 
-	"github.com/ropeixoto/harnessx/internal/platform/constants"
 	"github.com/ropeixoto/harnessx/internal/platform/ids"
 	"github.com/ropeixoto/harnessx/internal/platform/paths"
 )
@@ -379,90 +377,4 @@ func (r *Registry) Forget(ctx context.Context, ref string) error {
 	}
 	_, err = r.db.ExecContext(ctx, `delete from projects where id = ?`, p.ID)
 	return err
-}
-
-// --- helpers --------------------------------------------------------------
-
-func (r *Registry) byID(ctx context.Context, id string) (Project, error) {
-	return r.scanOne(ctx, `select id, slug, display_name, root_path, db_path, added_at, last_seen_at, archived_at, schema_version
-		from projects where id = ?`, id)
-}
-
-func (r *Registry) bySlug(ctx context.Context, slug string) (Project, error) {
-	return r.scanOne(ctx, `select id, slug, display_name, root_path, db_path, added_at, last_seen_at, archived_at, schema_version
-		from projects where slug = ?`, slug)
-}
-
-func (r *Registry) byRoot(ctx context.Context, root string) (Project, error) {
-	return r.scanOne(ctx, `select id, slug, display_name, root_path, db_path, added_at, last_seen_at, archived_at, schema_version
-		from projects where root_path = ?`, root)
-}
-
-func (r *Registry) scanOne(ctx context.Context, q string, args ...any) (Project, error) {
-	row := r.db.QueryRowContext(ctx, q, args...)
-	p, err := scanProject(row)
-	if errors.Is(err, sql.ErrNoRows) {
-		return Project{}, ErrNotFound
-	}
-	return p, err
-}
-
-type rowScanner interface {
-	Scan(...any) error
-}
-
-func scanProject(s rowScanner) (Project, error) {
-	var (
-		p              Project
-		addedAt        string
-		lastSeen, arch sql.NullString
-	)
-	if err := s.Scan(&p.ID, &p.Slug, &p.DisplayName, &p.RootPath, &p.DBPath,
-		&addedAt, &lastSeen, &arch, &p.SchemaVer); err != nil {
-		return Project{}, err
-	}
-	p.AddedAt, _ = time.Parse(timeFmt, addedAt)
-	if lastSeen.Valid {
-		p.LastSeenAt = parseTimePtr(lastSeen.String)
-	}
-	if arch.Valid {
-		p.ArchivedAt = parseTimePtr(arch.String)
-	}
-	return p, nil
-}
-
-func parseTimePtr(s string) *time.Time {
-	t, err := time.Parse(timeFmt, s)
-	if err != nil {
-		return nil
-	}
-	return &t
-}
-
-func defaultProjectDBPath(root string) string {
-	return filepath.Join(root, constants.HarnessDir, constants.DBSubdir, constants.DBFilename)
-}
-
-func Slugify(in string) string {
-	var b strings.Builder
-	prevSeparator := false
-	for _, r := range strings.ToLower(in) {
-		if isSlugRune(r) {
-			b.WriteRune(r)
-			prevSeparator = false
-			continue
-		}
-		if !prevSeparator {
-			b.WriteString(constants.SlugSeparator)
-			prevSeparator = true
-		}
-	}
-	if out := strings.Trim(b.String(), constants.SlugSeparator); out != "" {
-		return out
-	}
-	return constants.SlugFallbackName
-}
-
-func isSlugRune(r rune) bool {
-	return (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9')
 }
