@@ -226,6 +226,59 @@ func newAuditCmd() *cobra.Command {
 	c.Flags().StringVar(&kind, "kind", "", "filter by kind (sensor|hook|agent|cleanup|...)")
 	c.Flags().BoolVar(&jsonOut, "json", false, "emit JSON")
 	c.AddCommand(newAuditTailCmd())
+	c.AddCommand(newAuditReplayCmd())
+	return c
+}
+
+func newAuditReplayCmd() *cobra.Command {
+	var (
+		runID   string
+		dryRun  bool
+		jsonOut bool
+		tmpDir  string
+	)
+	c := &cobra.Command{
+		Use:   "replay",
+		Short: "Replay the event log for a specific run inside an isolated tmpdir",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if runID == "" {
+				return fmt.Errorf("audit replay: --id is required")
+			}
+			root, err := cwd()
+			if err != nil {
+				return err
+			}
+			report, err := audit.Replay(cmd.Context(), root, runID, audit.ReplayOptions{
+				DryRun: dryRun,
+				TmpDir: tmpDir,
+			})
+			if err != nil {
+				return err
+			}
+			if jsonOut {
+				return json.NewEncoder(cmd.OutOrStdout()).Encode(report)
+			}
+			out := cmd.OutOrStdout()
+			fmt.Fprintf(out, "run:      %s\n", report.RunID)
+			fmt.Fprintf(out, "dry-run:  %v\n", report.DryRun)
+			fmt.Fprintf(out, "tmpdir:   %s\n", report.TmpDir)
+			fmt.Fprintf(out, "events:   %d\n", report.Events)
+			for _, n := range report.Notes {
+				fmt.Fprintf(out, "note:     %s\n", n)
+			}
+			w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
+			fmt.Fprintln(w, "STEP\tWHEN\tKIND\tSOURCE\tACTION")
+			for _, s := range report.Steps {
+				fmt.Fprintf(w, "%03d\t%s\t%s\t%s\t%s\n",
+					s.Index, s.OccurredAt.Format("01-02 15:04:05"), s.Kind, s.Source, s.Action)
+			}
+			return w.Flush()
+		},
+	}
+	c.Flags().StringVar(&runID, "id", "", "run id to replay (required)")
+	c.Flags().BoolVar(&dryRun, "dry-run", true, "list actions without materialising the manifest")
+	c.Flags().BoolVar(&jsonOut, "json", false, "emit JSON")
+	c.Flags().StringVar(&tmpDir, "tmp-dir", "", "override tmpdir (default: OS temp under harness-audit-replay-*)")
 	return c
 }
 

@@ -2220,7 +2220,7 @@ harness backup list
 
 **HOOK (15s):** "Sensor rodou. Hook disparou. Agent respondeu. Cleanup limpou. Tudo em `events.jsonl`. `audit tail -30` imprime os últimos. Sem banco. Sem servidor."
 
-**CONTEXTO (60s):** `harness audit` (`cmd_metrics.go:184`) lê `.harness/audit/events.jsonl` append-only. Filtra por `--kind sensor|hook|agent|cleanup|...`, limita com `--limit`, emite JSON com `--json`. Subcomando `tail` faz os últimos N. `harness audit replay` [NÃO EXISTE — sugerir implementação]: iterar events por range temporal e re-executar hooks/sensors idempotentes num tmpdir isolado, com `--dry-run` default e diff de output vs artifact original — útil pra investigar regressão de sensor sem sujar tree.
+**CONTEXTO (60s):** `harness audit` (`cmd_metrics.go:184`) lê `.harness/audit/events.jsonl` append-only. Filtra por `--kind sensor|hook|agent|cleanup|...`, limita com `--limit`, emite JSON com `--json`. Subcomando `tail` faz os últimos N. `harness audit replay --id <run-id>` (`internal/audit/replay.go`) filtra eventos daquele run pelos dois locais canônicos (`.harness/audit/events.jsonl` e `.harness/logs/events.jsonl`), ordena cronologicamente e imprime cada step com marcador `would replay` (default `--dry-run=true`) ou `replayed` (quando `--dry-run=false`, gravando `manifest.txt` só dentro do tmpdir). Nunca escreve fora do tmpdir; retorna erro `ErrRunNotFound` se run id não existir em nenhum log nem em `.harness/runs/<id>/`. Útil pra investigar regressão de sensor sem sujar tree.
 
 **CODE TOUR (6min):**
 - `cmd_metrics.go:184-230` — `newAuditCmd()` com filtros.
@@ -2261,14 +2261,23 @@ func newAuditTailCmd() *cobra.Command {
 harness audit --kind sensor --limit 20
 harness audit tail --limit 10
 harness audit --json | jq '.[] | select(.kind=="agent")'
+
+# replay events de um run específico em tmpdir isolado (dry-run default)
+harness audit replay --id 01KX3ANMQ33YY71GW97ZH9XBJD
+
+# JSON estável pra pipeline
+harness audit replay --id 01KX3ANMQ33YY71GW97ZH9XBJD --json | jq '.steps | length'
+
+# materializa manifest dentro do tmpdir (--dry-run=false), sem tocar no repo
+harness audit replay --id 01KX3ANMQ33YY71GW97ZH9XBJD --dry-run=false --tmp-dir /tmp/replay-01
 ```
 
-**RECAP (30s):** JSONL append-only. Filesystem como source-of-truth. Post-mortem sem grafana.
+**RECAP (30s):** JSONL append-only. Filesystem como source-of-truth. Replay sandbox em tmpdir. Post-mortem sem grafana.
 
 **CTA (30s):** Marca esse video se você já debugou incidente com jq.
 
 **Perguntas plateia:**
-1. `audit replay` deveria existir? Como isolar side effects?
+1. `audit replay` já existe em dry-run — próximo passo é re-executar hooks/sensors idempotentes de verdade dentro do tmpdir. Vale a pena?
 2. JSONL escala pra 100k events?
 3. `--kind` livre ou taxonomy fechado?
 

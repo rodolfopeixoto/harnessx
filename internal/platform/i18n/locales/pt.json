@@ -37,5 +37,10 @@
   "dashboard.serving_react": "servindo build React de",
   "dashboard.serving_builtin": "servindo HTML embutido (rode `make dashboard-build` para a UI React)",
 
-  "completion.shell_help":  "Gera script de autocomplete para o shell."
+  "completion.shell_help":  "Gera script de autocomplete para o shell.",
+
+  "audit.replay.short":       "Reexecuta o event log de um run específico em tmpdir isolado",
+  "audit.replay.id_required": "audit replay: --id é obrigatório",
+  "audit.replay.run_not_found": "audit replay: run não encontrado",
+  "audit.replay.note_run_dir_no_events": "nenhum evento com esse run id; diretório existe mas event log está vazio"
 }
