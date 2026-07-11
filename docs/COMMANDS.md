@@ -294,7 +294,13 @@ Encrypted-at-rest secret store under `.harness/secrets/`.
 
 ### `harness audit tail|replay <run-id>`
 Tails and replays the append-only event log
-(`.harness/logs/events.jsonl`).
+(`.harness/audit/events.jsonl` or `.harness/logs/events.jsonl`).
+`replay --id <run-id> [--dry-run] [--json] [--tmp-dir <dir>]` filters
+events for the given run, orders them chronologically and prints each
+step. `--dry-run` (default true) never mutates state; when set to
+`false` a `manifest.txt` is written inside the tmpdir. Replay never
+writes outside the tmpdir. Returns non-zero when the run id is not
+found in any event log or under `.harness/runs/`.
 
 ### `harness audit-solid [--root <path>]`
 Scans for SOLID/god-file violations (file LOC > 400 or imports > 15).

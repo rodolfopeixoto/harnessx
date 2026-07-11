@@ -37,5 +37,10 @@
   "dashboard.serving_react": "serving React build from",
   "dashboard.serving_builtin": "serving built-in HTML (run `make dashboard-build` for React UI)",
 
-  "completion.shell_help":  "Output a shell-specific completion script."
+  "completion.shell_help":  "Output a shell-specific completion script.",
+
+  "audit.replay.short":       "Replay the event log for a specific run inside an isolated tmpdir",
+  "audit.replay.id_required": "audit replay: --id is required",
+  "audit.replay.run_not_found": "audit replay: run not found",
+  "audit.replay.note_run_dir_no_events": "no audit events tagged with this run id; run directory exists but event log is empty"
 }

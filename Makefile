@@ -20,8 +20,8 @@ LDFLAGS := -s -w \
 PLATFORMS ?= darwin/amd64 darwin/arm64 linux/amd64 linux/arm64 windows/amd64 windows/arm64
 
 .PHONY: all build test test-short vet lint fmt tidy check ci cd release \
-        e2e e2e-all bench coverage coverage-gate security licenses sbom \
-        profile-mem profile-cpu \
+        e2e e2e-all e2e-tutorial bench coverage coverage-gate security licenses sbom \
+        profile-mem profile-cpu vulncheck \
         clean install-hooks uninstall-hooks \
         dashboard-install dashboard-dev dashboard-build dashboard-test \
         help
@@ -128,7 +128,23 @@ scaffold-fmt:
 	done
 
 # ci: full local CI gate. Wired to the pre-push hook by `make install-hooks`.
-ci: lint check coverage-gate coverage-shell test-sh e2e-all
+ci: lint check coverage-gate coverage-shell test-sh e2e-all e2e-tutorial
+
+# vulncheck: govulncheck against all packages. Fails the gate on any
+# module with a known GHSA/GO-YYYY-NNNN. Waivers live in SECURITY.md.
+vulncheck:
+	@if ! command -v govulncheck >/dev/null; then \
+	  echo "✗ govulncheck missing — install via:"; \
+	  echo "    go install golang.org/x/vuln/cmd/govulncheck@latest"; \
+	  exit 1; \
+	fi
+	@echo "→ govulncheck"
+	@govulncheck ./... > /tmp/govulncheck.log 2>&1 || { \
+	  grep -E "^Vulnerability|GHSA|GO-" /tmp/govulncheck.log | head -20 || true; \
+	  echo "✗ vulnerabilities detected — upgrade or document waiver in SECURITY.md"; \
+	  exit 1; \
+	}
+	@echo "  (no vulnerabilities found)"
 
 # audit-regression: replay the 26 audit findings from
 # .harness/artifacts/HARNESS-AUDIT-COMPLETE.md and assert non-LLM scenarios
@@ -217,6 +233,9 @@ e2e-all: build
 	  echo "=== $$s ==="; \
 	  bash "$$s" || exit 1; \
 	done
+
+e2e-tutorial: build
+	bash scripts/e2e-tutorial.sh
 
 clean:
 	rm -rf bin dist coverage.* *.out
