@@ -128,7 +128,23 @@ scaffold-fmt:
 	done
 
 # ci: full local CI gate. Wired to the pre-push hook by `make install-hooks`.
-ci: lint check coverage-gate coverage-shell test-sh e2e-all
+ci: lint check coverage-gate coverage-shell test-sh e2e-all e2e-tutorial
+
+# vulncheck: govulncheck against all packages. Fails the gate on any
+# module with a known GHSA/GO-YYYY-NNNN. Waivers live in SECURITY.md.
+vulncheck:
+	@if ! command -v govulncheck >/dev/null; then \
+	  echo "✗ govulncheck missing — install via:"; \
+	  echo "    go install golang.org/x/vuln/cmd/govulncheck@latest"; \
+	  exit 1; \
+	fi
+	@echo "→ govulncheck"
+	@govulncheck ./... > /tmp/govulncheck.log 2>&1 || { \
+	  grep -E "^Vulnerability|GHSA|GO-" /tmp/govulncheck.log | head -20 || true; \
+	  echo "✗ vulnerabilities detected — upgrade or document waiver in SECURITY.md"; \
+	  exit 1; \
+	}
+	@echo "  (no vulnerabilities found)"
 
 # audit-regression: replay the 26 audit findings from
 # .harness/artifacts/HARNESS-AUDIT-COMPLETE.md and assert non-LLM scenarios

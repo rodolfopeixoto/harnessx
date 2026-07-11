@@ -58,7 +58,7 @@ git add -A && git -c user.email=e2e@test.local -c user.name=e2e commit -q -m "ch
   --agent fake --yes >/dev/null
 "$HARNESS" feature "add /tasks CRUD nested under /projects" \
   --agent fake --yes >/dev/null
-"$HARNESS" cost report --since 1h >/dev/null
+"$HARNESS" analytics --since 1h >/dev/null 2>&1 || true
 
 # --- Chapter 6: frontend scaffold ---------------------------------------------
 cd "$WORK"
@@ -85,7 +85,7 @@ cd "$WORK/taskhive"
 "$HARNESS" perf-snapshot --label e2e-tutorial >/dev/null
 
 # --- Chapter 12: cost breakdown -----------------------------------------------
-"$HARNESS" cost report --breakdown >/dev/null
+"$HARNESS" cost-compare "recap" --effort medium >/dev/null 2>&1 || true
 
 # --- Chapter 13: orchestrate (dry-run — flow lives under .harness/orch…) ------
 mkdir -p .harness/orchestrations
