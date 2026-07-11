@@ -5,7 +5,6 @@ package repl
 import (
 	"bufio"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -14,7 +13,6 @@ import (
 	"os/signal"
 	"path/filepath"
 	"regexp"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -97,115 +95,6 @@ type Options struct {
 	OutputJSON bool
 }
 
-type SessionSummary struct {
-	ID        string
-	Label     string
-	Goal      intentplan.Goal
-	Turns     int
-	LastInput string
-}
-
-// LoadSession rehydrates a prior chat from .harness/sessions/<id>.jsonl.
-// The file is JSONL of Turn records (see persist) without the Session
-// envelope, so we synthesise a Session shell and replay every turn into
-// it. Used by `harness chat --resume <id>`.
-func LoadSession(root, id string) (*Session, error) {
-	p := sessionPath(root, id)
-	f, err := os.Open(p)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-	sess := Session{ID: id, Started: time.Now().UTC(), Root: root}
-	dec := json.NewDecoder(f)
-	for dec.More() {
-		var t Turn
-		if err := dec.Decode(&t); err != nil {
-			return nil, err
-		}
-		sess.Turns = append(sess.Turns, t)
-	}
-	if meta, err := loadSessionMeta(root, id); err == nil {
-		if meta.Goal != "" {
-			sess.Goal = intentplan.Goal(meta.Goal)
-		}
-		sess.Label = meta.Label
-		sess.ContextMark = meta.ContextMark
-		sess.AutoGate = meta.AutoGate
-		sess.BudgetUSD = meta.BudgetUSD
-	}
-	if sess.Goal == "" {
-		for i := len(sess.Turns) - 1; i >= 0; i-- {
-			if sess.Turns[i].Plan != nil {
-				sess.Goal = sess.Turns[i].Plan.Goal
-				break
-			}
-		}
-	}
-	if sess.Goal == "" {
-		sess.Goal = intentplan.GoalDev
-	}
-	return &sess, nil
-}
-
-// ResolveSessionID converts either a ulid or a /save label into the
-// canonical session id. Labels are matched against ListSessions; on
-// ambiguity (two sessions sharing a label) the newest wins. Returns
-// the input unchanged when no label matches so callers can still
-// load by raw ulid.
-func ResolveSessionID(root, arg string) string {
-	if arg == "" {
-		return arg
-	}
-	rows, err := ListSessions(root)
-	if err != nil {
-		return arg
-	}
-	for _, r := range rows {
-		if r.ID == arg {
-			return arg
-		}
-	}
-	for _, r := range rows {
-		if r.Label == arg {
-			return r.ID
-		}
-	}
-	return arg
-}
-
-// SuggestSession returns the closest known label or id to arg via
-// Levenshtein distance, with a max distance of 3. Empty when nothing
-// is close enough — callers use the empty case to fall through to
-// the canonical "session not found" error so we never auto-resolve
-// to the wrong session silently.
-func SuggestSession(root, arg string) string {
-	if arg == "" {
-		return ""
-	}
-	rows, err := ListSessions(root)
-	if err != nil || len(rows) == 0 {
-		return ""
-	}
-	candidates := make([]string, 0, 2*len(rows))
-	for _, r := range rows {
-		if r.Label != "" {
-			candidates = append(candidates, r.Label)
-		}
-		candidates = append(candidates, r.ID)
-	}
-	best := ""
-	bestDist := 4
-	for _, c := range candidates {
-		d := levenshtein(arg, c)
-		if d < bestDist {
-			best = c
-			bestDist = d
-		}
-	}
-	return best
-}
-
 func levenshtein(a, b string) int {
 	ar, br := []rune(a), []rune(b)
 	if len(ar) == 0 {
@@ -242,66 +131,6 @@ func min3(a, b, c int) int {
 		m = c
 	}
 	return m
-}
-
-// ListSessions returns one summary per .harness/sessions/*.jsonl file,
-// sorted newest first by file mtime.
-//
-//nolint:gocognit // single WalkDir pass with several inline filters
-func ListSessions(root string) ([]SessionSummary, error) {
-	dir := filepath.Join(root, ".harness", "sessions")
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil
-		}
-		return nil, err
-	}
-	type entryWithStat struct {
-		name  string
-		mtime time.Time
-	}
-	var stats []entryWithStat
-	for _, e := range entries {
-		if !strings.HasSuffix(e.Name(), ".jsonl") {
-			continue
-		}
-		info, err := e.Info()
-		if err != nil {
-			continue
-		}
-		stats = append(stats, entryWithStat{name: e.Name(), mtime: info.ModTime()})
-	}
-	for i := range stats {
-		for j := i + 1; j < len(stats); j++ {
-			if stats[j].mtime.After(stats[i].mtime) {
-				stats[i], stats[j] = stats[j], stats[i]
-			}
-		}
-	}
-	out := make([]SessionSummary, 0, len(stats))
-	for _, s := range stats {
-		id := strings.TrimSuffix(s.name, ".jsonl")
-		sess, err := LoadSession(root, id)
-		if err != nil {
-			continue
-		}
-		last := ""
-		for i := len(sess.Turns) - 1; i >= 0; i-- {
-			if sess.Turns[i].Input != "" {
-				last = sess.Turns[i].Input
-				if len(last) > 60 {
-					last = last[:60] + "…"
-				}
-				break
-			}
-		}
-		out = append(out, SessionSummary{
-			ID: sess.ID, Label: sess.Label,
-			Goal: sess.Goal, Turns: len(sess.Turns), LastInput: last,
-		})
-	}
-	return out, nil
 }
 
 type Planner func(ctx context.Context, goal intentplan.Goal, prompt string) (intentplan.Plan, error)
@@ -841,25 +670,6 @@ func switchAdapter(opts *Options, id string) {
 	fmt.Fprintf(opts.Out, "  ✓ switched to %s\n", canonical)
 }
 
-// setBudget parses a USD value from /budget and stores it on the
-// session. Cumulative spend is enforced by checkBudget before each
-// chat turn.
-func setBudget(sess *Session, out io.Writer, raw string) {
-	raw = strings.TrimPrefix(raw, "$")
-	if raw == "" || raw == "off" || raw == "0" {
-		sess.BudgetUSD = 0
-		fmt.Fprintln(out, "  ✓ budget cleared")
-		return
-	}
-	v, err := strconv.ParseFloat(raw, 64)
-	if err != nil || v < 0 {
-		fmt.Fprintf(out, "  ✗ /budget needs a non-negative USD number (e.g. /budget 0.50)\n")
-		return
-	}
-	sess.BudgetUSD = v
-	fmt.Fprintf(out, "  ✓ budget set to $%.4f for this session\n", v)
-}
-
 // signalAwareCtx returns a derived context that cancels on SIGINT so
 // Ctrl-C during a long agent call or `harness ci` aborts just that
 // turn instead of killing the whole REPL. Printing the carriage-
@@ -1019,26 +829,6 @@ func runBranch(ctx context.Context, sess *Session, opts Options, name string) {
 	}
 }
 
-// setSessionLabel tags the session with a human-readable alias so
-// `harness chat list` and exports show "shop-api-checkout" instead of
-// an opaque ulid. Refuses obviously broken inputs (slashes, dot
-// prefix) so it stays safe to interpolate into paths and CLI output.
-func setSessionLabel(sess *Session, out io.Writer, label string) {
-	if label == "" {
-		fmt.Fprintln(out, "  ✗ /save needs a name (try /save my-feature)")
-		return
-	}
-	if strings.ContainsAny(label, "/\\\n\t") || strings.HasPrefix(label, ".") {
-		fmt.Fprintf(out, "  ✗ /save: %q contains an unsupported character\n", label)
-		return
-	}
-	if len(label) > 80 {
-		label = label[:80]
-	}
-	sess.Label = label
-	fmt.Fprintf(out, "  ✓ session labelled %q\n", label)
-}
-
 // recapSession asks the pinned adapter for a short summary of the
 // current session and prints the reply inline. Useful at the end of a
 // long chat to capture intent + decisions into the persistence layer.
@@ -1079,24 +869,6 @@ func buildRecapPrompt(sess *Session) string {
 		fmt.Fprintf(&b, "%d. [%s] %s\n", i+1, t.Action, truncateForContext(in, 200))
 	}
 	return b.String()
-}
-
-// checkBudget returns false when running another chat turn would push
-// cumulative spend over the configured cap. Prints why and refuses.
-func checkBudget(sess *Session, out io.Writer) bool {
-	if sess == nil || sess.BudgetUSD <= 0 {
-		return true
-	}
-	var spent float64
-	for _, t := range sess.Turns {
-		spent += t.CostUSD
-	}
-	if spent >= sess.BudgetUSD {
-		fmt.Fprintf(out, "  ✗ budget exhausted: $%.4f spent of $%.4f cap. /budget off to reset.\n",
-			spent, sess.BudgetUSD)
-		return false
-	}
-	return true
 }
 
 func executePlan(ctx context.Context, sess *Session, opts Options, prompt string, turn *Turn) {
@@ -1417,13 +1189,6 @@ func inKnownGoals(g intentplan.Goal) bool {
 	return false
 }
 
-func greet(out io.Writer, s Session) {
-	fmt.Fprintf(out, "harness chat — session %s, goal=%s\n", s.ID, s.Goal)
-	fmt.Fprintln(out, `plain text → talk to agent · /exec → plan+run · !<cmd> → shell · /help · /exit`)
-	fmt.Fprintln(out, ui.Muted.Render(`multi-line: end line with \  ·  or wrap with """ … """  ·  / lists slashes`))
-	fmt.Fprintln(out)
-}
-
 func printHelp(out io.Writer) {
 	fmt.Fprintln(out, "commands:")
 	fmt.Fprintln(out, "  plain text                     chat with pinned agent (streams)")
@@ -1458,30 +1223,6 @@ func printHelp(out io.Writer) {
 	fmt.Fprintln(out, "  /help                          this message")
 	fmt.Fprintln(out, "  /exit | /quit                  leave the session")
 	fmt.Fprintln(out, "  end a line with \\ to continue prompt on next line")
-}
-
-// printTimeline renders an at-a-glance ASCII view of every turn in
-// the session: clock, action label, truncated input, and cost in
-// USD. Designed for the "what happened today?" lookback after a long
-// chat. Cumulative cost is printed at the foot for a one-line sanity
-// check.
-func printTimeline(out io.Writer, sess *Session) {
-	if sess == nil || len(sess.Turns) == 0 {
-		fmt.Fprintln(out, "  no turns yet")
-		return
-	}
-	var total float64
-	for i, t := range sess.Turns {
-		clock := t.Time.Local().Format("15:04:05")
-		input := truncateForContext(t.Input, 60)
-		cost := ""
-		if t.CostUSD > 0 {
-			cost = fmt.Sprintf("  $%.4f", t.CostUSD)
-			total += t.CostUSD
-		}
-		fmt.Fprintf(out, "  %3d  %s  [%-15s] %s%s\n", i+1, clock, t.Action, input, cost)
-	}
-	fmt.Fprintf(out, "\n  total: %d turns, ~$%.4f\n", len(sess.Turns), total)
 }
 
 var knownSlashes = []string{
@@ -1541,42 +1282,6 @@ func commonPrefixLen(a, b string) int {
 		}
 	}
 	return n
-}
-
-func summariseSession(out io.Writer, sess *Session) {
-	if sess == nil || len(sess.Turns) == 0 {
-		return
-	}
-	totals := aggregateCost(sess.Turns)
-	fmt.Fprintln(out, ui.Heading.Render("session recap"))
-	fmt.Fprintf(out, "  %s id     %s\n", ui.Muted.Render("·"), ui.Accent.Render(sess.ID))
-	if sess.Label != "" {
-		fmt.Fprintf(out, "  %s label  %s\n", ui.Muted.Render("·"), ui.Accent.Render(sess.Label))
-	}
-	fmt.Fprintf(out, "  %s goal   %s\n", ui.Muted.Render("·"), string(sess.Goal))
-	fmt.Fprintf(out, "  %s turns  %d (chat=%d)\n", ui.Muted.Render("·"), len(sess.Turns), totals.ChatTurns)
-	fmt.Fprintf(out, "  %s tokens in=%d out=%d\n", ui.Muted.Render("·"), totals.Total.InTokens, totals.Total.OutTokens)
-	fmt.Fprintf(out, "  %s cost   %s\n", ui.Muted.Render("·"),
-		ui.Success.Render(fmt.Sprintf("$%.4f", totals.Total.CostUSD)))
-}
-
-// adapterBillingMode tells the user whether the adapter is going to
-// charge against their API key (oneshot CLI: claude --print, codex
-// exec, gemini -p) or against a logged-in plan/subscription
-// (interactive CLI: claude-interactive, kimi chat). The distinction
-// matters because oneshot calls show up on a separate invoice while
-// interactive ones drain the user's chat-mode token quota.
-func adapterBillingMode(id string) string {
-	switch id {
-	case "claude", "codex", "gemini", "anthropic-api", "openai-api",
-		"gemini-api", "moonshot-api", "minimax-api":
-		return "oneshot · API-billed"
-	case "claude-interactive", "kimi", "ollama":
-		return "interactive · plan/local"
-	case "fake":
-		return "fake · free"
-	}
-	return "unknown billing"
 }
 
 func printSlashMenu(out io.Writer) {
@@ -1653,228 +1358,4 @@ func padRight(s string, w int) string {
 		return s
 	}
 	return s + strings.Repeat(" ", w-len(s))
-}
-
-func printAgents(opts Options) {
-	if len(opts.AdaptersList) == 0 {
-		fmt.Fprintln(opts.Out, "no adapters registered (run 'harness agent list' for details)")
-		return
-	}
-	fmt.Fprintf(opts.Out, "active: %s\n", opts.AdapterID)
-	for _, id := range opts.AdaptersList {
-		marker := "  "
-		if id == opts.AdapterID {
-			marker = "→ "
-		}
-		fmt.Fprintf(opts.Out, "%s%s\n", marker, id)
-	}
-}
-
-func printCost(out io.Writer, sess *Session) {
-	if sess == nil || len(sess.Turns) == 0 {
-		fmt.Fprintln(out, "no agent turns yet")
-		return
-	}
-	totals := aggregateCost(sess.Turns)
-	renderCostReport(out, sess.ID, totals)
-}
-
-type costRow struct {
-	AdapterID string
-	Task      string
-	Turns     int
-	InTokens  int
-	OutTokens int
-	CostUSD   float64
-}
-
-type costTotals struct {
-	ChatTurns int
-	Total     costRow
-	PerAgent  []costRow
-}
-
-func aggregateCost(turns []Turn) costTotals {
-	byKey := map[string]*costRow{}
-	keys := []string{}
-	total := costRow{AdapterID: "TOTAL"}
-	chatTurns := 0
-	for _, t := range turns {
-		if t.Action == "chat" {
-			chatTurns++
-		}
-		if t.InTokens == 0 && t.OutTokens == 0 && t.CostUSD == 0 {
-			continue
-		}
-		id := t.AdapterID
-		if id == "" {
-			id = "unknown"
-		}
-		key := id + "|" + t.TaskTag
-		row, ok := byKey[key]
-		if !ok {
-			row = &costRow{AdapterID: id, Task: t.TaskTag}
-			byKey[key] = row
-			keys = append(keys, key)
-		}
-		row.Turns++
-		row.InTokens += t.InTokens
-		row.OutTokens += t.OutTokens
-		row.CostUSD += t.CostUSD
-		total.Turns++
-		total.InTokens += t.InTokens
-		total.OutTokens += t.OutTokens
-		total.CostUSD += t.CostUSD
-	}
-	rows := make([]costRow, 0, len(keys))
-	for _, k := range keys {
-		rows = append(rows, *byKey[k])
-	}
-	sort.SliceStable(rows, func(i, j int) bool { return rows[i].CostUSD > rows[j].CostUSD })
-	return costTotals{ChatTurns: chatTurns, Total: total, PerAgent: rows}
-}
-
-func renderCostReport(out io.Writer, sessionID string, t costTotals) {
-	fmt.Fprintf(out, "session %s: %d chat turns\n", sessionID, t.ChatTurns)
-	if len(t.PerAgent) == 0 {
-		fmt.Fprintln(out, "  (no recorded usage)")
-		return
-	}
-	fmt.Fprintf(out, "  %-12s %-16s %5s %8s %8s %10s\n", "ADAPTER", "TASK", "TURNS", "IN", "OUT", "COST")
-	for _, r := range t.PerAgent {
-		task := r.Task
-		if task == "" {
-			task = "-"
-		}
-		fmt.Fprintf(out, "  %-12s %-16s %5d %8d %8d $%9.4f\n",
-			r.AdapterID, task, r.Turns, r.InTokens, r.OutTokens, r.CostUSD)
-	}
-	fmt.Fprintln(out, "  "+strings.Repeat("─", 64))
-	fmt.Fprintf(out, "  %-12s %-16s %5d %8d %8d $%9.4f\n",
-		"TOTAL", "", t.Total.Turns, t.Total.InTokens, t.Total.OutTokens, t.Total.CostUSD)
-}
-
-func printHistory(out io.Writer, sess *Session) {
-	if sess == nil || len(sess.Turns) == 0 {
-		fmt.Fprintln(out, "history empty")
-		return
-	}
-	start := 0
-	if len(sess.Turns) > 20 {
-		start = len(sess.Turns) - 20
-	}
-	for i := start; i < len(sess.Turns); i++ {
-		fmt.Fprintf(out, "%3d  %s\n", i+1, sess.Turns[i].Input)
-	}
-}
-
-func lastPromptInput(sess *Session) string {
-	if sess == nil {
-		return ""
-	}
-	for i := len(sess.Turns) - 1; i >= 0; i-- {
-		in := sess.Turns[i].Input
-		if in == "" || strings.HasPrefix(in, "/") {
-			continue
-		}
-		return in
-	}
-	return ""
-}
-
-func sessionPath(root, id string) string {
-	return filepath.Join(root, ".harness", "sessions", id+".jsonl")
-}
-
-func sessionMetaPath(root, id string) string {
-	return filepath.Join(root, ".harness", "sessions", id+".meta.json")
-}
-
-// sessionMeta carries the Session fields that do not fit in the
-// per-turn JSONL stream. Persisted as a sidecar alongside the JSONL so
-// older readers (which ignore it) keep working.
-type sessionMeta struct {
-	ID          string  `json:"id"`
-	Goal        string  `json:"goal"`
-	Label       string  `json:"label,omitempty"`
-	ContextMark int     `json:"context_mark,omitempty"`
-	AutoGate    bool    `json:"auto_gate,omitempty"`
-	BudgetUSD   float64 `json:"budget_usd,omitempty"`
-}
-
-func emitTurnJSON(w io.Writer, sessionID string, t Turn) {
-	envelope := struct {
-		Session   string    `json:"session"`
-		Time      time.Time `json:"time"`
-		Input     string    `json:"input"`
-		Action    string    `json:"action"`
-		Adapter   string    `json:"adapter_id,omitempty"`
-		TaskTag   string    `json:"task_tag,omitempty"`
-		InTokens  int       `json:"in_tokens,omitempty"`
-		OutTokens int       `json:"out_tokens,omitempty"`
-		CostUSD   float64   `json:"cost_usd,omitempty"`
-		Ok        *bool     `json:"ok,omitempty"`
-	}{
-		Session:   sessionID,
-		Time:      t.Time,
-		Input:     t.Input,
-		Action:    t.Action,
-		Adapter:   t.AdapterID,
-		TaskTag:   t.TaskTag,
-		InTokens:  t.InTokens,
-		OutTokens: t.OutTokens,
-		CostUSD:   t.CostUSD,
-	}
-	if t.Result != nil {
-		ok := t.Result.OK
-		envelope.Ok = &ok
-	}
-	b, err := json.Marshal(envelope)
-	if err != nil {
-		return
-	}
-	_, _ = w.Write(append(b, '\n'))
-}
-
-func persist(root string, s Session) error {
-	p := sessionPath(root, s.ID)
-	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
-		return err
-	}
-	f, err := os.Create(p)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	enc := json.NewEncoder(f)
-	for _, t := range s.Turns {
-		if err := enc.Encode(t); err != nil {
-			return err
-		}
-	}
-	meta := sessionMeta{
-		ID:          s.ID,
-		Goal:        string(s.Goal),
-		Label:       s.Label,
-		ContextMark: s.ContextMark,
-		AutoGate:    s.AutoGate,
-		BudgetUSD:   s.BudgetUSD,
-	}
-	body, err := json.MarshalIndent(meta, "", "  ")
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(sessionMetaPath(root, s.ID), body, 0o644)
-}
-
-func loadSessionMeta(root, id string) (sessionMeta, error) {
-	body, err := os.ReadFile(sessionMetaPath(root, id))
-	if err != nil {
-		return sessionMeta{}, err
-	}
-	var m sessionMeta
-	if err := json.Unmarshal(body, &m); err != nil {
-		return sessionMeta{}, err
-	}
-	return m, nil
 }
