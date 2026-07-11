@@ -11,7 +11,7 @@ import (
 	"github.com/ropeixoto/harnessx/internal/intentplan"
 )
 
-//nolint:gocognit,gocyclo // one slash-command dispatch table; splitting fragments break audit
+//nolint:gocyclo // one slash-command dispatch table; splitting fragments break audit
 func handleInput(ctx context.Context, sess *Session, opts *Options, input string) Turn {
 	turn := Turn{Time: time.Now().UTC(), Input: input}
 	if opts.Deterministic && callsLLM(input) {
