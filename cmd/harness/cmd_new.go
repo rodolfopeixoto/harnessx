@@ -3,25 +3,21 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"errors"
 	"fmt"
 	"io"
 	"os"
+	osexec "os/exec"
 	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
 
-	osexec "os/exec"
-
 	"github.com/ropeixoto/harnessx/internal/app/initcmd"
-	"github.com/ropeixoto/harnessx/internal/projectcfg"
 	"github.com/ropeixoto/harnessx/internal/scaffoldpkg"
 	"github.com/ropeixoto/harnessx/internal/scm"
 	"github.com/ropeixoto/harnessx/internal/ui"
-	"github.com/ropeixoto/harnessx/internal/venvinstall"
 )
 
 type newOptions struct {
@@ -225,58 +221,6 @@ func commitScaffoldBaseline(ctx context.Context, root string, out io.Writer) {
 	fmt.Fprintln(out, "new: scaffold committed as baseline (chore: scaffold baseline)")
 }
 
-func applyNewScaffold(abs string, opts *newOptions, out io.Writer) error {
-	m, err := scaffoldpkg.Load(opts.stack)
-	if err != nil {
-		return err
-	}
-	name := opts.name
-	if name == "" {
-		name = filepath.Base(abs)
-	}
-	res, err := scaffoldpkg.Apply(m, scaffoldpkg.ApplyOptions{Root: abs, Name: name})
-	if err != nil {
-		return err
-	}
-	fmt.Fprintf(out, "new: scaffold %s applied — %d files\n", opts.stack, len(res.Created))
-	cfg := projectcfg.FromMeta(m.Language, map[string]string{
-		"lint": m.LintCommand,
-		"test": m.TestCommand,
-		"run":  m.RunCommand,
-		"dev":  m.RunCommand,
-	})
-	if err := projectcfg.Save(abs, cfg); err != nil {
-		fmt.Fprintf(out, "new: warning project.yaml: %v\n", err)
-	}
-	if opts.withDeps {
-		runPostStepsInDir(out, abs, m)
-	}
-	return nil
-}
-
-func runPostStepsInDir(out io.Writer, root string, m scaffoldpkg.Meta) {
-	if m.Language == "python" || m.Language == "python-ecommerce" {
-		res, err := venvinstall.Install(context.Background(), root, "requirements.txt", out)
-		if err != nil {
-			fmt.Fprintf(out, "  ✗ venv install failed across every strategy: %v\n", err)
-			fmt.Fprintln(out, "    fix: install uv (https://docs.astral.sh/uv/) or python3.11/3.12/3.13 and rerun --with-deps")
-			return
-		}
-		fmt.Fprintf(out, "  ✓ deps installed via %s strategy\n", res.Strategy)
-		return
-	}
-	for _, step := range m.PostSteps {
-		fmt.Fprintf(out, "new: post-step %s — %v\n", step.Name, step.Cmd)
-		cmd := osexec.Command(step.Cmd[0], step.Cmd[1:]...)
-		cmd.Dir = root
-		cmd.Stdout = out
-		cmd.Stderr = out
-		if err := cmd.Run(); err != nil {
-			fmt.Fprintf(out, "  ✗ %s failed: %v\n", step.Name, err)
-		}
-	}
-}
-
 func installNewHooks(abs string, opts newOptions, out io.Writer) {
 	if !opts.withHooks {
 		return
@@ -286,41 +230,4 @@ func installNewHooks(abs string, opts newOptions, out io.Writer) {
 		return
 	}
 	fmt.Fprintf(out, "new: pre-push hook installed\n")
-}
-
-func promptChoice(in io.Reader, out io.Writer, label string, options []string) (string, error) {
-	fmt.Fprintf(out, "%s? (%s)\n> ", label, strings.Join(options, "|"))
-	r := bufio.NewReader(in)
-	line, err := r.ReadString('\n')
-	if err != nil && line == "" {
-		return "", err
-	}
-	line = strings.TrimSpace(line)
-	if !contains(options, line) {
-		return "", fmt.Errorf("invalid choice %q", line)
-	}
-	return line, nil
-}
-
-func promptString(in io.Reader, out io.Writer, label, fallback string) (string, error) {
-	fmt.Fprintf(out, "%s? [%s]\n> ", label, fallback)
-	r := bufio.NewReader(in)
-	line, err := r.ReadString('\n')
-	if err != nil && line == "" {
-		return "", err
-	}
-	line = strings.TrimSpace(line)
-	if line == "" {
-		return fallback, nil
-	}
-	return line, nil
-}
-
-func contains(s []string, v string) bool {
-	for _, x := range s {
-		if x == v {
-			return true
-		}
-	}
-	return false
 }

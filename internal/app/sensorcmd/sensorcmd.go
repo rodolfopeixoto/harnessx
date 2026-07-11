@@ -9,18 +9,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
 
-	"github.com/ropeixoto/harnessx/internal/adapters/logger"
-	"github.com/ropeixoto/harnessx/internal/adapters/sqlite"
-	"github.com/ropeixoto/harnessx/internal/domain"
 	"github.com/ropeixoto/harnessx/internal/index"
 	"github.com/ropeixoto/harnessx/internal/platform/config"
-	"github.com/ropeixoto/harnessx/internal/platform/ids"
 	"github.com/ropeixoto/harnessx/internal/platform/paths"
 	"github.com/ropeixoto/harnessx/internal/sensors"
 )
@@ -87,12 +81,6 @@ type RunOptions struct {
 	InstallMissing bool
 }
 
-var installableBySensorID = map[string]string{
-	"py_bandit":    "bandit",
-	"py_mypy":      "mypy",
-	"py_pip_audit": "pip-audit",
-}
-
 // slowSensorIDs is the denylist consulted when Fast is true.
 var slowSensorIDs = map[string]bool{
 	"secrets_scan": true,
@@ -125,38 +113,12 @@ func Run(ctx context.Context, opts RunOptions, out io.Writer) ([]sensors.Result,
 		}
 	}
 
-	// Open DB + logger if .harness/ initialised.
-	var repo *sqlite.Repo
-	var lg *logger.JSONL
-	var sess domain.Session
-	var run domain.Run
-	hasDB := false
-	if _, err := os.Stat(rc.dbPath); err == nil {
-		repo, err = sqlite.Open(rc.dbPath)
-		if err == nil {
-			hasDB = true
-			defer repo.Close()
-			lg, _ = logger.Open(rc.logPath, rc.cfg.Logging.RotateMaxBytes)
-			if lg != nil {
-				defer lg.Close()
-			}
-			now := time.Now().UTC()
-			sess = domain.Session{
-				ID: ids.New(), ProjectPath: rc.root, Mode: domain.ModeAudit,
-				Status: domain.StatusRunning, StartedAt: now,
-			}
-			run = domain.Run{
-				ID: ids.New(), SessionID: sess.ID, Stage: domain.StageSensors,
-				Status: domain.StatusRunning, StartedAt: now,
-			}
-			_ = repo.CreateSession(ctx, sess)
-			_ = repo.CreateRun(ctx, run)
-		}
-	}
+	st := openSessionState(ctx, rc)
+	defer st.close()
 
 	rcOut := filepath.Join(rc.root, ".harness", "artifacts", "sensors")
-	if hasDB {
-		rcOut = filepath.Join(rcOut, run.ID)
+	if st.hasDB {
+		rcOut = filepath.Join(rcOut, st.run.ID)
 	}
 	runner := &sensors.Runner{
 		OnResult: func(res sensors.Result) {
@@ -167,16 +129,7 @@ func Run(ctx context.Context, opts RunOptions, out io.Writer) ([]sensors.Result,
 				}
 				fmt.Fprintf(out, "  [%s] %-22s %s %s%s\n", icon(res.Status), res.ID, res.Duration.Round(time.Millisecond), detail(res), conf)
 			}
-			if hasDB {
-				_ = repo.WriteSensorResult(ctx, run.ID, res.ID, string(res.Status), res.Duration.Milliseconds(), res.OutputPath, time.Now().UTC())
-				if lg != nil {
-					_ = lg.Write("info", map[string]any{
-						"stage": "sensor", "session_id": sess.ID, "run_id": run.ID,
-						"sensor": res.ID, "status": string(res.Status),
-						"duration_ms": res.Duration.Milliseconds(),
-					})
-				}
-			}
+			st.recordResult(ctx, res)
 		},
 	}
 	results := runner.Run(ctx, selected, sensors.RunCtx{Root: rc.root, OutputDir: rcOut})
@@ -195,105 +148,10 @@ func Run(ctx context.Context, opts RunOptions, out io.Writer) ([]sensors.Result,
 		}
 	}
 
-	if hasDB {
-		end := time.Now().UTC()
-		status := domain.StatusSucceeded
-		if sum.Failed > 0 {
-			status = domain.StatusFailed
-		}
-		_ = repo.FinishRun(ctx, run.ID, status, end, ifFail(sum.Failed > 0))
-		_ = repo.FinishSession(ctx, sess.ID, status, end)
-	}
+	st.finish(ctx, sum.Failed > 0)
 
 	if opts.FailOnError && sum.Failed > 0 {
 		return results, errors.New("one or more sensors failed")
 	}
 	return results, nil
-}
-
-func filterByIDs(in []sensors.Sensor, ids []string) []sensors.Sensor {
-	if len(ids) == 0 {
-		return in
-	}
-	want := map[string]bool{}
-	for _, id := range ids {
-		want[id] = true
-	}
-	var out []sensors.Sensor
-	for _, s := range in {
-		if want[s.ID()] {
-			out = append(out, s)
-		}
-	}
-	return out
-}
-
-func icon(s sensors.Status) string {
-	switch s {
-	case sensors.StatusPassed:
-		return "✓"
-	case sensors.StatusFailed:
-		return "✗"
-	default:
-		return "·"
-	}
-}
-
-func detail(res sensors.Result) string {
-	if res.Detail == "" {
-		return ""
-	}
-	return "— " + res.Detail
-}
-
-func ifFail(b bool) int {
-	if b {
-		return 1
-	}
-	return 0
-}
-
-func missingInstallables(results []sensors.Result) []string {
-	seen := map[string]bool{}
-	var out []string
-	for _, r := range results {
-		pkg, ok := installableBySensorID[r.ID]
-		if !ok {
-			continue
-		}
-		if !strings.HasPrefix(r.Detail, "binary not on PATH") {
-			continue
-		}
-		if seen[pkg] {
-			continue
-		}
-		seen[pkg] = true
-		out = append(out, pkg)
-	}
-	return out
-}
-
-func installPythonTools(ctx context.Context, root string, pkgs []string, out io.Writer) error {
-	venvPython := filepath.Join(root, ".venv", "bin", "python")
-	if _, err := os.Stat(venvPython); err != nil {
-		return fmt.Errorf(".venv missing — run `harness new <stack> --with-deps` or `uv venv .venv && uv pip install -r requirements.txt`")
-	}
-	fmt.Fprintf(out, "  → installing into .venv: %s\n", strings.Join(pkgs, " "))
-	args := append([]string{"pip", "install", "--python", venvPython}, pkgs...)
-	cmd := exec.CommandContext(ctx, "uv", args...)
-	cmd.Dir = root
-	cmd.Stdout = out
-	cmd.Stderr = out
-	if err := cmd.Run(); err == nil {
-		return nil
-	}
-	pipArgs := append([]string{"-m", "pip", "install"}, pkgs...)
-	pipCmd := exec.CommandContext(ctx, venvPython, pipArgs...)
-	pipCmd.Dir = root
-	pipCmd.Stdout = out
-	pipCmd.Stderr = out
-	if err := pipCmd.Run(); err != nil {
-		return fmt.Errorf("install failed via uv and pip: %w", err)
-	}
-	return nil
 }
