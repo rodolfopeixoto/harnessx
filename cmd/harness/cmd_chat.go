@@ -176,7 +176,9 @@ the deterministic planner.`,
 				opts.Route = func(task string) (agents.AgentAdapter, string, error) {
 					dec, err := rtr.Select(task)
 					if err != nil || len(dec.Chain) == 0 {
-						return adapter, adapterID, nil
+						// No routing decision: caller keeps the currently
+						// pinned adapter (whatever /use last selected).
+						return nil, "", nil
 					}
 					return dec.Chain[0], dec.Chain[0].ID(), nil
 				}

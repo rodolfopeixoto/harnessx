@@ -62,6 +62,25 @@ func (p *Probe) Start(ctx context.Context) {
 	go p.loop(cctx)
 }
 
+// Swap retargets the probe at a new adapter, preserving lifecycle state.
+// Used when the chat session swaps the pinned adapter mid-session
+// (/use or /cycle) — without this the prompt badge would keep showing
+// the old adapter id forever.
+func (p *Probe) Swap(adapter agents.AgentAdapter) {
+	if p == nil || adapter == nil {
+		return
+	}
+	p.mu.Lock()
+	p.adapter = adapter
+	p.id = adapter.ID()
+	p.current = Status{AgentID: p.id}
+	p.mu.Unlock()
+	if p.running.Load() {
+		ctx := context.Background()
+		p.runOnce(ctx)
+	}
+}
+
 func (p *Probe) Stop() {
 	if p == nil {
 		return
@@ -102,8 +121,19 @@ func (p *Probe) loop(ctx context.Context) {
 func (p *Probe) runOnce(ctx context.Context) {
 	cctx, cancel := context.WithTimeout(ctx, p.tick/2)
 	defer cancel()
-	res := p.adapter.Healthcheck(cctx)
+	p.mu.RLock()
+	adapter := p.adapter
+	id := p.id
+	p.mu.RUnlock()
+	if adapter == nil {
+		return
+	}
+	res := adapter.Healthcheck(cctx)
 	p.mu.Lock()
+	if p.id != id {
+		p.mu.Unlock()
+		return
+	}
 	p.current = Status{
 		AgentID:    p.id,
 		OK:         res.OK,

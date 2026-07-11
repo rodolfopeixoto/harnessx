@@ -130,6 +130,24 @@ func TestNilProbeMethodsSafe(t *testing.T) {
 	}
 }
 
+func TestProbeSwapRetargetsAdapter(t *testing.T) {
+	a := &fakeAdapter{id: "ollama"}
+	a.Flip(true, "")
+	p := New(a, 20*time.Millisecond)
+	p.Start(context.Background())
+	defer p.Stop()
+	time.Sleep(40 * time.Millisecond)
+	if id := p.Snapshot().AgentID; id != "ollama" {
+		t.Fatalf("pre-swap snapshot id = %q want ollama", id)
+	}
+	b := &fakeAdapter{id: "kimi"}
+	b.Flip(true, "")
+	p.Swap(b)
+	if id := p.Snapshot().AgentID; id != "kimi" {
+		t.Fatalf("post-swap snapshot id = %q want kimi", id)
+	}
+}
+
 func TestBadgePlainAndColored(t *testing.T) {
 	plain := Badge(Status{AgentID: "claude", OK: true}, true)
 	if plain != "|claude ok" {
