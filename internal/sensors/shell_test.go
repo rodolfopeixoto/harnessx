@@ -74,6 +74,54 @@ func TestShellSensorSurfacesStderrFirstLine(t *testing.T) {
 	}
 }
 
+func TestShellSensorIDCategoryKindGetters(t *testing.T) {
+	t.Parallel()
+	s := ShellSensor{IDValue: "my_id", CategoryV: CatLint, KindV: KindComputational}
+	if got := s.ID(); got != "my_id" {
+		t.Errorf("ID: %q", got)
+	}
+	if got := s.Category(); got != CatLint {
+		t.Errorf("Category: %v", got)
+	}
+	if got := s.Kind(); got != KindComputational {
+		t.Errorf("Kind: %v", got)
+	}
+	_ = profileShim{names: []string{"go"}}.stackList()
+	empty := ShellSensor{IDValue: "y", CategoryV: CatTest}
+	if got := empty.Kind(); got != KindComputational {
+		t.Errorf("default Kind: %v", got)
+	}
+}
+
+func TestShellSensorAppliesToStackMatching(t *testing.T) {
+	t.Parallel()
+	if !(ShellSensor{}).AppliesTo(profileShim{names: nil}) {
+		t.Error("empty stacks must apply universally")
+	}
+	if !(ShellSensor{Stacks: []string{"python"}}).AppliesTo(profileShim{names: []string{"python", "go"}}) {
+		t.Error("should apply when stack matches")
+	}
+	if (ShellSensor{Stacks: []string{"ruby"}}).AppliesTo(profileShim{names: []string{"python"}}) {
+		t.Error("must not apply when no stack match")
+	}
+}
+
+func TestShellSensorMissingBinaryOptionalSkipsRequiredFails(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	failLookup := func(string) (string, error) { return "", os.ErrNotExist }
+	req := ShellSensor{IDValue: "req", Binary: "no-such-tool", Lookup: failLookup}
+	res := req.Run(RunCtx{Ctx: context.Background(), Root: dir})
+	if res.Status != StatusFailed {
+		t.Errorf("required missing tool must fail, got %s", res.Status)
+	}
+	opt := ShellSensor{IDValue: "opt", Binary: "no-such-tool", OptionalTool: true, Lookup: failLookup}
+	res2 := opt.Run(RunCtx{Ctx: context.Background(), Root: dir})
+	if res2.Status != StatusSkipped {
+		t.Errorf("optional missing tool must skip, got %s", res2.Status)
+	}
+}
+
 func TestFirstNonEmptyLine(t *testing.T) {
 	cases := []struct {
 		in, want string

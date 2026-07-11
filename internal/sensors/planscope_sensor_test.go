@@ -3,6 +3,7 @@ package sensors
 import (
 	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 
@@ -95,6 +96,65 @@ func TestPlanScopeSensorPassesInScope(t *testing.T) {
 	r := s.Run(RunCtx{Ctx: context.Background(), Root: dir})
 	if r.Status != StatusFailed {
 		t.Errorf("dirty repo with no manifest will fail (git not init); got %v", r.Status)
+	}
+}
+
+func TestPlanScopeSensorRunFailsWhenPlanMissing(t *testing.T) {
+	dir := t.TempDir()
+	s := PlanScopeSensor{IDValue: "plan_scope", PlanID: "does-not-exist"}
+	r := s.Run(RunCtx{Ctx: context.Background(), Root: dir})
+	if r.Status != StatusFailed {
+		t.Errorf("expected failure when plan missing, got %v", r.Status)
+	}
+	if r.Detail == "" {
+		t.Errorf("expected failure detail")
+	}
+	if r.Duration <= 0 {
+		t.Errorf("duration should be > 0")
+	}
+}
+
+func TestPlanScopeSensorMetadataGetters(t *testing.T) {
+	t.Parallel()
+	s := PlanScopeSensor{IDValue: "plan_scope", PlanID: "x"}
+	if s.ID() != "plan_scope" {
+		t.Errorf("ID: %q", s.ID())
+	}
+	if s.Category() != CatSpec {
+		t.Errorf("Category: %v", s.Category())
+	}
+	if s.Kind() != KindComputational {
+		t.Errorf("Kind: %v", s.Kind())
+	}
+}
+
+// TestPlanScopeSensorPassesCleanWorkingCopy inits a real git repo whose
+// only changed files live under `.harness/` — always-allowed — so
+// planscope returns zero violations and Run yields StatusPassed.
+func TestPlanScopeSensorPassesCleanWorkingCopy(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not on PATH")
+	}
+	dir := t.TempDir()
+	writePlan(t, dir, "clean", samplePlan)
+	for _, args := range [][]string{
+		{"init", "-q"},
+		{"config", "user.email", "x@y"},
+		{"config", "user.name", "x"},
+	} {
+		cmd := exec.Command("git", args...)
+		cmd.Dir = dir
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v %s", args, err, out)
+		}
+	}
+	s := PlanScopeSensor{IDValue: "plan_scope", PlanID: "clean"}
+	r := s.Run(RunCtx{Ctx: context.Background(), Root: dir})
+	if r.Status != StatusPassed {
+		t.Fatalf("want passed, got %v detail=%q", r.Status, r.Detail)
+	}
+	if r.Confidence != 1.0 {
+		t.Errorf("confidence: %v", r.Confidence)
 	}
 }
 

@@ -70,3 +70,39 @@ func TestEnrichRelevantFiles_PopulatesBytesAndHash(t *testing.T) {
 type dummyEstimator struct{}
 
 func (dummyEstimator) Estimate(s string) int { return len(s) }
+
+func TestWriteCache_AtomicRenameOverwritesExisting(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	target := filepath.Join(dir, "pack.json")
+	require.NoError(t, os.WriteFile(target, []byte(`{"stale":true}`), 0o644))
+	p := &Pack{Task: "hello", Hash: "abc"}
+	require.NoError(t, writeCache(target, p))
+	_, err := os.Stat(target + ".tmp")
+	require.True(t, os.IsNotExist(err), "tmp file must not linger")
+	b, err := os.ReadFile(target)
+	require.NoError(t, err)
+	require.Contains(t, string(b), "\"hello\"")
+	require.Contains(t, string(b), "\"abc\"")
+}
+
+func TestWriteCache_FailsOnUnwritableDir(t *testing.T) {
+	t.Parallel()
+	err := writeCache(filepath.Join(t.TempDir(), "nope", "sub", "x.json"), &Pack{})
+	require.Error(t, err)
+}
+
+func TestReadCache_MissingReturnsFalse(t *testing.T) {
+	t.Parallel()
+	_, ok := readCache(filepath.Join(t.TempDir(), "absent.json"))
+	require.False(t, ok)
+}
+
+func TestReadCache_MalformedReturnsFalse(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	p := filepath.Join(dir, "bad.json")
+	require.NoError(t, os.WriteFile(p, []byte("{not json"), 0o644))
+	_, ok := readCache(p)
+	require.False(t, ok)
+}
