@@ -70,7 +70,7 @@ func Scan(root string, opts Opts) ([]Violation, error) {
 
 func skipDir(name string) bool {
 	switch name {
-	case "vendor", "node_modules", ".git", "dist", "bin":
+	case "vendor", "node_modules", ".git", "dist", "bin", ".claude":
 		return true
 	}
 	return false
