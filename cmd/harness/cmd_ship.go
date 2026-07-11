@@ -3,14 +3,11 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -277,76 +274,4 @@ func shipCommit(ctx context.Context, out io.Writer, root string, opts shipOption
 		body += "\nPlan: " + opts.planID
 	}
 	return runGit(ctx, root, "commit", "-m", subject, "-m", body)
-}
-
-func runHarness(ctx context.Context, bin, root string, out io.Writer, args []string) error {
-	cmd := exec.CommandContext(ctx, bin, args...)
-	cmd.Dir = root
-	cmd.Env = append(os.Environ(), "HARNESS_PLAIN=1", "NO_COLOR=1")
-	var stderr bytes.Buffer
-	cmd.Stdout = out
-	cmd.Stderr = io.MultiWriter(out, &stderr)
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("%w: %s", err, stderr.String())
-	}
-	return nil
-}
-
-func runGit(ctx context.Context, root string, args ...string) error {
-	cmd := exec.CommandContext(ctx, "git", args...)
-	cmd.Dir = root
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("git %s: %v: %s", strings.Join(args, " "), err, string(out))
-	}
-	return nil
-}
-
-func gitDirty(ctx context.Context, root string) (bool, error) {
-	cmd := exec.CommandContext(ctx, "git", "status", "--porcelain")
-	cmd.Dir = root
-	out, err := cmd.Output()
-	if err != nil {
-		return false, fmt.Errorf("git status: %w", err)
-	}
-	return len(bytes.TrimSpace(out)) > 0, nil
-}
-
-var rateLimitRe = regexp.MustCompile(`(?i)(429|rate[\s_-]?limit|too many requests|quota.*exceed)`)
-
-func isRateLimit(s string) bool { return rateLimitRe.MatchString(s) }
-
-var slugRe = regexp.MustCompile(`[^a-z0-9]+`)
-
-func slugify(s string) string {
-	s = strings.ToLower(strings.TrimSpace(s))
-	s = slugRe.ReplaceAllString(s, "-")
-	s = strings.Trim(s, "-")
-	if len(s) > 50 {
-		s = s[:50]
-		s = strings.Trim(s, "-")
-	}
-	if s == "" {
-		s = "change"
-	}
-	return s
-}
-
-func conventionalSubject(prefix, prompt string) string {
-	conv := "feat"
-	switch prefix {
-	case "fix", "hotfix":
-		conv = "fix"
-	case "chore":
-		conv = "chore"
-	case "refactor":
-		conv = "refactor"
-	case "docs":
-		conv = "docs"
-	}
-	short := strings.TrimSpace(prompt)
-	if len(short) > 50-len(conv)-2 {
-		short = short[:50-len(conv)-2]
-	}
-	return fmt.Sprintf("%s: %s", conv, short)
 }
