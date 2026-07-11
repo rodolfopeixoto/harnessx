@@ -12,6 +12,12 @@ if [[ "${HARNESS_SKIP_PRECOMMIT:-}" == "1" ]]; then
   exit 0
 fi
 
+# Private-material guardrail runs first — cheap check, protects the
+# open-source boundary from personal marketing / YouTube channel notes.
+if [[ -x scripts/git-hooks/pre-commit-privatecheck.sh ]]; then
+  scripts/git-hooks/pre-commit-privatecheck.sh
+fi
+
 staged="$(git diff --cached --name-only --diff-filter=ACMR -- '*.go' || true)"
 if [[ -z "$staged" ]]; then
   exit 0

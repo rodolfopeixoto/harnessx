@@ -23,3 +23,15 @@ harness.exe
 .harness/audit-status.json
 .harness/audit-status.json.tmp
 .harness/project/
+
+# Personal / non-open-source material — never commit.
+# Rodolfo's YouTube / marketing notes live outside the repo; backup at
+# ~/harnessx-notes/. See scripts/git-hooks/pre-commit-privatecheck.sh.
+docs/youtube/
+docs/marketing/
+docs/canal/
+docs/roteiros/
+.claude/
+.harness/config/active.yaml
+.harness/runs/
+.harness/sessions/

@@ -127,6 +127,34 @@ chore(deps): bump charmbracelet/bubbletea
 
 Subject ≤ 50 chars. Body wraps at 72.
 
+<!-- privatecheck: allow — this section legitimately quotes the guardrail's blocklist. -->
+## Open-source boundary — no personal material
+
+harnessx is a public MIT-licensed project. Personal marketing material
+(YouTube channel scripts, thumb briefs, SEO plans, growth playbooks,
+brand/title matrices, roteiros de canal) has no place in the repo.
+
+The `pre-commit-privatecheck.sh` guardrail (installed by
+`scripts/install-hooks.sh`) blocks any commit that stages:
+
+- files under `docs/youtube/`, `docs/marketing/`, `docs/canal/`,
+  `docs/roteiros/`
+- files whose names match `*THUMB*`, `*SHORTS*`, `*ENGAGEMENT-GROWTH*`,
+  `*BRAND-*MATRIX*`, `*SEO-RETENCAO*`, `*PLAYLISTS-GROWTH*`,
+  `SERIE-DENTRO-DO-HARNESSX`, `SERIE-PAPERS-NA-PRATICA`
+- files whose contents contain marketing keywords such as
+  `CTR ≥`, `AVD ≥`, `Subs 30d`, `thumb brief`, `Shorts factory`,
+  `canal do YouTube`
+
+If you must commit something the guardrail flags (e.g. a genuine doc
+that legitimately mentions one of those strings), audit-bypass with:
+
+```
+HARNESS_ALLOW_PRIVATE=1 git commit ...
+```
+
+Reviewers will ask why on the PR.
+
 ## Code rules (non-negotiable)
 
 **Constants** — every magic value lives in
